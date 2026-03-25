@@ -648,6 +648,45 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
     <!-- BACKUP -->
     <div class="page" id="page-backup">
       <div class="page-header"><div class="page-title">💾 النسخ <span>الاحتياطي</span></div></div>
+
+      <!-- ══ GitHub Sync Setup Card ══ -->
+      <div class="table-container" style="margin-bottom:20px;border-color:var(--accent)">
+        <div class="table-header" style="background:rgba(0,212,255,0.05)">
+          <div class="table-title" style="color:var(--accent)">☁️ مزامنة GitHub — حفظ البيانات على أي جهاز</div>
+          <div id="ghSyncStatus" style="font-size:0.82rem"></div>
+        </div>
+        <div style="padding:18px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div class="form-group" style="margin:0">
+              <label style="font-size:0.82rem;color:var(--text2);display:block;margin-bottom:6px">🔑 GitHub Token (ghp_...)</label>
+              <input id="ghToken" type="password" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:Cairo,sans-serif;font-size:0.85rem;outline:none"
+                oninput="saveGhSettings()">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label style="font-size:0.82rem;color:var(--text2);display:block;margin-bottom:6px">📋 Gist ID (اتركه فارغاً للإنشاء أول مرة)</label>
+              <input id="ghGistId" placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:Cairo,sans-serif;font-size:0.85rem;outline:none"
+                oninput="saveGhSettings()">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-accent" onclick="ghPush()">☁️ رفع البيانات الآن</button>
+            <button class="btn btn-outline" onclick="ghPull()">📥 تحميل من GitHub</button>
+            <button class="btn btn-outline" style="color:var(--green);border-color:var(--green)" onclick="toggleAutoSync()">
+              <span id="autoSyncLabel">⚡ تفعيل المزامنة التلقائية</span>
+            </button>
+            <span id="ghLastSync" style="font-size:0.78rem;color:var(--text2);margin-right:auto"></span>
+          </div>
+          <div style="margin-top:12px;padding:10px 14px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:8px;font-size:0.78rem;color:var(--text2);line-height:1.7">
+            📌 <strong>خطوات الإعداد:</strong>
+            اذهب لـ <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--accent)">github.com/settings/tokens</a> ←
+            اختر <em>Classic Token</em> ← فعّل صلاحية <code>gist</code> ← انسخ الـ Token هنا.
+            عند الضغط "رفع البيانات" أول مرة سيُنشئ Gist جديد ويحفظ الـ ID تلقائياً.
+          </div>
+        </div>
+      </div>
+
       <div class="alert alert-info" style="margin-bottom:16px">
         💡 <strong>ملاحظة:</strong> يتم حفظ كل العمليات تلقائياً في ذاكرة المتصفح. لحفظ السجل في مجلد <code>C:\Users\hp\Documents\DigiTronics</code> — اضغط "تصدير سجل العمليات" وانقل الملف للمجلد يدوياً، أو استخدم ملف <code>DigiTronics.bat</code> المرفق.
       </div>
@@ -3228,10 +3267,19 @@ function autoBackupCheck(){
   }
 }
 function renderBackupPage(){
+  loadGhSettings();
   const el=document.getElementById('autoBackupLog');
   if(!DB.autoBackups.length){el.innerHTML='لا يوجد سجل نسخ احتياطية بعد';return;}
   el.innerHTML=`<table class="data-table"><thead><tr><th>التاريخ</th><th>الحجم</th></tr></thead><tbody>${[...DB.autoBackups].reverse().map(b=>`<tr><td>${b.date}</td><td style="color:var(--text2)">${(b.size/1024).toFixed(1)} KB</td></tr>`).join('')}</tbody></table>`;
 }
+
+// Init auto-sync on load
+window.addEventListener('load', () => {
+  if (localStorage.getItem(GH_AUTOSYNC_KEY) === '1') {
+    autoSyncEnabled = true;
+    startAutoSync();
+  }
+});
 function resetAllData(){DB=defaultDB();localStorage.removeItem(KEY);saveDB();showToast('تم إعادة الضبط','error');setTimeout(()=>doLogout(),1000);}
 
 // ==================== MODALS ====================
@@ -3570,24 +3618,39 @@ echo [%date% %time%] DigiTronics launched >> "%DTDIR%\\launcher_log.txt"
 
 :: Move any downloaded log files to DigiTronics folder
 for %%f in ("%USERPROFILE%\\Downloads\\DigiTronics_Log_*.txt") do (
-  move "%%f" "%DTDIR%\\" >nul 2>&1
-  echo Moved %%~nxf to DigiTronics folder
+  if exist "%%f" ( copy "%%f" "%DTDIR%\\" >nul 2>&1 & del "%%f" >nul 2>&1 )
+)
+
+:: Move any downloaded backup files to Backups folder
+for %%f in ("%USERPROFILE%\\Downloads\\DigiTronics_Backup_*.json") do (
+  if exist "%%f" ( copy "%%f" "%DTDIR%\\Backups\\" >nul 2>&1 )
 )
 
 :: Open the HTML app
 set "FILE=%~dp0DigiTronics.html"
 if not exist "%FILE%" set "FILE=%~dp0DigiTronics_v5.html"
+
 if exist "%FILE%" (
   start "" "%FILE%"
+  timeout /t 2 >nul
 ) else (
   echo ERROR: DigiTronics.html not found!
   pause
+  exit
 )
 
 echo.
-echo DigiTronics folder: %DTDIR%
-echo Log files will be saved here automatically.
-timeout /t 3 >nul
+echo ====================================
+echo  DigiTronics Launcher
+echo ====================================
+echo  مجلد البيانات: %DTDIR%
+echo  مجلد النسخ الاحتياطية: %DTDIR%\\Backups
+echo.
+echo  لاستيراد بيانات قديمة:
+echo  افتح النظام ^> النسخ الاحتياطي ^> استعادة النسخة
+echo  ثم اختر ملف JSON من: %DTDIR%\\Backups
+echo ====================================
+timeout /t 5 >nul
 exit
 `;
   const blob = new Blob([bat], {type:'text/plain'});
@@ -3596,6 +3659,153 @@ exit
   a.download = 'DigiTronics.bat';
   a.click();
   showToast('تم تحميل DigiTronics.bat — ضعه مع ملف HTML','success');
+}
+
+// ==================== GITHUB GIST SYNC ====================
+const GH_TOKEN_KEY  = 'dgt_gh_token';
+const GH_GIST_KEY   = 'dgt_gh_gist';
+const GH_AUTOSYNC_KEY = 'dgt_gh_autosync';
+const GH_LASTSYNC_KEY = 'dgt_gh_lastsync';
+let autoSyncEnabled = false;
+let autoSyncTimer = null;
+
+function saveGhSettings() {
+  const token = document.getElementById('ghToken').value.trim();
+  const gist  = document.getElementById('ghGistId').value.trim();
+  if (token) localStorage.setItem(GH_TOKEN_KEY, token);
+  if (gist)  localStorage.setItem(GH_GIST_KEY, gist);
+}
+
+function loadGhSettings() {
+  const token = localStorage.getItem(GH_TOKEN_KEY) || '';
+  const gist  = localStorage.getItem(GH_GIST_KEY)  || '';
+  const el1 = document.getElementById('ghToken');
+  const el2 = document.getElementById('ghGistId');
+  if (el1) el1.value = token;
+  if (el2) el2.value = gist;
+  autoSyncEnabled = localStorage.getItem(GH_AUTOSYNC_KEY) === '1';
+  updateAutoSyncLabel();
+  const last = localStorage.getItem(GH_LASTSYNC_KEY);
+  const el3 = document.getElementById('ghLastSync');
+  if (el3 && last) el3.textContent = '⏱️ آخر مزامنة: ' + last;
+}
+
+function setGhSyncStatus(msg, color) {
+  const el = document.getElementById('ghSyncStatus');
+  if (el) { el.textContent = msg; el.style.color = color || 'var(--text2)'; }
+}
+
+async function ghPush() {
+  const token = localStorage.getItem(GH_TOKEN_KEY);
+  if (!token) { showToast('أدخل GitHub Token أولاً', 'error'); return; }
+  let gistId = localStorage.getItem(GH_GIST_KEY);
+  setGhSyncStatus('⏳ جاري الرفع...', 'var(--yellow)');
+  try {
+    const body = {
+      description: 'DigiTronics DB Sync',
+      public: false,
+      files: { 'digitronics_db.json': { content: JSON.stringify(DB) } }
+    };
+    let url = 'https://api.github.com/gists';
+    let method = 'POST';
+    if (gistId) { url += '/' + gistId; method = 'PATCH'; }
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!gistId) {
+      localStorage.setItem(GH_GIST_KEY, data.id);
+      const el = document.getElementById('ghGistId');
+      if (el) el.value = data.id;
+      showToast('✅ تم إنشاء Gist جديد وحفظ الـ ID', 'success');
+    } else {
+      showToast('☁️ تم رفع البيانات لـ GitHub', 'success');
+    }
+    const now = new Date().toLocaleString('ar-EG');
+    localStorage.setItem(GH_LASTSYNC_KEY, now);
+    const el3 = document.getElementById('ghLastSync');
+    if (el3) el3.textContent = '⏱️ آخر مزامنة: ' + now;
+    setGhSyncStatus('✅ مزامنة ناجحة', 'var(--green)');
+    logActivity('GitHub Sync', 'رفع بيانات ناجح');
+  } catch (e) {
+    setGhSyncStatus('❌ فشل الرفع: ' + e.message, 'var(--red)');
+    showToast('فشل الرفع: ' + e.message, 'error');
+  }
+}
+
+async function ghPull() {
+  const token  = localStorage.getItem(GH_TOKEN_KEY);
+  const gistId = localStorage.getItem(GH_GIST_KEY);
+  if (!token)  { showToast('أدخل GitHub Token أولاً', 'error'); return; }
+  if (!gistId) { showToast('أدخل Gist ID أولاً', 'error'); return; }
+  if (!confirm('سيتم استبدال البيانات الحالية ببيانات GitHub. هل تريد الاستمرار؟')) return;
+  setGhSyncStatus('⏳ جاري التحميل...', 'var(--yellow)');
+  try {
+    const res = await fetch('https://api.github.com/gists/' + gistId, {
+      headers: { Authorization: 'token ' + token }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const content = data.files['digitronics_db.json']?.content;
+    if (!content) throw new Error('الملف غير موجود في الـ Gist');
+    const parsed = JSON.parse(content);
+    Object.assign(DB, parsed);
+    saveDB();
+    const now = new Date().toLocaleString('ar-EG');
+    localStorage.setItem(GH_LASTSYNC_KEY, now);
+    const el3 = document.getElementById('ghLastSync');
+    if (el3) el3.textContent = '⏱️ آخر مزامنة: ' + now;
+    setGhSyncStatus('✅ تم تحميل البيانات', 'var(--green)');
+    showToast('📥 تم تحميل البيانات من GitHub ✅', 'success');
+    logActivity('GitHub Sync', 'تحميل بيانات ناجح');
+    setTimeout(() => location.reload(), 1200);
+  } catch (e) {
+    setGhSyncStatus('❌ فشل التحميل: ' + e.message, 'var(--red)');
+    showToast('فشل التحميل: ' + e.message, 'error');
+  }
+}
+
+function toggleAutoSync() {
+  autoSyncEnabled = !autoSyncEnabled;
+  localStorage.setItem(GH_AUTOSYNC_KEY, autoSyncEnabled ? '1' : '0');
+  updateAutoSyncLabel();
+  if (autoSyncEnabled) {
+    showToast('⚡ المزامنة التلقائية مفعّلة (كل 5 دقائق)', 'success');
+    startAutoSync();
+  } else {
+    clearInterval(autoSyncTimer);
+    showToast('المزامنة التلقائية متوقفة', 'info');
+  }
+}
+
+function updateAutoSyncLabel() {
+  const el = document.getElementById('autoSyncLabel');
+  if (!el) return;
+  el.textContent = autoSyncEnabled ? '⚡ إيقاف المزامنة التلقائية ✅' : '⚡ تفعيل المزامنة التلقائية';
+}
+
+function startAutoSync() {
+  clearInterval(autoSyncTimer);
+  if (autoSyncEnabled) {
+    autoSyncTimer = setInterval(() => {
+      if (localStorage.getItem(GH_TOKEN_KEY) && localStorage.getItem(GH_GIST_KEY)) ghPush();
+    }, 5 * 60 * 1000); // كل 5 دقائق
+  }
+}
+
+// Hook saveDB to push when auto-sync is on
+const _origSaveDB = saveDB;
+function saveDB() {
+  localStorage.setItem(KEY, JSON.stringify(DB));
+  autoBackupCheck();
+  if (autoSyncEnabled && localStorage.getItem(GH_TOKEN_KEY) && localStorage.getItem(GH_GIST_KEY)) {
+    // Debounce: wait 3s after last save then push
+    clearTimeout(saveDB._syncTimer);
+    saveDB._syncTimer = setTimeout(ghPush, 3000);
+  }
 }
 
 // ==================== UTILS ====================
