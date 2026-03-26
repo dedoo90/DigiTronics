@@ -49,39 +49,53 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:90;}
 @media(max-width:768px){
   .hamburger{display:block;}
-  .sidebar{transform:translateX(100%);}
+  .sidebar{transform:translateX(100%);width:82vw;max-width:280px;}
   .sidebar.open{transform:translateX(0);}
   .overlay.show{display:block;}
   .main-content{margin-right:0;padding:10px;padding-top:58px;}
   .page-title{font-size:1.1rem;}
-  .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
-  .stat-card{padding:12px;}
-  .stat-value{font-size:1.1rem;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .stat-card{padding:12px 10px;}
+  .stat-icon{font-size:1.4rem;margin-bottom:6px;}
+  .stat-value{font-size:1rem;}
+  .stat-label{font-size:0.7rem;}
   .grid-2,.grid-3{grid-template-columns:1fr!important;}
-  .table-actions{gap:6px;}
-  .table-actions .btn{padding:6px 10px;font-size:0.75rem;}
-  .search-input{width:130px;}
-  .data-table th,.data-table td{padding:8px 8px;font-size:0.75rem;}
-  .modal{width:95vw;max-width:95vw;max-height:90vh;overflow-y:auto;padding:14px;}
-  .modal-title{font-size:0.95rem;}
-  .btn{padding:7px 12px;font-size:0.8rem;}
-  .login-box{padding:28px 18px;}
-  .login-logo{font-size:1.8rem;}
-  .page-header{flex-direction:column;align-items:flex-start;}
-  .table-header{flex-direction:column;align-items:flex-start;gap:8px;}
+  .table-actions{flex-wrap:wrap;gap:5px;}
+  .table-actions .btn{padding:6px 9px;font-size:0.74rem;}
+  .search-input{width:100%;max-width:100%;}
+  .data-table th,.data-table td{padding:7px 6px;font-size:0.74rem;}
+  .modal{width:96vw;max-width:96vw;max-height:92vh;overflow-y:auto;padding:12px;margin:4vh auto;}
+  .modal-lg{width:96vw;}
+  .modal-title{font-size:0.95rem;padding-bottom:10px;}
+  .btn{padding:7px 11px;font-size:0.8rem;}
+  .btn-sm{padding:5px 9px;font-size:0.73rem;}
+  .login-box{padding:24px 16px;width:92vw;}
+  .login-logo{font-size:1.9rem;}
+  .page-header{flex-direction:column;align-items:flex-start;gap:8px;}
+  .table-header{flex-direction:column;align-items:flex-start;gap:7px;}
+  .table-container{border-radius:10px;}
   .overflow-x{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  .sidebar{width:82vw;}
+  .pos-layout{grid-template-columns:1fr!important;height:auto!important;}
+  .pos-cart{position:relative!important;max-height:none!important;}
+  .cart-footer{position:relative!important;}
+  .modal-footer{flex-wrap:wrap;gap:6px;}
+  .modal-footer .btn{flex:1;min-width:80px;}
+  .nav-item{padding:12px 16px;}
+  .sidebar-footer{padding:10px 14px;}
 }
 @media(max-width:480px){
-  .stats-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
-  .stat-card{padding:10px;}
-  .stat-icon{font-size:1.3rem;}
-  .stat-value{font-size:1rem;}
-  .stat-label{font-size:0.72rem;}
-  .main-content{padding:8px;padding-top:54px;}
-  .data-table th,.data-table td{padding:6px 6px;font-size:0.72rem;white-space:nowrap;}
-  .badge{font-size:0.65rem;padding:2px 6px;}
-  .btn-sm{padding:4px 8px;font-size:0.7rem;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:6px;}
+  .stat-card{padding:9px 8px;}
+  .stat-icon{font-size:1.2rem;}
+  .stat-value{font-size:0.95rem;}
+  .stat-label{font-size:0.68rem;}
+  .main-content{padding:7px;padding-top:52px;}
+  .data-table th,.data-table td{padding:6px 5px;font-size:0.7rem;white-space:nowrap;}
+  .badge{font-size:0.62rem;padding:2px 5px;}
+  .page-title{font-size:1rem;}
+  .hamburger{top:10px;left:10px;padding:7px 11px;}
+  .form-group input,.form-group select,.form-group textarea{font-size:0.85rem;padding:9px 10px;}
+  .btn-primary{padding:11px;}
 }
 
 /* PAGES */
@@ -93,6 +107,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px;}
 .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;cursor:default;}
 .stat-card:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(0,0,0,0.3);}
+.stat-card[onclick]{transition:transform .15s,box-shadow .2s,border-color .2s;}
+.stat-card[onclick]:hover{border-color:var(--accent)!important;transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,212,255,0.2);}
+.stat-card[onclick]::after{content:'انقر للتفاصيل ↗';display:block;font-size:0.6rem;color:var(--text2);margin-top:4px;opacity:0;transition:opacity .2s;}
+.stat-card[onclick]:hover::after{opacity:1;}
 .stat-card::before{content:'';position:absolute;top:0;right:0;width:70px;height:70px;border-radius:0 14px 0 70px;opacity:.12;}
 .stat-card.blue::before{background:var(--accent);}.stat-card.green::before{background:var(--green);}
 .stat-card.yellow::before{background:var(--yellow);}.stat-card.red::before{background:var(--red);}
@@ -310,14 +328,14 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
         <div id="dashDate" style="color:var(--text2);font-size:0.88rem"></div>
       </div>
       <div class="stats-grid">
-        <div class="stat-card blue"><div class="stat-icon">💰</div><div class="stat-value" id="ds-sales">0</div><div class="stat-label">إجمالي المبيعات اليوم</div></div>
-        <div class="stat-card green"><div class="stat-icon">📈</div><div class="stat-value" id="ds-profit">0</div><div class="stat-label">أرباح المبيعات اليوم</div></div>
-        <div class="stat-card red"><div class="stat-icon">💸</div><div class="stat-value" id="ds-expenses">0</div><div class="stat-label">المصروفات التشغيلية اليوم</div></div>
-        <div class="stat-card purple"><div class="stat-icon">✨</div><div class="stat-value" id="ds-netprofit">0</div><div class="stat-label">صافي الربح اليوم (أرباح − مصروفات)</div></div>
-        <div class="stat-card yellow"><div class="stat-icon">📦</div><div class="stat-value" id="ds-products">0</div><div class="stat-label">عدد المنتجات</div></div>
-        <div class="stat-card orange"><div class="stat-icon">⚠️</div><div class="stat-value" id="ds-lowstock">0</div><div class="stat-label">مخزون منخفض</div></div>
-        <div class="stat-card blue"><div class="stat-icon">🏦</div><div class="stat-value" id="ds-treasury">0</div><div class="stat-label">رصيد الخزنة الكلي</div></div>
-        <div class="stat-card red"><div class="stat-icon">🔧</div><div class="stat-value" id="ds-maint">0</div><div class="stat-label">صيانة قيد التنفيذ</div></div>
+        <div class="stat-card blue" style="cursor:pointer" onclick="showPage('invoices')"><div class="stat-icon">💰</div><div class="stat-value" id="ds-sales">0</div><div class="stat-label">إجمالي المبيعات اليوم</div></div>
+        <div class="stat-card green" style="cursor:pointer" onclick="showPage('reports')"><div class="stat-icon">📈</div><div class="stat-value" id="ds-profit">0</div><div class="stat-label">أرباح المبيعات اليوم</div></div>
+        <div class="stat-card red" style="cursor:pointer" onclick="showPage('expenses')"><div class="stat-icon">💸</div><div class="stat-value" id="ds-expenses">0</div><div class="stat-label">المصروفات التشغيلية اليوم</div></div>
+        <div class="stat-card purple" style="cursor:pointer" onclick="showPage('reports')"><div class="stat-icon">✨</div><div class="stat-value" id="ds-netprofit">0</div><div class="stat-label">صافي الربح اليوم (أرباح − مصروفات)</div><div id="ds-netprofit-formula" style="font-size:0.68rem;color:var(--text2)"></div></div>
+        <div class="stat-card yellow" style="cursor:pointer" onclick="showPage('products')"><div class="stat-icon">📦</div><div class="stat-value" id="ds-products">0</div><div class="stat-label">عدد المنتجات</div></div>
+        <div class="stat-card orange" style="cursor:pointer" onclick="showPage('products')"><div class="stat-icon">⚠️</div><div class="stat-value" id="ds-lowstock">0</div><div class="stat-label">مخزون منخفض</div></div>
+        <div class="stat-card blue" style="cursor:pointer" onclick="showPage('treasury')"><div class="stat-icon">🏦</div><div class="stat-value" id="ds-treasury">0</div><div class="stat-label">رصيد الخزنة (بعد خصم المصروفات)</div><div id="ds-treasury-detail" style="font-size:0.65rem;color:var(--text2);margin-top:2px"></div></div>
+        <div class="stat-card red" style="cursor:pointer" onclick="showPage('maintenance')"><div class="stat-icon">🔧</div><div class="stat-value" id="ds-maint">0</div><div class="stat-label">صيانة قيد التنفيذ</div></div>
       </div>
       <!-- Profit breakdown card -->
       <div id="profitBreakdownCard" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px">
@@ -583,12 +601,12 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       </div>
       <div class="tab-content active" id="rtab-summary">
         <div class="stats-grid">
-          <div class="stat-card blue"><div class="stat-icon">💰</div><div class="stat-value" id="rep-sales">0</div><div class="stat-label">إجمالي المبيعات</div></div>
-          <div class="stat-card green"><div class="stat-icon">📈</div><div class="stat-value" id="rep-profit">0</div><div class="stat-label">إجمالي الأرباح</div></div>
-          <div class="stat-card red"><div class="stat-icon">💸</div><div class="stat-value" id="rep-expenses">0</div><div class="stat-label">المصروفات</div></div>
-          <div class="stat-card purple"><div class="stat-icon">✨</div><div class="stat-value" id="rep-netprofit">0</div><div class="stat-label">صافي الربح</div></div>
-          <div class="stat-card orange"><div class="stat-icon">🛍️</div><div class="stat-value" id="rep-purchases">0</div><div class="stat-label">تكلفة المشتريات</div></div>
-          <div class="stat-card yellow"><div class="stat-icon">📆</div><div class="stat-value" id="rep-installments">0</div><div class="stat-label">تقسيط متبقي</div></div>
+          <div class="stat-card blue" style="cursor:pointer" onclick="showPage('invoices')"><div class="stat-icon">💰</div><div class="stat-value" id="rep-sales">0</div><div class="stat-label">إجمالي المبيعات</div></div>
+          <div class="stat-card green" style="cursor:pointer" onclick="switchReportTab('bestsellers',document.querySelector('.tab:nth-child(2)'))"><div class="stat-icon">📈</div><div class="stat-value" id="rep-profit">0</div><div class="stat-label">إجمالي الأرباح</div></div>
+          <div class="stat-card red" style="cursor:pointer" onclick="showPage('expenses')"><div class="stat-icon">💸</div><div class="stat-value" id="rep-expenses">0</div><div class="stat-label">المصروفات</div></div>
+          <div class="stat-card purple" style="cursor:pointer" onclick="switchReportTab('monthly',document.querySelector('.tab:last-child'))"><div class="stat-icon">✨</div><div class="stat-value" id="rep-netprofit">0</div><div class="stat-label">صافي الربح (أرباح − مصروفات)</div></div>
+          <div class="stat-card orange" style="cursor:pointer" onclick="showPage('purchases')"><div class="stat-icon">🛍️</div><div class="stat-value" id="rep-purchases">0</div><div class="stat-label">تكلفة المشتريات</div></div>
+          <div class="stat-card yellow" style="cursor:pointer" onclick="showPage('installments')"><div class="stat-icon">📆</div><div class="stat-value" id="rep-installments">0</div><div class="stat-label">تقسيط متبقي</div></div>
         </div>
       </div>
       <div class="tab-content" id="rtab-bestsellers">
@@ -1509,12 +1527,19 @@ function renderDashboard() {
   if(netProfit!==null){
     npEl.textContent=fmt(netProfit)+' EGP';
     npEl.style.color=netProfit>=0?'var(--purple)':'var(--red)';
+    const fEl=document.getElementById('ds-netprofit-formula');
+    if(fEl) fEl.textContent=fmt(todayProfit||0)+' − '+fmt(todayExp)+' = '+fmt(netProfit);
   } else { npEl.textContent='—'; }
 
   document.getElementById('ds-products').textContent=DB.products.length;
   document.getElementById('ds-lowstock').textContent=DB.products.filter(p=>p.stock<=p.minStock).length;
   const treasBalance = getTreasuryBalance();
   document.getElementById('ds-treasury').textContent=can('viewTreasury')?fmt(treasBalance)+' EGP':'—';
+  if(can('viewTreasury')){
+    const todayTotalOut=DB.cashflow.filter(c=>c.type==='out').reduce((s,c)=>s+c.amount,0);
+    const detEl=document.getElementById('ds-treasury-detail');
+    if(detEl) detEl.textContent='صادر كلي: '+fmt(todayTotalOut)+' EGP';
+  }
   document.getElementById('ds-maint').textContent=DB.maintenance.filter(m=>m.status==='pending'||m.status==='inprogress').length;
 
   // ── Profit Breakdown Card ──────────────────────────────
@@ -1752,10 +1777,16 @@ function showInvoice(inv, allowEdit=false) {
     </tr>`).join('');
   document.getElementById('invoiceContent').innerHTML=`
     <div id="printable" style="position:relative;overflow:hidden;background:#fff;border-radius:10px;font-family:Cairo,sans-serif;direction:rtl;color:#000">
-      <div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;user-select:none">
-        <div style="transform:rotate(-35deg);opacity:0.09;text-align:center;white-space:nowrap">
-          <div style="font-size:3.5rem;font-weight:900;color:#1a3c6e;letter-spacing:-2px;line-height:1">DigiTronics</div>
-          <div style="font-size:1rem;font-weight:700;color:#1a3c6e;letter-spacing:4px;margin-top:4px">LAPTOS & TECH</div>
+      <div style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;overflow:hidden;user-select:none">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);white-space:nowrap;text-align:center">
+          <div style="font-size:4rem;font-weight:900;color:#1a3c6e;letter-spacing:-2px;line-height:1;opacity:0.12">DigiTronics</div>
+          <div style="font-size:1.1rem;font-weight:700;color:#1a3c6e;letter-spacing:6px;margin-top:6px;opacity:0.12">⚡ LAPTOS &amp; TECH ⚡</div>
+        </div>
+        <div style="position:absolute;top:20%;left:50%;transform:translateX(-50%) rotate(-35deg);white-space:nowrap;opacity:0.05">
+          <div style="font-size:2rem;font-weight:900;color:#1a3c6e">DigiTronics</div>
+        </div>
+        <div style="position:absolute;top:75%;left:50%;transform:translateX(-50%) rotate(-35deg);white-space:nowrap;opacity:0.05">
+          <div style="font-size:2rem;font-weight:900;color:#1a3c6e">DigiTronics</div>
         </div>
       </div>
       <div style="background:linear-gradient(135deg,#1a3c6e,#0066cc);padding:18px;text-align:center;position:relative;z-index:1">
@@ -1859,7 +1890,7 @@ function printInvoice(){
   const w=window.open('','_blank');
   w.document.write(`<html dir="rtl"><head><meta charset="UTF-8">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
-  <style>body{font-family:Cairo,sans-serif;padding:20px;max-width:400px;margin:0 auto}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f0f4ff}.wm-logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.08;font-size:3.5rem;font-weight:900;color:#1a3c6e;pointer-events:none;z-index:0;white-space:nowrap;text-align:center}</style></head>
+  <style>body{font-family:Cairo,sans-serif;padding:20px;max-width:400px;margin:0 auto}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f0f4ff}.wm-logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.12;font-size:4rem;font-weight:900;color:#1a3c6e;pointer-events:none;z-index:0;white-space:nowrap;text-align:center;line-height:1.2}</style></head>
   <body>${content}</body></html>`);
   w.setTimeout(()=>w.print(),500);
 }
@@ -2894,6 +2925,7 @@ function renderReports(){
   document.getElementById('rep-profit').textContent=(can('viewProfit')?fmt(profit):'—')+' EGP';
   document.getElementById('rep-expenses').textContent=fmt(expenses)+' EGP';
   document.getElementById('rep-netprofit').textContent=(can('viewProfit')?fmt(net):'—')+' EGP';
+  document.getElementById('rep-netprofit').style.color=net>=0?'var(--purple)':'var(--red)';
   document.getElementById('rep-purchases').textContent=fmt(purTotal)+' EGP';
   document.getElementById('rep-installments').textContent=fmt(instRem)+' EGP';
   // Best sellers
@@ -3914,14 +3946,14 @@ async function autoPullIfNewDevice(token, gistId) {
           localStorage.setItem(KEY, JSON.stringify(DB));
           localStorage.setItem(GH_INIT_KEY, '1');
                     showToast('☁️ تم تحميل بياناتك من GitHub تلقائياً ✅', 'success');
-          // تحديث DB بدون reload لتجنب العودة لتسجيل الدخول
-          const wasLoggedIn = currentUser;
           Object.assign(DB, parsed);
           localStorage.setItem(KEY, JSON.stringify(DB));
-          if (wasLoggedIn) {
-            // إعادة رسم الصفحة الحالية فقط بدون logout
-            const activePage = document.querySelector('.nav-item.active');
-            if (activePage && activePage.dataset.page) showPage(activePage.dataset.page);
+          localStorage.setItem(GH_INIT_KEY, '1');
+          // لو المستخدم مسجل دخول → حدّث الصفحة الحالية بدون logout
+          if (currentUser) {
+            const activeNav = document.querySelector('.nav-item.active');
+            if (activeNav && activeNav.dataset.page) showPage(activeNav.dataset.page);
+            else renderDashboard && renderDashboard();
           } else {
             setTimeout(() => location.reload(), 1500);
           }
