@@ -3662,12 +3662,26 @@ exit
 }
 
 // ==================== GITHUB GIST SYNC ====================
-const GH_TOKEN_KEY  = 'dgt_gh_token';
-const GH_GIST_KEY   = 'dgt_gh_gist';
+// ── القيم المدمجة في الملف — تشتغل على أي جهاز تلقائياً ──
+const GH_DEFAULT_TOKEN = '';
+const GH_DEFAULT_GIST  = '050242275f097f1711f0124fb5c47e92';
+
+const GH_TOKEN_KEY    = 'dgt_gh_token';
+const GH_GIST_KEY     = 'dgt_gh_gist';
 const GH_AUTOSYNC_KEY = 'dgt_gh_autosync';
 const GH_LASTSYNC_KEY = 'dgt_gh_lastsync';
+const GH_INIT_KEY     = 'dgt_gh_initialized';
 let autoSyncEnabled = false;
 let autoSyncTimer = null;
+
+function ensureGhDefaults() {
+  if (GH_DEFAULT_TOKEN !== 'PASTE_TOKEN_HERE') {
+    if (!localStorage.getItem(GH_TOKEN_KEY)) localStorage.setItem(GH_TOKEN_KEY, GH_DEFAULT_TOKEN);
+  }
+  if (GH_DEFAULT_GIST !== 'PASTE_GIST_ID_HERE') {
+    if (!localStorage.getItem(GH_GIST_KEY)) localStorage.setItem(GH_GIST_KEY, GH_DEFAULT_GIST);
+  }
+}
 
 function saveGhSettings() {
   const token = document.getElementById('ghToken').value.trim();
@@ -3677,13 +3691,15 @@ function saveGhSettings() {
 }
 
 function loadGhSettings() {
+  ensureGhDefaults();
   const token = localStorage.getItem(GH_TOKEN_KEY) || '';
   const gist  = localStorage.getItem(GH_GIST_KEY)  || '';
   const el1 = document.getElementById('ghToken');
   const el2 = document.getElementById('ghGistId');
   if (el1) el1.value = token;
   if (el2) el2.value = gist;
-  autoSyncEnabled = localStorage.getItem(GH_AUTOSYNC_KEY) === '1';
+  autoSyncEnabled = true;
+  localStorage.setItem(GH_AUTOSYNC_KEY, '1');
   updateAutoSyncLabel();
   const last = localStorage.getItem(GH_LASTSYNC_KEY);
   const el3 = document.getElementById('ghLastSync');
@@ -3806,6 +3822,56 @@ function saveDB() {
     clearTimeout(saveDB._syncTimer);
     saveDB._syncTimer = setTimeout(ghPush, 3000);
   }
+}
+
+// ── تشغيل تلقائي عند فتح النظام على أي جهاز ──
+window.addEventListener('load', async () => {
+  ensureGhDefaults();
+  autoSyncEnabled = true;
+  localStorage.setItem(GH_AUTOSYNC_KEY, '1');
+  startAutoSync();
+  const gistId = localStorage.getItem(GH_GIST_KEY);
+  let token    = localStorage.getItem(GH_TOKEN_KEY);
+  // لو مفيش token → اطلبه مرة واحدة بس ويتحفظ تلقائياً
+  if (!token && gistId) {
+    setTimeout(() => {
+      const t = prompt('🔑 أدخل GitHub Token مرة واحدة بس\n(من github.com/settings/tokens — صلاحية gist فقط)\n\nبعدها يتحفظ تلقائياً ومش هيطلبه تاني:');
+      if (t && t.trim()) {
+        token = t.trim();
+        localStorage.setItem(GH_TOKEN_KEY, token);
+        showToast('✅ تم حفظ التوكين — جاري مزامنة البيانات...', 'success');
+        autoPullIfNewDevice(token, gistId);
+      }
+    }, 800);
+    return;
+  }
+  autoPullIfNewDevice(token, gistId);
+});
+
+async function autoPullIfNewDevice(token, gistId) {
+  if (!token || !gistId) return;
+  const hasLocalData = !!localStorage.getItem(KEY);
+  const alreadyInit  = localStorage.getItem(GH_INIT_KEY);
+  if (!hasLocalData && !alreadyInit) {
+    try {
+      const res = await fetch('https://api.github.com/gists/' + gistId, {
+        headers: { Authorization: 'token ' + token }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const content = data.files['digitronics_db.json']?.content;
+        if (content) {
+          const parsed = JSON.parse(content);
+          Object.assign(DB, parsed);
+          localStorage.setItem(KEY, JSON.stringify(DB));
+          localStorage.setItem(GH_INIT_KEY, '1');
+          showToast('☁️ تم تحميل بياناتك من GitHub تلقائياً ✅', 'success');
+          setTimeout(() => location.reload(), 1500);
+        }
+      }
+    } catch(e) {}
+  }
+  if (hasLocalData) localStorage.setItem(GH_INIT_KEY, '1');
 }
 
 // ==================== UTILS ====================
