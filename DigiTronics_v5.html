@@ -47,7 +47,42 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
 .main-content{margin-right:245px;min-height:100vh;padding:22px;}
 .hamburger{display:none;position:fixed;top:14px;left:14px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 13px;cursor:pointer;font-size:1.1rem;color:var(--accent);}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:90;}
-@media(max-width:768px){.hamburger{display:block;}.sidebar{transform:translateX(100%);}.sidebar.open{transform:translateX(0);}.overlay.show{display:block;}.main-content{margin-right:0;padding:14px;padding-top:56px;}}
+@media(max-width:768px){
+  .hamburger{display:block;}
+  .sidebar{transform:translateX(100%);}
+  .sidebar.open{transform:translateX(0);}
+  .overlay.show{display:block;}
+  .main-content{margin-right:0;padding:10px;padding-top:58px;}
+  .page-title{font-size:1.1rem;}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:10px;}
+  .stat-card{padding:12px;}
+  .stat-value{font-size:1.1rem;}
+  .grid-2,.grid-3{grid-template-columns:1fr!important;}
+  .table-actions{gap:6px;}
+  .table-actions .btn{padding:6px 10px;font-size:0.75rem;}
+  .search-input{width:130px;}
+  .data-table th,.data-table td{padding:8px 8px;font-size:0.75rem;}
+  .modal{width:95vw;max-width:95vw;max-height:90vh;overflow-y:auto;padding:14px;}
+  .modal-title{font-size:0.95rem;}
+  .btn{padding:7px 12px;font-size:0.8rem;}
+  .login-box{padding:28px 18px;}
+  .login-logo{font-size:1.8rem;}
+  .page-header{flex-direction:column;align-items:flex-start;}
+  .table-header{flex-direction:column;align-items:flex-start;gap:8px;}
+  .overflow-x{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .sidebar{width:82vw;}
+}
+@media(max-width:480px){
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .stat-card{padding:10px;}
+  .stat-icon{font-size:1.3rem;}
+  .stat-value{font-size:1rem;}
+  .stat-label{font-size:0.72rem;}
+  .main-content{padding:8px;padding-top:54px;}
+  .data-table th,.data-table td{padding:6px 6px;font-size:0.72rem;white-space:nowrap;}
+  .badge{font-size:0.65rem;padding:2px 6px;}
+  .btn-sm{padding:4px 8px;font-size:0.7rem;}
+}
 
 /* PAGES */
 .page{display:none;}.page.active{display:block;}
@@ -950,6 +985,10 @@ body{font-family:'Cairo',sans-serif;background:var(--bg);color:var(--text);min-h
       <div class="form-group"><label>سعر الشراء (EGP)</label><input id="pBuy" type="number" placeholder="0" min="0"></div>
       <div class="form-group"><label>سعر البيع (EGP)</label><input id="pSell" type="number" placeholder="0" min="0"></div>
     </div>
+    <div class="form-group">
+      <label>🔢 السيريال نمبر <span style="color:var(--text2);font-size:0.78rem">(اختياري)</span></label>
+      <input id="pSerial" placeholder="مثال: SN-ABC123456 (اختياري)">
+    </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('productModal')">إلغاء</button><button class="btn btn-accent" onclick="saveProduct()">💾 حفظ</button></div>
   </div>
 </div>
@@ -1598,7 +1637,7 @@ function addToCart(pid) {
   if(prod.stock<=0){showToast('نفد من المخزون','error');return;}
   const ex=cart.find(i=>i.pid===pid);
   if(ex){if(ex.qty>=prod.stock){showToast('الحد الأقصى للمخزون','error');return;}ex.qty++;}
-  else cart.push({pid,name:prod.name,price:prod.sell,buy:prod.buy,qty:1});
+  else cart.push({pid,name:prod.name,price:prod.sell,buy:prod.buy,qty:1,serial:prod.serial||''});
   updateCartUI();
 }
 
@@ -1659,7 +1698,7 @@ function completeSale(){
   const customerPhone=(document.getElementById('cartCustomerPhone')||{value:''}).value||'';
   const now=new Date();
   const invoiceId=DB.invoiceSeq++;
-  const items=cart.map(c=>({pid:c.pid,name:c.name,price:c.price,buy:c.buy,qty:c.qty,subtotal:c.price*c.qty}));
+  const items=cart.map(c=>({pid:c.pid,name:c.name,price:c.price,buy:c.buy,qty:c.qty,subtotal:c.price*c.qty,serial:c.serial||''}));
 
   // Handle installment
   let installmentRef=null;
@@ -1706,14 +1745,19 @@ function showInvoice(inv, allowEdit=false) {
   currentInvoiceId=inv.id;
   const rows=inv.items.map(i=>`
     <tr>
-      <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #e8ecf4">${i.name}</td>
+      <td style="padding:8px 10px;text-align:right;border-bottom:1px solid #e8ecf4">${i.name}${i.serial?`<div style='font-size:0.7rem;color:#666'>🔢 ${i.serial}</div>`:''}</td>
       <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #e8ecf4">${i.qty}</td>
       <td style="padding:8px 10px;text-align:center;border-bottom:1px solid #e8ecf4">${fmt(i.price)}</td>
       <td style="padding:8px 10px;text-align:center;font-weight:700;border-bottom:1px solid #e8ecf4">${fmt(i.subtotal)}</td>
     </tr>`).join('');
   document.getElementById('invoiceContent').innerHTML=`
     <div id="printable" style="position:relative;overflow:hidden;background:#fff;border-radius:10px;font-family:Cairo,sans-serif;direction:rtl;color:#000">
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);opacity:0.04;font-size:4rem;font-weight:900;color:#1a3c6e;white-space:nowrap;pointer-events:none;z-index:0;user-select:none">DigiTronics</div>
+      <div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;user-select:none">
+        <div style="transform:rotate(-35deg);opacity:0.09;text-align:center;white-space:nowrap">
+          <div style="font-size:3.5rem;font-weight:900;color:#1a3c6e;letter-spacing:-2px;line-height:1">DigiTronics</div>
+          <div style="font-size:1rem;font-weight:700;color:#1a3c6e;letter-spacing:4px;margin-top:4px">LAPTOS & TECH</div>
+        </div>
+      </div>
       <div style="background:linear-gradient(135deg,#1a3c6e,#0066cc);padding:18px;text-align:center;position:relative;z-index:1">
         <div style="font-size:1.5rem;font-weight:900;color:#fff;letter-spacing:-1px">⚡ DigiTronics</div>
         <div style="font-size:0.75rem;color:rgba(255,255,255,0.8);margin-top:3px">LAPTOS & TECH / REVIEWS • GUIDES • DEALS</div>
@@ -1815,7 +1859,7 @@ function printInvoice(){
   const w=window.open('','_blank');
   w.document.write(`<html dir="rtl"><head><meta charset="UTF-8">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
-  <style>body{font-family:Cairo,sans-serif;padding:20px;max-width:400px;margin:0 auto}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f0f4ff}.wm-logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);opacity:0.05;font-size:3rem;font-weight:900;color:#000;pointer-events:none;z-index:0}</style></head>
+  <style>body{font-family:Cairo,sans-serif;padding:20px;max-width:400px;margin:0 auto}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:7px;text-align:right}th{background:#f0f4ff}.wm-logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);opacity:0.08;font-size:3.5rem;font-weight:900;color:#1a3c6e;pointer-events:none;z-index:0;white-space:nowrap;text-align:center}</style></head>
   <body>${content}</body></html>`);
   w.setTimeout(()=>w.print(),500);
 }
@@ -1844,7 +1888,7 @@ function completeQuickSale(){
   const profit=(qsSelectedProduct.sell-qsSelectedProduct.buy)*qty;
   const invoiceId=DB.invoiceSeq++;
   const invoice={id:invoiceId,date:today(),time:new Date().toLocaleTimeString('ar-EG'),customer:'',seller:currentUser.username,payment:pay,
-    items:[{pid:qsSelectedProduct.id,name:qsSelectedProduct.name,price:qsSelectedProduct.sell,buy:qsSelectedProduct.buy,qty,subtotal:total}],
+    items:[{pid:qsSelectedProduct.id,name:qsSelectedProduct.name,price:qsSelectedProduct.sell,buy:qsSelectedProduct.buy,qty,subtotal:total,serial:qsSelectedProduct.serial||''}],
     subtotal:total,discount:0,total,profit};
   DB.invoices.push(invoice);
   qsSelectedProduct.stock=Math.max(0,qsSelectedProduct.stock-qty);
@@ -1981,18 +2025,18 @@ function renderProductsTable(q=''){
     const pr=(p.sell-p.buy).toFixed(2);
     const idx=DB.products.indexOf(p);
     const st=p.stock<=0?'<span class="badge badge-red">نفد</span>':p.stock<=p.minStock?'<span class="badge badge-yellow">منخفض</span>':'<span class="badge badge-green">متاح</span>';
-    return `<tr><td>${p.id}</td><td style="font-size:0.78rem;color:var(--text2)">${p.barcode||'—'}</td><td style="font-weight:700">${p.name}</td><td>${p.stock}</td><td>${p.minStock}</td>
+    return `<tr><td>${p.id}</td><td style="font-size:0.78rem;color:var(--text2)">${p.barcode||'—'}</td><td style="font-weight:700">${p.name}${p.serial?`<div style="font-size:0.7rem;color:var(--accent);margin-top:2px">🔢 ${p.serial}</div>`:''}</td><td>${p.stock}</td><td>${p.minStock}</td>
     <td>${showBuy?fmt(p.buy):'—'}</td><td style="color:var(--accent)">${fmt(p.sell)}</td><td style="color:var(--green)">${showProfit?fmt(pr):'—'}</td><td>${st}</td>
     <td>${canEdit?`<button class="btn btn-outline btn-sm" onclick="editProduct(${idx})">✏️</button>`:''}${canDel?`<button class="btn btn-danger btn-sm" onclick="deleteProduct(${idx})">🗑️</button>`:''}</td></tr>`;
   }).join('');
   renderProductLog();
 }
-function openProductModal(){if(!can('addProduct')){showToast('لا صلاحية','error');return;}editingIdx.product=null;document.getElementById('productModalTitle').textContent='➕ منتج جديد';['pId','pBarcode','pName','pStock','pMinStock','pBuy','pSell'].forEach(id=>document.getElementById(id).value='');openModal('productModal');}
-function editProduct(idx){if(!can('editProduct')){showToast('لا صلاحية','error');return;}editingIdx.product=idx;const p=DB.products[idx];document.getElementById('productModalTitle').textContent='✏️ تعديل منتج';document.getElementById('pId').value=p.id;document.getElementById('pBarcode').value=p.barcode||'';document.getElementById('pName').value=p.name;document.getElementById('pStock').value=p.stock;document.getElementById('pMinStock').value=p.minStock;document.getElementById('pBuy').value=p.buy;document.getElementById('pSell').value=p.sell;openModal('productModal');}
+function openProductModal(){if(!can('addProduct')){showToast('لا صلاحية','error');return;}editingIdx.product=null;document.getElementById('productModalTitle').textContent='➕ منتج جديد';['pId','pBarcode','pName','pStock','pMinStock','pBuy','pSell','pSerial'].forEach(id=>document.getElementById(id).value='');openModal('productModal');}
+function editProduct(idx){if(!can('editProduct')){showToast('لا صلاحية','error');return;}editingIdx.product=idx;const p=DB.products[idx];document.getElementById('productModalTitle').textContent='✏️ تعديل منتج';document.getElementById('pId').value=p.id;document.getElementById('pBarcode').value=p.barcode||'';document.getElementById('pName').value=p.name;document.getElementById('pStock').value=p.stock;document.getElementById('pMinStock').value=p.minStock;document.getElementById('pBuy').value=p.buy;document.getElementById('pSell').value=p.sell;document.getElementById('pSerial').value=p.serial||'';openModal('productModal');}
 function saveProduct(){
   const id=document.getElementById('pId').value.trim(),name=document.getElementById('pName').value.trim();
   if(!id||!name){showToast('ملء الحقول المطلوبة','error');return;}
-  const prod={id,barcode:document.getElementById('pBarcode').value.trim(),name,stock:parseFloat(document.getElementById('pStock').value)||0,minStock:parseFloat(document.getElementById('pMinStock').value)||0,buy:parseFloat(document.getElementById('pBuy').value)||0,sell:parseFloat(document.getElementById('pSell').value)||0};
+  const serial=document.getElementById('pSerial').value.trim();const prod={id,barcode:document.getElementById('pBarcode').value.trim(),name,stock:parseFloat(document.getElementById('pStock').value)||0,minStock:parseFloat(document.getElementById('pMinStock').value)||0,buy:parseFloat(document.getElementById('pBuy').value)||0,sell:parseFloat(document.getElementById('pSell').value)||0,serial:serial||''};
   if(editingIdx.product!==null){
     const old=DB.products[editingIdx.product];
     DB.productLog.push({action:'تعديل',productId:id,productName:name,by:currentUser.username,at:nowStr(),changes:`مخزون:${old.stock}→${prod.stock}|سعر:${old.sell}→${prod.sell}`});
@@ -2666,6 +2710,10 @@ function renderCashFlow(){
   document.getElementById('treas-total').style.color=balance>=0?'#fff':'#ff9999';
   document.getElementById('treas-total-in').textContent=fmt(totalIn)+' EGP';
   document.getElementById('treas-total-out').textContent=fmt(totalOut)+' EGP';
+  // Show expense deduction breakdown
+  const totalExpOut = DB.expenses.filter(e=>e.deductedFromTreasury!==false).reduce((s,e)=>s+(e.amount||0),0);
+  const expNoteEl = document.getElementById('treas-expense-note');
+  if(expNoteEl) expNoteEl.textContent = 'منها مصروفات: ' + fmt(totalExpOut) + ' EGP';
 
   // Per-account: net = in − out for each method
   const methods=['cash','instapay','vodafone','fawry'];
@@ -3865,8 +3913,18 @@ async function autoPullIfNewDevice(token, gistId) {
           Object.assign(DB, parsed);
           localStorage.setItem(KEY, JSON.stringify(DB));
           localStorage.setItem(GH_INIT_KEY, '1');
-          showToast('☁️ تم تحميل بياناتك من GitHub تلقائياً ✅', 'success');
-          setTimeout(() => location.reload(), 1500);
+                    showToast('☁️ تم تحميل بياناتك من GitHub تلقائياً ✅', 'success');
+          // تحديث DB بدون reload لتجنب العودة لتسجيل الدخول
+          const wasLoggedIn = currentUser;
+          Object.assign(DB, parsed);
+          localStorage.setItem(KEY, JSON.stringify(DB));
+          if (wasLoggedIn) {
+            // إعادة رسم الصفحة الحالية فقط بدون logout
+            const activePage = document.querySelector('.nav-item.active');
+            if (activePage && activePage.dataset.page) showPage(activePage.dataset.page);
+          } else {
+            setTimeout(() => location.reload(), 1500);
+          }
         }
       }
     } catch(e) {}
