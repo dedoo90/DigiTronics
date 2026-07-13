@@ -1,4 +1,4 @@
-const DIGITRONICS_PWA_VERSION = 'omnistore-erp-v33-customer-provisioning-v34-saas-admin-v35-ops-security-v36-self-managed-v37-recovery-v38-performance-v39-production-execution-v40-ai-copilot-v41-go-live-v42-status-badge-ui-v43-dashboard-v5';
+const DIGITRONICS_PWA_VERSION = 'omnistore-erp-v33-customer-provisioning-v34-saas-admin-v35-ops-security-v36-self-managed-v37-recovery-v38-performance-v39-production-execution-v40-ai-copilot-v41-go-live-v42-status-badge-ui-v43-dashboard-v5-v44-dashboard-v6';
 const APP_SHELL_CACHE = DIGITRONICS_PWA_VERSION;
 const APP_SHELL_ASSETS = [
   './',
