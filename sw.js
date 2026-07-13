@@ -1,7 +1,8 @@
-const DIGITRONICS_PWA_VERSION = 'omnistore-erp-v33-customer-provisioning-v34-saas-admin-v35-ops-security-v36-self-managed-v37-recovery-v38-performance-v39-production-execution-v40-ai-copilot-v41-go-live-v42-status-badge-ui-v43-dashboard-v5-v44-dashboard-v6';
+const DIGITRONICS_PWA_VERSION = 'omnistore-erp-v44-dashboard-v6';
 const APP_SHELL_CACHE = DIGITRONICS_PWA_VERSION;
 const APP_SHELL_ASSETS = [
   './',
+  './index.html',
   './DigiTronics_v5.html',
   './services/businessEngine/registry.js',
   './services/businessEngine/businessEngine.js',
@@ -431,7 +432,7 @@ self.addEventListener('fetch', event => {
         const copy = response.clone();
         caches.open(APP_SHELL_CACHE).then(cache => cache.put(request, copy)).catch(() => {});
         return response;
-      }).catch(() => cached || caches.match('./DigiTronics_v5.html'));
+      }).catch(() => cached || caches.match('./index.html') || caches.match('./DigiTronics_v5.html'));
       return cached || network;
     })
   );
@@ -458,7 +459,7 @@ self.addEventListener('notificationclick', event => {
       for (const client of clients) {
         if ('focus' in client) return client.focus();
       }
-      if (self.clients.openWindow) return self.clients.openWindow('./DigiTronics_v5.html');
+      if (self.clients.openWindow) return self.clients.openWindow('./index.html');
     })
   );
 });
