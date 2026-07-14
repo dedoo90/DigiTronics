@@ -18139,7 +18139,7 @@ function renderDashboard() {
         { id: 'settings', title: 'الإعدادات', desc: 'إعدادات النظام', icon: '⚙️', color: 'linear-gradient(135deg,#64748b,#94a3b8)', metrics: [{l:'الفروع',v:(DB.branches||[]).length},{l:'المستخدمين',v:(DB.users||[]).length}] },
         { id: 'analytics', title: 'التحليلات', desc: 'الذكاء التجاري', icon: '💡', color: 'linear-gradient(135deg,#059669,#34d399)', metrics: [{l:'التحليلات',v:'متاح'},{l:'التنبؤات',v:'متاح'}] }
       ];
-      modulesGrid.innerHTML = modules.map(m => '<div class="d6-module-tile" onclick="showPage('' + m.id + '')" style="--tile-accent:' + m.color + '"><div class="d6-module-top"><div class="d6-module-icon" style="background:' + m.color + ';color:#fff">' + m.icon + '</div><div class="d6-module-title">' + m.title + '</div></div><div class="d6-module-desc">' + m.desc + '</div><div class="d6-module-metrics">' + m.metrics.map(me => '<div class="d6-module-metric"><span>' + me.l + ':</span> <strong>' + me.v + '</strong></div>').join('') + '</div></div>').join('');
+      modulesGrid.innerHTML = modules.map(m => '<div class="d6-module-tile" onclick="showPage(\'' + m.id + '\')" style="--tile-accent:' + m.color + '"><div class="d6-module-top"><div class="d6-module-icon" style="background:' + m.color + ';color:#fff">' + m.icon + '</div><div class="d6-module-title">' + m.title + '</div></div><div class="d6-module-desc">' + m.desc + '</div><div class="d6-module-metrics">' + m.metrics.map(me => '<div class="d6-module-metric"><span>' + me.l + ':</span> <strong>' + me.v + '</strong></div>').join('') + '</div></div>').join('');
     }
   } catch(e) {}
   
