@@ -1,0 +1,31 @@
+{
+  "product": "OmniStore ERP",
+  "version": "1.0.0-commercial",
+  "freezeDate": "2026-07-02",
+  "productionModeDefault": "OFF",
+  "testsPassed": 1980,
+  "testSuitesPassed": 37,
+  "releaseStatus": "READY_FOR_CUSTOMER_001",
+  "customer001": {
+    "name": "Mario Fely",
+    "tenantId": "mario_fely",
+    "workspaceSlug": "mario-fely-auto-accessories",
+    "created": false
+  },
+  "criticalFiles": {
+    "DigiTronics_v5.html": true,
+    "sw.js": true,
+    "manifest.json": true,
+    "release/v1.0": true,
+    "customerRollout/marioFely": true,
+    "services/goLive": true
+  },
+  "serviceWorkerCacheVersion": "v41-go-live",
+  "checksumAlgorithm": "SHA-256",
+  "checksumEntries": 36,
+  "productionExecutionPerformed": false,
+  "supabaseConnectionExecuted": false,
+  "sqlExecuted": false,
+  "databaseModified": false,
+  "scopeRoot": "E:/Projects/ESO"
+}

@@ -1,0 +1,15 @@
+{
+  "product": "OmniStore ERP",
+  "version": "1.0.0",
+  "release_channel": "commercial",
+  "release_date": "2026-07-02",
+  "completed_phases": "8-36",
+  "customer_rollout": "001-mario-fely",
+  "production_mode_default": "OFF",
+  "controlled_execution_required": true,
+  "service_worker_version": "v41-go-live",
+  "test_suites": 37,
+  "test_checks": 1980,
+  "customer_created": false,
+  "sql_executed_during_release_preparation": false
+}

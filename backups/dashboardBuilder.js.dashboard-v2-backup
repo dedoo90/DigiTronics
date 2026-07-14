@@ -1,0 +1,65 @@
+(function (root) {
+  'use strict';
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+  }
+
+  function ensureHost() {
+    if (!root.document) return null;
+    let host = root.document.getElementById('omniDynamicDashboardWidgets');
+    if (host) return host;
+    const page = root.document.getElementById('page-dashboard');
+    const header = page?.querySelector('.page-header');
+    if (!page || !header) return null;
+    host = root.document.createElement('div');
+    host.id = 'omniDynamicDashboardWidgets';
+    host.className = 'stats-grid';
+    host.style.marginBottom = '12px';
+    header.insertAdjacentElement('afterend', host);
+    return host;
+  }
+
+  function resolveMetric(widget) {
+    const source = widget.sourceElement ? root.document.getElementById(widget.sourceElement) : null;
+    if (source) return source.textContent || '0';
+    const snapshot = root.getOmniPluginRuntimeSnapshot?.() || {};
+    if (widget.metric === 'product_count') return snapshot.productCount || 0;
+    if (widget.metric === 'sales_total') return root.formatMoney?.(snapshot.salesTotal || 0) || snapshot.salesTotal || 0;
+    if (widget.metric === 'stock_value') return root.formatMoney?.(snapshot.stockValue || 0) || snapshot.stockValue || 0;
+    return 'جاهز';
+  }
+
+  function build() {
+    const loader = root.OmniModuleLoader;
+    const host = ensureHost();
+    if (!loader || !host) return [];
+    const widgets = loader.getActiveModules().flatMap(module =>
+      (module.widgets || []).map(widget => ({ ...widget, moduleId: module.id }))
+    );
+    const pluginWidgets = root.OmniPluginSDK?.getActivePlugins?.().flatMap(plugin =>
+      (plugin.dashboardCards || []).map(card => ({
+        ...card,
+        moduleId: `plugin:${plugin.metadata.id}`,
+        label: root.OmniPluginSDK.translate(plugin.metadata.id, card.labelKey || 'products')
+      }))
+    ) || [];
+    widgets.push(...pluginWidgets);
+    host.innerHTML = widgets.map(widget => {
+      const value = resolveMetric(widget);
+      return `<div class="stat-card blue" data-module-widget="${escapeHtml(widget.moduleId)}" style="padding:14px;cursor:pointer" onclick="showPage('${escapeHtml(widget.route)}')">
+        <div class="stat-icon">${escapeHtml(widget.icon)}</div>
+        <div class="stat-value" style="font-size:1rem">${escapeHtml(value)}</div>
+        <div class="stat-label">${escapeHtml(widget.label)}</div>
+      </div>`;
+    }).join('');
+    root.document.querySelectorAll('#page-dashboard .stat-card[onclick*="showPage"]').forEach(card => {
+      const match = String(card.getAttribute('onclick') || '').match(/showPage\(['"]([^'"]+)/);
+      if (match) card.style.display = loader.isRouteEnabled(match[1]) ? '' : 'none';
+    });
+    return widgets;
+  }
+
+  root.OmniDashboardBuilder = Object.freeze({ build });
+})(typeof globalThis !== 'undefined' ? globalThis : window);

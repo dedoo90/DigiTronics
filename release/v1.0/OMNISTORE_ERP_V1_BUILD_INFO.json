@@ -1,0 +1,12 @@
+{
+  "name": "OmniStore ERP v1.0 Commercial Release",
+  "build": "20260702.001",
+  "previous_baseline_tests": 1851,
+  "phase_36_tests": 129,
+  "total_tests": 1980,
+  "target_customer": "Mario Fely #001",
+  "tenant_id": "mario_fely",
+  "workspace_slug": "mario-fely-auto-accessories",
+  "production_mode": "OFF",
+  "real_deployment_performed": false
+}

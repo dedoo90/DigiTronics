@@ -1,0 +1,43 @@
+{
+  "phase": "dry_run",
+  "status": "blocked",
+  "created_at": "2026-06-27T17:29:23.392Z",
+  "counts": {
+    "products": 0,
+    "purchase_items": 0,
+    "sale_items": 0,
+    "stock_transactions": 0,
+    "distinct_legacy_product_id": 0,
+    "products_to_create": 0
+  },
+  "exact_count_headers": [
+    {
+      "table": "products",
+      "status": 200,
+      "contentRange": "*/0",
+      "error": ""
+    },
+    {
+      "table": "purchase_items",
+      "status": 200,
+      "contentRange": "*/0",
+      "error": ""
+    },
+    {
+      "table": "sale_items",
+      "status": 200,
+      "contentRange": "*/0",
+      "error": ""
+    },
+    {
+      "table": "stock_transactions",
+      "status": 200,
+      "contentRange": "*/0",
+      "error": ""
+    }
+  ],
+  "reason": "Supabase Data API returned 0 visible rows from all source tables. Execution stopped before insert.",
+  "products_created": 0,
+  "uuid_linking_performed": false,
+  "other_tables_modified": false
+}
