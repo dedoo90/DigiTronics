@@ -1938,7 +1938,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
 
   <div class="pwa-bottom-nav no-print" id="pwaBottomNav">
     <button onclick="pwaNavigate('dashboard')"><span>📊</span><span>الرئيسية</span></button>
-    <button onclick="pwaNavigate('pos')"><span>💰</span><span>بيع</span></button>
+    <button onclick="openNewSaleInvoiceModal()"><span>💰</span><span>بيع</span></button>
     <button onclick="pwaNavigate('serialsearch')"><span>🔍</span><span>بحث</span></button>
     <button onclick="pwaNavigate('alerts-center')"><span>🔔</span><span>تنبيهات</span></button>
     <button onclick="pwaNavigate('pwa')"><span>📲</span><span>PWA</span></button>
@@ -2056,7 +2056,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
 
       <!-- Quick Actions -->
       <div class="d6-quick-actions">
-        <button class="d6-quick-btn" onclick="showPage('pos')">
+        <button class="d6-quick-btn" onclick="openNewSaleInvoiceModal()">
           <span class="icon">🛒</span> فاتورة بيع
         </button>
         <button class="d6-quick-btn" onclick="showPage('purchases')">
@@ -2167,7 +2167,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       <!-- FAB -->
       <button class="d6-fab" id="d6Fab" onclick="toggleD6Fab()">+</button>
       <div class="d6-fab-menu" id="d6FabMenu">
-        <button class="d6-fab-item" onclick="showPage('pos');toggleD6Fab()">
+        <button class="d6-fab-item" onclick="openNewSaleInvoiceModal();toggleD6Fab()">
           <span class="icon">🛒</span> فاتورة بيع
         </button>
         <button class="d6-fab-item" onclick="showPage('purchases');toggleD6Fab()">
@@ -13106,7 +13106,7 @@ function renderEnterpriseCommandCenter(force = false) {
   document.getElementById('commandOperations').innerHTML = commandRows([['Sales', data.sales.length], ['Purchases', data.purchases.length], ['Inventory', data.products.length], ['Repairs', data.repairs.length], ['Workflow', data.pendingApprovals], ['Automation', (getAutomationState?.().queue || []).length], ['Plugin Health', (getPluginHealthRows?.() || []).filter(x => !x.ok).length], ['PWA Status', getPwaState().installed ? 'Installed' : 'Browser'], ['Supabase', getSupabaseLiveLabel()]]);
   document.getElementById('commandForecast').innerHTML = commandRows([['Sales Forecast', formatMoney(data.forecast.sales)], ['Cash Forecast', formatMoney(data.forecast.cash)], ['Installments Risk', data.forecast.installments], ['Payroll Forecast', formatMoney(data.forecast.payroll)], ['Inventory Risk', data.forecast.inventory], ['Repairs Forecast', data.forecast.repairs]]);
   document.getElementById('commandRanking').innerHTML = commandRows([['Top Branch', data.topBranch[0]], ['Top Employee', (data.employees[0]?.name || '-')], ['Top Customer', data.topCustomer[0]], ['Top Technician', topTechnicianName()], ['Top Supplier', data.topSupplier[0]], ['Top Product', data.topProduct[0]]]);
-  document.getElementById('commandQuickActions').innerHTML = `<div class="live-sync-actions"><button class="btn btn-accent btn-sm" onclick="showPage('pos')">Create Sale</button><button class="btn btn-outline btn-sm" onclick="showPage('purchases')">Create Purchase</button><button class="btn btn-outline btn-sm" onclick="showPage('maintenance')">Create Repair</button><button class="btn btn-outline btn-sm" onclick="showPage('installments')">Collect Installment</button><button class="btn btn-outline btn-sm" onclick="showPage('approvals')">Approve Workflow</button><button class="btn btn-outline btn-sm" onclick="showPage('financial-center')">Partner Settlement</button><button class="btn btn-outline btn-sm" onclick="showPage('hr')">Payroll</button><button class="btn btn-green btn-sm" onclick="showPage('backup')">Backup</button></div>`;
+  document.getElementById('commandQuickActions').innerHTML = `<div class="live-sync-actions"><button class="btn btn-accent btn-sm" onclick="openNewSaleInvoiceModal()">Create Sale</button><button class="btn btn-outline btn-sm" onclick="showPage('purchases')">Create Purchase</button><button class="btn btn-outline btn-sm" onclick="showPage('maintenance')">Create Repair</button><button class="btn btn-outline btn-sm" onclick="showPage('installments')">Collect Installment</button><button class="btn btn-outline btn-sm" onclick="showPage('approvals')">Approve Workflow</button><button class="btn btn-outline btn-sm" onclick="showPage('financial-center')">Partner Settlement</button><button class="btn btn-outline btn-sm" onclick="showPage('hr')">Payroll</button><button class="btn btn-green btn-sm" onclick="showPage('backup')">Backup</button></div>`;
   document.getElementById('commandPerformance').innerHTML = commandRows([['Render cache', commandCenterCache.data ? 'Ready' : 'Cold'], ['Sync queue', data.liveStats.pending], ['Offline queue', (getPwaState().pendingSync || []).length], ['Memory estimate', (performance?.memory?.usedJSHeapSize ? Math.round(performance.memory.usedJSHeapSize/1024/1024)+' MB' : 'N/A')], ['PWA installed', getPwaState().installed ? 'Yes' : 'No']]);
   document.getElementById('commandEnterpriseMap').innerHTML = renderCommandMap();
   renderCommandTimeline();
@@ -35607,7 +35607,7 @@ document.addEventListener('keydown', function(e) {
   }
   if (e.key === 'F1') {
     e.preventDefault();
-    showPage('pos');
+    openNewSaleInvoiceModal();
   }
   if (e.key === 'F2') {
     e.preventDefault();
