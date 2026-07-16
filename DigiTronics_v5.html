@@ -19620,7 +19620,7 @@ function deleteProduct(id) {
   if (stockMoveRefs.length) blockers.push(`حركات مخزون (${stockMoveRefs.length})`);
   if (serialRefs.length) blockers.push(`سيريالات (${serialRefs.length})`);
   if (blockers.length > 0) {
-    showToast(`لا يمكن حذف المنتج "${p.name}" لأنه مستخدم في: ${blockers.join('، ')}. احذف/اربط السجلات المرتبطة أولاً.`, 'error');
+    showToast(`لا يمكن حذف المنتج "${p.name}" لأنه مستخدم داخل النظام (${blockers.join('، ')}). احذف/اربط السجلات المرتبطة أولاً.`, 'error');
     return;
   }
 
@@ -20424,7 +20424,7 @@ function updatePurchaseInvoice(id) {
       DB.serials = DB.serials.filter(s => !item.serials.includes(s.serial) || s.purchaseInvoiceId !== id);
     } else {
       // Decrement no-serial stock
-      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
+      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
       if (prod) prod.stockQty = Math.max(0, (prod.stockQty || 0) - item.qty);
     }
     addStockMovement(item.productId, 'out', item.qty, `إلغاء شراء قديم - فاتورة ${id}`, null, purchaseMeta);
@@ -20441,7 +20441,7 @@ function updatePurchaseInvoice(id) {
 
   // Apply new inventory effects
   purCart.forEach(item => {
-    const prod = DB.products.find(p => sameProductId(p.id, B.productId));
+    const prod = DB.products.find(p => sameProductId(p.id, item.productId));
     if (item.noSerial) {
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     } else {
@@ -31225,7 +31225,7 @@ function legacyFinalizeSaleTransaction(payload) {
   const issueDateIso = payload.issueDateIso || (payload.issueDate ? localDateWithCurrentTime(payload.issueDate) : localDateTimeString());
   const createdAt = payload.createdAt || localDateTimeString();
   const saleItems = Array.isArray(payload.items) ? payload.items.map(item => {
-    const product = DB.products.find(p => sameProductId(p.id, B.productId));
+    const product = DB.products.find(p => sameProductId(p.id, item.productId));
     const fallbackSell = product ? ((parseFloat(product.sellPrice) > 0) ? parseFloat(product.sellPrice) : (parseFloat(product.buyPrice) || 0)) : 0;
     return {
       ...item,
@@ -31270,7 +31270,7 @@ function legacyFinalizeSaleTransaction(payload) {
         });
       });
       if (item.isAmanat && (!item.serials || item.serials.length === 0)) {
-        const product = DB.products.find(p => sameProductId(p.id, B.productId));
+        const product = DB.products.find(p => sameProductId(p.id, item.productId));
         if (product) product.stockQty = (product.stockQty || 0) - item.qty;
       }
     }
@@ -31564,7 +31564,7 @@ function buildPurchasePayloadFromPOS() {
 
   const serialWithoutSerial = normalizedCart.filter(item => {
     if (!item || item.productId == null) return false;
-    const prod = DB.products.find(p => sameProductId(p.id, B.productId));
+    const prod = DB.products.find(p => sameProductId(p.id, item.productId));
     if (!prod) return false;
     const serials = Array.isArray(item.serials) ? item.serials.filter(Boolean) : [];
     return prod.hasSerial !== false && serials.length === 0;
@@ -32345,7 +32345,7 @@ function deleteSaleInvoice(id) {
   // MI-6: Check if invoice has returns - deleting would corrupt data
   const returns = getSaleReturnsForInvoice(id);
   if (returns.length > 0) {
-    showToast(`لا يمكن حذف فاتورة البيع #${id} لأنها تحتوي على ${returns.length} مرتجع. قم بحذف المرتجعات أولاً.`, 'error');
+    showToast(`لا يمكن حذف الفاتورة #${id} لأنها مرتبطة بمرتجع بيع (${returns.length} مرتجع). قم بحذف المرتجعات أولاً.`, 'error');
     return;
   }
   
@@ -32359,7 +32359,7 @@ function deleteSaleInvoice(id) {
         if (s) { s.status = 'available'; s.saleInvoiceId = null; }
       });
     } else if (item.productId) {
-      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
+      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     }
     if (item.productId) addStockMovement(item.productId, 'in', item.qty, `إلغاء فاتورة بيع #${id}`);
@@ -32388,7 +32388,7 @@ function deletePurchaseInvoice(id) {
   // MI-6b: Check if invoice has purchase returns - deleting would corrupt data
   const returns = getPurchaseReturnsForInvoice(id);
   if (returns.length > 0) {
-    showToast(`لا يمكن حذف فاتورة الشراء #${id} لأنها تحتوي على ${returns.length} مرتجع. قم بحذف المرتجعات أولاً.`, 'error');
+    showToast(`لا يمكن حذف الفاتورة #${id} لأنها مرتبطة بمرتجع شراء (${returns.length} مرتجع). قم بحذف المرتجعات أولاً.`, 'error');
     return;
   }
   
@@ -32402,7 +32402,7 @@ function deletePurchaseInvoice(id) {
     if (item.serials && item.serials.length > 0) {
       DB.serials = DB.serials.filter(s => !(item.serials.includes(s.serial) && s.purchaseInvoiceId === id));
     } else if (item.productId) {
-      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
+      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
       if (prod) prod.stockQty = Math.max(0, (prod.stockQty || 0) - item.qty);
     }
     if (item.productId) addStockMovement(item.productId, 'out', item.qty, `إلغاء فاتورة شراء #${id}`);
@@ -32515,7 +32515,7 @@ function saveEditSaleInvoice() {
         if (s) { s.status = 'available'; s.saleInvoiceId = null; }
       });
     } else if (item.productId) {
-      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
+      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     }
   });
