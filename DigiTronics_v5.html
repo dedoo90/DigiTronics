@@ -6133,8 +6133,20 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
   <div class="modal-title">⚡ بيع سريع (نسخة جديدة)<button class="modal-close" onclick="closeModal('quickSaleModal')">&times;</button></div>
 
   <div class="grid-2">
-    <div class="form-group"><label>المنتج</label><input type="text" id="quickProd" placeholder="اسم المنتج"></div>
-    <div class="form-group"><label>السيريال</label><input type="text" id="quickSerial" placeholder="رقم السيريال"></div>
+    <div class="form-group" style="position:relative">
+      <label>المنتج</label>
+      <input type="text" id="quickProdSearch" placeholder="🔍 اكتب اسم المنتج أو الباركود أو Part Number..."
+        autocomplete="off" oninput="quickSaleSearchInput(this.value)" onfocus="quickSaleSearchInput(this.value)"
+        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.9rem;outline:none;transition:border-color .2s"
+        onkeydown="quickSaleKeyNav(event)">
+      <input type="hidden" id="quickProductId">
+      <input type="hidden" id="quickProductName">
+      <input type="hidden" id="quickProductBarcode">
+      <input type="hidden" id="quickProductPartNumber">
+      <div id="quickProdDropdown"
+        style="display:none;position:absolute;top:100%;right:0;left:0;background:var(--surface);border:1px solid var(--accent);border-radius:10px;z-index:9999;max-height:220px;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,.2);margin-top:2px"></div>
+    </div>
+    <div class="form-group"><label>السيريال</label><input type="text" id="quickSerial" placeholder="رقم السيريال (اختياري - للمنتجات المتسلسلة)"></div>
   </div>
 
   <div class="grid-2">
@@ -17921,6 +17933,26 @@ function getSaleReturnsForInvoice(invoiceId) {
   });
 }
 
+function getPurchaseReturnsForInvoice(invoiceId) {
+  const id = String(invoiceId || '').trim().toLowerCase();
+  if (!id) return [];
+  return (DB.returns || []).filter(r => {
+    const retType = (r.invoiceType || 'sale');
+    return retType === 'purchase' && String(r.invoiceId || '').trim().toLowerCase() === id;
+  });
+}
+
+// ===== ATOMIC INVOICE ID GENERATOR (Code-5 Fix) =====
+// Generates a unique invoice ID atomically to prevent race conditions
+// when multiple invoices are created simultaneously.
+function generateInvoiceId(prefix) {
+  const pref = prefix || 'INV';
+  const current = parseInt(DB.settings && DB.settings.nextInvoiceNum, 10) || 1;
+  const id = pref + '-' + String(current).padStart(6, '0');
+  DB.settings.nextInvoiceNum = current + 1;
+  return id;
+}
+
 function getSaleReturnFinancialImpact(invoice) {
   if (!invoice || !invoice.id) return { returnedTotal: 0, returnedProfit: 0 };
   const originalTotal = Number(invoice.total || 0);
@@ -17945,7 +17977,7 @@ function getSaleReturnFinancialImpact(invoice) {
     retItems.forEach(ri => {
       const qty = Math.max(0, Number(ri.qty || 0));
       const invItem = (invoice.items || []).find(it =>
-        (ri.productId && it.productId === ri.productId) ||
+        (ri.productId && sameProductId(it.productId, ri.productId)) ||
         ((it.name || '').trim() === (ri.name || '').trim())
       );
       const unitPrice = Number.isFinite(Number(ri.price))
@@ -19014,6 +19046,33 @@ function normalizeProductNameForLink(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
+// ===== Code-3: Unified Product ID Resolution =====
+// Resolves product ID from an item regardless of which field name variant is used.
+// This prevents bugs caused by mixed naming conventions (productId, product_id, legacy_product_id, legacyProductId).
+// NOTE: item.id is intentionally NOT used - it is often the invoice/serial id, not a product id,
+// and falling through to it would silently resolve the wrong product.
+function resolveProductId(item = {}) {
+  if (!item) return null;
+  // Try all known product-ID field variants in priority order (no .id fallback).
+  const id = item.productId ?? item.product_id ?? item.legacy_product_id ?? item.legacyProductId ?? null;
+  if (id == null || id === '') return null;
+  return id;
+}
+
+// ===== Code-3: Normalized productId comparison =====
+// Product ids are numeric timestamps (Date.now()), but legacy/imported invoice items may store ids as strings.
+// Comparing with === across a numeric/string boundary silently fails to match - corrupting inventory, reports,
+// returns, profit and accounting totals. Always compare through this helper.
+// Returns false if either side is null/undefined/''.
+function sameProductId(a, b) {
+  if (a == null || a === '' || b == null || b === '') return false;
+  // Coerce both sides to Number; if either is non-finite (e.g. a non-numeric legacy string id),
+  // fall back to trimmed case-insensitive string comparison so legacy string ids still match.
+  const na = Number(a), nb = Number(b);
+  if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
+  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+}
+
 function resolveProductForInvoiceItem(item = {}) {
   const productUuid = resolveSupabaseProductUuid(item);
   if (productUuid) {
@@ -19031,7 +19090,12 @@ function resolveProductForInvoiceItem(item = {}) {
   }
   const itemName = normalizeProductNameForLink(item.productName || item.name || item.product || item.itemName);
   if (!itemName) return null;
-  return (DB.products || []).find(p => normalizeProductNameForLink(p.name) === itemName) || null;
+  // Code-4: Name-based lookup is fallback only - warn if ambiguous
+  const nameMatches = (DB.products || []).filter(p => normalizeProductNameForLink(p.name) === itemName);
+  if (nameMatches.length > 1) {
+    console.warn(`[Code-4] Ambiguous product name match: "${itemName}" matches ${nameMatches.length} products. Using first match (ID: ${nameMatches[0].id}). Consider assigning unique product IDs to invoice items.`);
+  }
+  return nameMatches[0] || null;
 }
 
 function normalizeInvoiceItemProductLink(item = {}, invoice = {}) {
@@ -19531,14 +19595,40 @@ function applyPurchaseAveragesToOldCosts() {
 
 function deleteProduct(id) {
   if (!requirePermission('deleteProducts')) return;
-  if (!confirm('هل تريد حذف هذا المنتج؟')) return;
-  
-  const p = DB.products.find(x => x.id === id);
-  DB.products = DB.products.filter(x => x.id !== id);
-  DB.serials = DB.serials.filter(s => s.productId !== id);
-  
-  logProductChange('حذف منتج', p ? p.name : 'Unknown', 'تم حذف المنتج والسيريالات');
-  
+  const p = DB.products.find(x => sameProductId(x.id, id));
+  if (!p) { showToast('المنتج غير موجود', 'error'); return; }
+
+  // Data-5: Block deletion while the product is still referenced by accounting/inventory history.
+  // Deleting it would orphan invoice items, returns and stock movement records, corrupting
+  // reports (profit, inventory valuation, treasury reconciliation). Use sameProductId() so
+  // legacy string ids still match the numeric product id.
+  const saleRefs = (DB.saleInvoices || []).filter(inv =>
+    (inv.items || []).some(it => sameProductId(it.productId, id)));
+  const purchaseRefs = (DB.purchaseInvoices || []).filter(inv => {
+    const items = (inv.items && inv.items.length) ? inv.items : [{ productId: inv.productId, qty: inv.qty || 1, serials: [] }];
+    return items.some(it => sameProductId(it.productId, id));
+  });
+  const returnRefs = (DB.returns || []).filter(r =>
+    (r.items || []).some(it => sameProductId(it.productId, id)));
+  const stockMoveRefs = (DB.stockMovement || []).filter(m => sameProductId(m.productId, id));
+  const serialRefs = (DB.serials || []).filter(sr => sameProductId(sr.productId, id));
+
+  const blockers = [];
+  if (saleRefs.length) blockers.push(`فواتير بيع (${saleRefs.length})`);
+  if (purchaseRefs.length) blockers.push(`فواتير شراء (${purchaseRefs.length})`);
+  if (returnRefs.length) blockers.push(`مرتجعات (${returnRefs.length})`);
+  if (stockMoveRefs.length) blockers.push(`حركات مخزون (${stockMoveRefs.length})`);
+  if (serialRefs.length) blockers.push(`سيريالات (${serialRefs.length})`);
+  if (blockers.length > 0) {
+    showToast(`لا يمكن حذف المنتج "${p.name}" لأنه مستخدم في: ${blockers.join('، ')}. احذف/اربط السجلات المرتبطة أولاً.`, 'error');
+    return;
+  }
+
+  if (!confirm(`هل تريد حذف المنتج "${p.name}" نهائياً؟\nلا توجد سجلات مرتبطة به.`)) return;
+
+  DB.products = DB.products.filter(x => !sameProductId(x.id, id));
+  logProductChange('حذف منتج', p.name, 'تم حذف المنتج (لا توجد سجلات مرتبطة)');
+
   saveDB();
   renderProductsTable();
   showToast('تم الحذف');
@@ -20334,7 +20424,7 @@ function updatePurchaseInvoice(id) {
       DB.serials = DB.serials.filter(s => !item.serials.includes(s.serial) || s.purchaseInvoiceId !== id);
     } else {
       // Decrement no-serial stock
-      const prod = DB.products.find(p => p.id === item.productId);
+      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
       if (prod) prod.stockQty = Math.max(0, (prod.stockQty || 0) - item.qty);
     }
     addStockMovement(item.productId, 'out', item.qty, `إلغاء شراء قديم - فاتورة ${id}`, null, purchaseMeta);
@@ -20351,7 +20441,7 @@ function updatePurchaseInvoice(id) {
 
   // Apply new inventory effects
   purCart.forEach(item => {
-    const prod = DB.products.find(p => p.id === item.productId);
+    const prod = DB.products.find(p => sameProductId(p.id, B.productId));
     if (item.noSerial) {
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     } else {
@@ -21871,7 +21961,7 @@ function saveReturnImpl() {
       returnedItems.push({ productId: item.productId, name: item.name, qty: selectedSerials.length, serials: selectedSerials, price: item.price || 0, buyPrice: item.buyPrice || 0, refund: itemRefund });
     } else {
       const qty = parseInt(document.getElementById(`retQty_${idx}`)?.value) || item.qty;
-      const prod = DB.products.find(p => p.id === item.productId);
+      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
       if (prod) prod.stockQty = (prod.stockQty || 0) + qty;
       const itemRefund = item.price * qty;
       totalRefundCalc += itemRefund;
@@ -23741,12 +23831,12 @@ function renderReports() {
   
   const slowMovers = DB.products.filter(p => {
     const lastSale = DB.saleInvoices
-      .filter(inv => inv.items && inv.items.some(i => i.productId === p.id))
+      .filter(inv => inv.items && inv.items.some(i => sameProductId(i.productId, p.id)))
       .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
     return !lastSale || new Date(lastSale.date) < thirtyDaysAgo;
   }).map(p => {
     const lastSale = DB.saleInvoices
-      .filter(inv => inv.items && inv.items.some(i => i.productId === p.id))
+      .filter(inv => inv.items && inv.items.some(i => sameProductId(i.productId, p.id)))
       .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
     const days = lastSale ? Math.floor((new Date() - new Date(lastSale.date)) / (1000 * 60 * 60 * 24)) : 'لم يُباع';
     const stock = getProductStock(p.id);
@@ -24180,7 +24270,7 @@ function renderForecastPage() {
     const sold90 = (DB.saleInvoices || []).reduce((sum, inv) => {
       const ageDays = (Date.now() - new Date(inv.date).getTime()) / (1000 * 60 * 60 * 24);
       if (ageDays > 90) return sum;
-      const item = (inv.items || []).find(i => i.productId === p.id);
+      const item = (inv.items || []).find(i => sameProductId(i.productId, p.id));
       return sum + (item ? (item.qty || 0) : 0);
     }, 0);
     const monthlyAvg = sold90 / 3;
@@ -31135,7 +31225,7 @@ function legacyFinalizeSaleTransaction(payload) {
   const issueDateIso = payload.issueDateIso || (payload.issueDate ? localDateWithCurrentTime(payload.issueDate) : localDateTimeString());
   const createdAt = payload.createdAt || localDateTimeString();
   const saleItems = Array.isArray(payload.items) ? payload.items.map(item => {
-    const product = DB.products.find(p => p.id === item.productId);
+    const product = DB.products.find(p => sameProductId(p.id, B.productId));
     const fallbackSell = product ? ((parseFloat(product.sellPrice) > 0) ? parseFloat(product.sellPrice) : (parseFloat(product.buyPrice) || 0)) : 0;
     return {
       ...item,
@@ -31157,15 +31247,15 @@ function legacyFinalizeSaleTransaction(payload) {
   const total = roundMoney(Math.max(0, subtotal - discount));
   const profit = calculateSaleInvoiceProfit({ items: saleItems, discount });
 
-  const invoiceId = payload.invoiceId || ('INV-' + String(DB.settings.nextInvoiceNum).padStart(6, '0'));
+  const invoiceId = payload.invoiceId || generateInvoiceId('INV');
   const invoiceNumMatch = String(invoiceId).match(/(\d+)$/);
-  const invoiceNum = invoiceNumMatch ? parseInt(invoiceNumMatch[1], 10) : DB.settings.nextInvoiceNum;
+  const invoiceNum = invoiceNumMatch ? parseInt(invoiceNumMatch[1], 10) : (parseInt(DB.settings && DB.settings.nextInvoiceNum, 10) || 1);
   DB.settings.nextInvoiceNum = Math.max(parseInt(DB.settings.nextInvoiceNum, 10) || 1, (invoiceNum || 0) + 1);
   const saleMeta = { referenceType: 'sale', referenceId: invoiceId, entryKind: 'sale', sourceModule: 'sales', transactionDate: issueDateIso, saleDate: issueDateIso.slice(0, 10), ...getCurrentBranchMeta(), cashier: payload.user || (currentUser ? currentUser.username : 'system') };
 
   saleItems.forEach(item => {
     if (item.noSerial) {
-      const product = DB.products.find(p => p.id === item.productId);
+      const product = DB.products.find(p => sameProductId(p.id, item.productId));
       if (product) {
         if (item.isAmanat) product.stockQty = (product.stockQty || 0) - item.qty;
         else product.stockQty = Math.max(0, (product.stockQty || 0) - item.qty);
@@ -31180,7 +31270,7 @@ function legacyFinalizeSaleTransaction(payload) {
         });
       });
       if (item.isAmanat && (!item.serials || item.serials.length === 0)) {
-        const product = DB.products.find(p => p.id === item.productId);
+        const product = DB.products.find(p => sameProductId(p.id, B.productId));
         if (product) product.stockQty = (product.stockQty || 0) - item.qty;
       }
     }
@@ -31474,7 +31564,7 @@ function buildPurchasePayloadFromPOS() {
 
   const serialWithoutSerial = normalizedCart.filter(item => {
     if (!item || item.productId == null) return false;
-    const prod = DB.products.find(p => p.id === item.productId);
+    const prod = DB.products.find(p => sameProductId(p.id, B.productId));
     if (!prod) return false;
     const serials = Array.isArray(item.serials) ? item.serials.filter(Boolean) : [];
     return prod.hasSerial !== false && serials.length === 0;
@@ -32251,6 +32341,14 @@ function deleteSaleInvoice(id) {
   if (!requirePermission('deleteData')) return;
   const inv = DB.saleInvoices.find(i => i.id === id);
   if (!inv) return;
+  
+  // MI-6: Check if invoice has returns - deleting would corrupt data
+  const returns = getSaleReturnsForInvoice(id);
+  if (returns.length > 0) {
+    showToast(`لا يمكن حذف فاتورة البيع #${id} لأنها تحتوي على ${returns.length} مرتجع. قم بحذف المرتجعات أولاً.`, 'error');
+    return;
+  }
+  
   if (!confirm(`⚠️ هل تريد حذف فاتورة البيع #${id} نهائياً؟\n\nسيتم:\n• إعادة السيريالات للمخزون\n• خصم المبلغ من الخزنة\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
 
   // Reverse inventory effects
@@ -32261,7 +32359,7 @@ function deleteSaleInvoice(id) {
         if (s) { s.status = 'available'; s.saleInvoiceId = null; }
       });
     } else if (item.productId) {
-      const prod = DB.products.find(p => p.id === item.productId);
+      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     }
     if (item.productId) addStockMovement(item.productId, 'in', item.qty, `إلغاء فاتورة بيع #${id}`);
@@ -32286,6 +32384,14 @@ function deletePurchaseInvoice(id) {
   if (!requirePermission('deleteData')) return;
   const inv = DB.purchaseInvoices.find(p => p.id === id);
   if (!inv) return;
+  
+  // MI-6b: Check if invoice has purchase returns - deleting would corrupt data
+  const returns = getPurchaseReturnsForInvoice(id);
+  if (returns.length > 0) {
+    showToast(`لا يمكن حذف فاتورة الشراء #${id} لأنها تحتوي على ${returns.length} مرتجع. قم بحذف المرتجعات أولاً.`, 'error');
+    return;
+  }
+  
   if (!confirm(`⚠️ هل تريد حذف فاتورة الشراء #${id} نهائياً؟\n\nسيتم:\n• حذف السيريالات المرتبطة بها\n• إرجاع المبلغ للخزنة\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
 
   // Reverse inventory effects
@@ -32296,7 +32402,7 @@ function deletePurchaseInvoice(id) {
     if (item.serials && item.serials.length > 0) {
       DB.serials = DB.serials.filter(s => !(item.serials.includes(s.serial) && s.purchaseInvoiceId === id));
     } else if (item.productId) {
-      const prod = DB.products.find(p => p.id === item.productId);
+      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
       if (prod) prod.stockQty = Math.max(0, (prod.stockQty || 0) - item.qty);
     }
     if (item.productId) addStockMovement(item.productId, 'out', item.qty, `إلغاء فاتورة شراء #${id}`);
@@ -32409,7 +32515,7 @@ function saveEditSaleInvoice() {
         if (s) { s.status = 'available'; s.saleInvoiceId = null; }
       });
     } else if (item.productId) {
-      const prod = DB.products.find(p => p.id === item.productId);
+      const prod = DB.products.find(p => sameProductId(p.id, B.productId));
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     }
   });
@@ -32549,19 +32655,119 @@ async function saveNewSaleInvoiceFromModal() {
 // ================= QUICK SALE =================
 function openQuickSaleModal() {
   if (!requirePermission('viewFinancial')) return;
-  document.getElementById('quickProd').value = '';
+  document.getElementById('quickProdSearch').value = '';
+  document.getElementById('quickProductId').value = '';
+  document.getElementById('quickProductName').value = '';
+  document.getElementById('quickProductBarcode').value = '';
+  document.getElementById('quickProductPartNumber').value = '';
   document.getElementById('quickSerial').value = '';
   document.getElementById('quickPrice').value = '';
   document.getElementById('quickCost').value = '';
   document.getElementById('quickCustomer').value = '';
   document.getElementById('quickPayment').value = 'cash';
   const qn = document.getElementById('quickNote'); if (qn) qn.value = '';
+  const qd = document.getElementById('quickProdDropdown'); if (qd) { qd.style.display = 'none'; qd.innerHTML = ''; }
   openModal('quickSaleModal');
+}
+
+let _quickSaleDropIdx = -1;
+let _quickSaleDropdownHover = false;
+let _quickSaleDropdownHideTimer = null;
+let _quickSaleSelectedProduct = null;
+
+function quickSaleCancelHideDropdown() {
+  if (_quickSaleDropdownHideTimer) { clearTimeout(_quickSaleDropdownHideTimer); _quickSaleDropdownHideTimer = null; }
+}
+
+function quickSaleHideDropdownDelayed(ms = 220) {
+  quickSaleCancelHideDropdown();
+  _quickSaleDropdownHideTimer = setTimeout(() => {
+    if (_quickSaleDropdownHover) return;
+    const d = document.getElementById('quickProdDropdown');
+    if (d) d.style.display = 'none';
+  }, ms);
+}
+
+function quickSaleSearchInput(val) {
+  quickSaleCancelHideDropdown();
+  _quickSaleDropIdx = -1;
+  const typedValue = String(val || '').trim();
+  if (_quickSaleSelectedProduct && typedValue.toLowerCase() !== String(_quickSaleSelectedProduct.name || '').trim().toLowerCase()) {
+    _quickSaleSelectedProduct = null;
+    document.getElementById('quickProductId').value = '';
+    document.getElementById('quickProductName').value = '';
+    document.getElementById('quickProductBarcode').value = '';
+    document.getElementById('quickProductPartNumber').value = '';
+  }
+  const drop = document.getElementById('quickProdDropdown');
+  if (!drop) return;
+  const q = (val || '').trim().toLowerCase();
+  const matches = q.length >= 1
+    ? DB.products.filter(p => 
+        p.name.toLowerCase().includes(q) || 
+        String(p.id).includes(q) ||
+        String(p.barcode || '').toLowerCase().includes(q) ||
+        String(p.partNumber || '').toLowerCase().includes(q)
+      ).slice(0, 40)
+    : DB.products.slice(0, 40);
+  if (!matches.length) {
+    drop.innerHTML = '<div style="padding:12px 14px;color:var(--text2);font-size:0.82rem;text-align:center">لا يوجد منتج مطابق</div>';
+    drop.style.display = 'block'; return;
+  }
+  drop.innerHTML = matches.map((p, i) => {
+    const stock = typeof getProductStock === 'function' ? getProductStock(p.id) : '?';
+    const safe = p.name.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return `<div id="quickSaleDrop_${i}" onclick="quickSaleSelectProduct(${p.id})"
+      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;transition:background .12s"
+      onmouseover="quickSaleDropHover(${i})" onmouseout="this.style.background=''">
+      <span style="font-weight:700">${escapeHtml(p.name)}</span>
+      <span style="font-size:0.72rem;color:var(--text2);white-space:nowrap;margin-right:8px">شراء: ${formatMoney(p.buyPrice||0)} | مخزون: ${stock}</span>
+    </div>`;
+  }).join('');
+  drop.style.display = 'block';
+  drop.onmouseenter = function() { _quickSaleDropdownHover = true; quickSaleCancelHideDropdown(); };
+  drop.onmouseleave = function() { _quickSaleDropdownHover = false; quickSaleHideDropdownDelayed(180); };
+}
+
+function quickSaleDropHover(i) {
+  _quickSaleDropIdx = i;
+  document.querySelectorAll('#quickProdDropdown > div').forEach((el,j) => {
+    el.style.background = j === i ? 'var(--surface2)' : '';
+  });
+}
+
+function quickSaleKeyNav(e) {
+  const drop = document.getElementById('quickProdDropdown');
+  if (!drop || drop.style.display === 'none') return;
+  const items = drop.querySelectorAll('div[id^="quickSaleDrop_"]');
+  if (!items.length) return;
+  if (e.key === 'ArrowDown')  { e.preventDefault(); _quickSaleDropIdx = Math.min(_quickSaleDropIdx+1, items.length-1); quickSaleDropHover(_quickSaleDropIdx); items[_quickSaleDropIdx]?.scrollIntoView({block:'nearest'}); }
+  if (e.key === 'ArrowUp')    { e.preventDefault(); _quickSaleDropIdx = Math.max(_quickSaleDropIdx-1, 0); quickSaleDropHover(_quickSaleDropIdx); items[_quickSaleDropIdx]?.scrollIntoView({block:'nearest'}); }
+  if (e.key === 'Enter' && _quickSaleDropIdx >= 0) { e.preventDefault(); items[_quickSaleDropIdx]?.click(); }
+  if (e.key === 'Escape')     { drop.style.display = 'none'; }
+}
+
+function quickSaleSelectProduct(id) {
+  quickSaleCancelHideDropdown();
+  const selected = DB.products.find(product => Number(product.id) === Number(id)) || null;
+  _quickSaleSelectedProduct = selected ? { ...selected } : null;
+  const h = document.getElementById('quickProductId'); if(h) h.value = id;
+  const n = document.getElementById('quickProductName'); if(n) n.value = selected?.name || '';
+  const b = document.getElementById('quickProductBarcode'); if(b) b.value = selected?.barcode || '';
+  const p = document.getElementById('quickProductPartNumber'); if(p) p.value = selected?.partNumber || '';
+  const s = document.getElementById('quickProdSearch');  if(s) s.value = selected?.name || '';
+  const price = document.getElementById('quickPrice'); if(price) price.value = selected?.sellPrice || '';
+  const cost = document.getElementById('quickCost'); if(cost) cost.value = selected?.buyPrice || '';
+  const d = document.getElementById('quickProdDropdown'); if(d) d.style.display = 'none';
+  _quickSaleDropIdx = -1;
 }
 
 function saveQuickSale() {
   if (!requirePermission('createInvoices') || !requirePermission('viewFinancial')) return;
-  const product = document.getElementById('quickProd').value.trim();
+  const productId = document.getElementById('quickProductId').value;
+  const productName = document.getElementById('quickProductName').value.trim();
+  const productBarcode = document.getElementById('quickProductBarcode').value.trim();
+  const productPartNumber = document.getElementById('quickProductPartNumber').value.trim();
   const serial = document.getElementById('quickSerial').value.trim();
   const price = Math.max(0, roundMoney(toSafeFloat(document.getElementById('quickPrice').value, 0)));
   const cost = Math.max(0, roundMoney(toSafeFloat(document.getElementById('quickCost').value, 0)));
@@ -32569,10 +32775,52 @@ function saveQuickSale() {
   const payment = document.getElementById('quickPayment').value;
   const note = (document.getElementById('quickNote')?.value || '').trim();
   
-  if (!product || !price) { showToast('أدخل المنتج والسعر', 'error'); return; }
+  if (!productId || !productName || !price) { showToast('اختر المنتج وأدخل السعر', 'error'); return; }
   
-  const invoiceId = 'INV-' + String(DB.settings.nextInvoiceNum).padStart(6, '0');
-  DB.settings.nextInvoiceNum++;
+  const stockProduct = DB.products.find(p => Number(p.id) === Number(productId));
+  if (!stockProduct) { showToast('المنتج غير موجود', 'error'); return; }
+  
+  // ===== STOCK VALIDATION (CR-2) =====
+  // Use getProductStock() - same function used by POS system
+  const currentStock = getProductStock(Number(productId));
+  
+  if (serial) {
+    // Serial-tracked product: validate serial availability using same logic as POS
+    const serialRecord = findSerialRecordByIdentifier(serial);
+    if (!serialRecord) {
+      showToast('لا يمكن إتمام عملية البيع، السيريال غير مسجل في النظام.', 'error');
+      return;
+    }
+    const info = getSerialSaleBlockInfo(serial);
+    const deviceStatus = String(info.deviceRecord?.status || '').toLowerCase();
+    const serialStatus = String(info.serialRecord?.status || serialRecord.status || '').toLowerCase();
+    if (['sold', 'resold'].includes(deviceStatus) || ['sold', 'resold'].includes(serialStatus)) {
+      showToast('لا يمكن إتمام عملية البيع، السيريال تم بيعه بالفعل.', 'error');
+      return;
+    }
+    if ((deviceStatus || serialStatus) && !['available', 'in_stock', 'returned'].includes(deviceStatus || serialStatus)) {
+      showToast('لا يمكن إتمام عملية البيع، السيريال غير متاح للبيع حالياً.', 'error');
+      return;
+    }
+  } else {
+    // Quantity product: validate stock availability
+    if (currentStock < 1) {
+      showToast('لا يمكن إتمام عملية البيع، الكمية المتوفرة غير كافية.', 'error');
+      return;
+    }
+  }
+  // ===== END STOCK VALIDATION =====
+
+  // Feat-3 (validation): an installment sale needs a real named customer to carry the debt.
+  // Reject early (before any state mutation) to keep inventory/treasury/invoices consistent.
+  // Quick Sale has no down-payment/term UI, so the full price becomes the customer's debt
+  // (recorded after invoice creation below).
+  if (payment === 'installment' && (!customer || customer === 'عميل نقدي')) {
+    showToast('بيع التقسيط يتطلب اختيار عميل محدد (لا يمكن استخدامه مع عميل نقدي).', 'error');
+    return;
+  }
+
+  const invoiceId = generateInvoiceId('INV');
   const saleMeta = { referenceType: 'sale', referenceId: invoiceId, entryKind: 'quick_sale', sourceModule: 'sales', ...getCurrentBranchMeta(), cashier: currentUser ? currentUser.username : 'system' };
   
   const profit = roundMoney(price - cost);
@@ -32583,19 +32831,26 @@ function saveQuickSale() {
     customer,
     customerPhone: '',
     items: [{
-      productId: null,
-      name: product,
+      productId: Number(productId),
+      product_id: resolveSupabaseProductUuid(stockProduct),
+      legacy_product_id: String(productId),
+      productName: productName,
+      name: productName,
       qty: 1,
       price,
       buyPrice: cost,
-      serials: serial ? [serial] : []
+      serials: serial ? [serial] : [],
+      noSerial: !serial,
+      saleTrackingMode: serial ? 'serial' : 'quantity',
+      barcode: productBarcode,
+      partNumber: productPartNumber
     }],
     subtotal: price,
     discount: 0,
     total: price,
     profit,
     payment,
-    invoiceType: 'cash',
+    invoiceType: payment === 'installment' || payment === 'ajel' ? payment : 'cash',
     note,
     user: currentUser ? currentUser.username : 'system'
   };
@@ -32613,10 +32868,32 @@ function saveQuickSale() {
   }
   
   if (payment !== 'installment') {
-    addCashEntry('in', price, payment === 'ajel' ? 'cash' : payment, `بيع سريع - ${product}`, null, saleMeta);
+    addCashEntry('in', price, payment, `بيع سريع - ${productName}`, null, saleMeta);
+  }
+
+  // Feat-3: Quick Sale Installment must record the financed amount on the customer.
+  // Quick Sale has no down-payment/term UI, so the full price is treated as a credit
+  // sale: the customer's balance increases by the full sale price (mirrors the main
+  // sale flow's 'ajel' credit treatment). Without this, goods are sold on credit
+  // terms but no debt is recorded anywhere — a real accounting leak.
+  if (payment === 'installment') {
+    autoSaveCustomer(customer, '');
+    const cust = DB.customers.find(c => (c.name || '').trim().toLowerCase() === String(customer).trim().toLowerCase());
+    if (cust) cust.balance = (cust.balance || 0) + price;
   }
   
-  logActivity('بيع سريع', `${product} - ${formatMoney(price)}`);
+  // Deduct stock using productId (matches legacyFinalizeSaleTransaction behavior)
+  if (stockProduct) {
+    if (serial) {
+      // Serial product: stock deducted via markSoldSerialForSale, no quantity deduction
+    } else {
+      // Quantity product: deduct from stockQty
+      stockProduct.stockQty = Math.max(0, (stockProduct.stockQty || 0) - 1);
+    }
+  }
+  addStockMovement(Number(productId), 'out', 1, `بيع سريع - ${productName}`, null, saleMeta);
+  
+  logActivity('بيع سريع', `${productName} - ${formatMoney(price)}`);
   
   saveDB();
   closeModal('quickSaleModal');
