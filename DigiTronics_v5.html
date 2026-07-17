@@ -27872,7 +27872,7 @@ function getSupplierArApTransactions(supplier) {
     label: 'مرتجع شراء',
     reference: r.id || r.returnId || r.invoiceId,
     debit: 0,
-    credit: toSafeFloat(r.amount || r.refundAmount || r.total, 0),
+    credit: toSafeFloat(r.amount || r.refundAmount || r.refund || r.total, 0),
     notes: r.reason || ''
   }));
   (DB.supplierPayments || []).filter(p => arApSameParty(p, supplier, ['supplierName', 'name'])).forEach(p => push({
