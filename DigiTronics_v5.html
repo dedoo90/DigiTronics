@@ -939,7 +939,114 @@ body.accent-orange{--accent:#ea580c;--accent2:#c2410c;--accent-color:#ea580c;}
 }
 @media print{.pwa-bottom-nav,.pwa-install-banner{display:none!important}}
 
+/* ===== DASHBOARD V3 ===== */
+.dashboard-section {
+  background: var(--glass-bg, rgba(255,255,255,0.82));
+  border: 1px solid var(--border, #d7e3f2);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--glass-shadow, 0 10px 28px rgba(15,23,42,0.08));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.dashboard-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text, #0f172a);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border, #d7e3f2);
+}
+.dashboard-kpi-row {
+  margin-bottom: 16px;
+}
 
+/* Alerts Grid */
+.dashboard-alerts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.alert-card {
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #d7e3f2);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+.alert-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(15,23,42,0.1);
+}
+.alert-card-icon {
+  font-size: 1.6rem;
+  margin-bottom: 6px;
+}
+.alert-card-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--red, #dc2626);
+}
+.alert-card-label {
+  font-size: 0.75rem;
+  color: var(--muted, #64748b);
+  margin-top: 2px;
+}
+
+/* Quick Actions */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border, #d7e3f2);
+  background: var(--surface, #ffffff);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.quick-action-btn:hover {
+  background: var(--accent, #2563eb);
+  color: #fff;
+  border-color: var(--accent, #2563eb);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(37,99,235,0.22);
+}
+.quick-action-icon {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.quick-action-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+/* Chart wrapper */
+.dashboard-chart-wrapper {
+  position: relative;
+  height: 280px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard-alerts-grid { grid-template-columns: repeat(3, 1fr); }
+  .quick-actions-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 480px) {
+  .quick-actions-grid { grid-template-columns: repeat(2, 1fr); }
+}
+/* ===== END DASHBOARD V3 ===== */
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
@@ -1401,6 +1508,9 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
   <button class="hamburger" onclick="toggleSidebar()">☰</button>
 <div class="overlay" id="overlay"></div>
   <style>
+    .demo-safety-badges{position:fixed;top:8px;right:62px;z-index:90;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 150px);pointer-events:none}
+    .demo-safety-badge{padding:5px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--border);box-shadow:0 3px 12px rgba(0,0,0,.08);font-size:.66rem;font-weight:700;color:var(--text2)}
+    .demo-safety-badge.primary{background:#fff7ed;color:#9a3412;border-color:#fdba74}
     .demo-guide-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px;margin-top:14px}
     .demo-step{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.82rem}
     .demo-step>span{display:grid;place-items:center;min-width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800}
@@ -1479,129 +1589,16 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     .go-live-row strong{overflow-wrap:anywhere;text-align:end}
     .go-live-actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
     .go-live-result{direction:ltr;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);font-size:.72rem;max-height:420px;overflow:auto}
-    @media(max-width:760px){.demo-guide-grid{grid-template-columns:1fr}}
-
-
-    @media(max-width:480px){.d6-kpi-grid{grid-template-columns:1fr}.d6-quick-actions{grid-template-columns:repeat(2,1fr)}}
-
-
-    /* ===== DASHBOARD V6 ENTERPRISE ===== */
-    .d6{--d6-bg:var(--bg);--d6-surface:var(--surface);--d6-surface2:var(--surface2);--d6-border:var(--border);--d6-text:var(--text);--d6-text2:var(--text2);--d6-muted:var(--muted);--d6-accent:var(--accent);--d6-green:var(--green);--d6-red:var(--red);--d6-yellow:var(--yellow);--d6-purple:var(--purple);--d6-orange:var(--orange);--d6-teal:var(--teal);--d6-sky:var(--sky)}
-    .d6-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:linear-gradient(135deg,rgba(255,255,255,.92) 0%,rgba(238,244,251,.95) 100%);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--d6-border);position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap;box-shadow:0 1px 8px rgba(15,23,42,.06)}
-    .d6-header-left{display:flex;align-items:center;gap:14px;flex:1;min-width:0}
-    .d6-logo{font-size:1.15rem;font-weight:900;color:var(--d6-accent);letter-spacing:-.3px;display:flex;align-items:center;gap:6px}
-    .d6-logo-icon{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--d6-accent),var(--d6-sky));display:grid;place-items:center;color:#fff;font-size:.9rem}
-    .d6-header-center{display:flex;align-items:center;gap:8px;flex:1;justify-content:center;max-width:400px}
-    .d6-search{position:relative;flex:1;max-width:320px}
-    .d6-search input{width:100%;padding:8px 14px 8px 36px;border-radius:12px;border:1px solid var(--d6-border);background:rgba(255,255,255,.7);font-size:.78rem;font-family:inherit;outline:none;transition:all .2s}
-    .d6-search input:focus{border-color:var(--d6-accent);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
-    .d6-search::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:.8rem;opacity:.5}
-    .d6-header-right{display:flex;align-items:center;gap:8px}
-    .d6-header-btn{position:relative;width:36px;height:36px;border-radius:10px;border:1px solid var(--d6-border);background:rgba(255,255,255,.7);display:grid;place-items:center;cursor:pointer;transition:all .2s;font-size:1rem}
-    .d6-header-btn:hover{background:var(--d6-accent);color:#fff;border-color:var(--d6-accent);transform:translateY(-1px)}
-    .d6-header-btn .badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:var(--d6-red);color:#fff;font-size:.6rem;font-weight:800;display:grid;place-items:center;padding:0 4px}
-    .d6-header-btn.profile{width:auto;padding:4px 10px 4px 4px;display:flex;align-items:center;gap:6px;font-size:.75rem;font-weight:600;color:var(--d6-text2)}
-    .d6-header-btn.profile .avatar{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--d6-accent),var(--d6-purple));color:#fff;display:grid;place-items:center;font-size:.7rem;font-weight:700}
-    .d6-clock{font-size:.72rem;color:var(--d6-muted);font-weight:500;direction:ltr}
-    .d6-connection{display:flex;align-items:center;gap:4px;font-size:.68rem;color:var(--d6-green);font-weight:600}
-    .d6-connection.offline{color:var(--d6-red)}
-    .d6-kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:16px 20px}
-    .d6-kpi-card{background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-radius:14px;padding:14px;border:1px solid rgba(215,227,242,.6);box-shadow:0 2px 8px rgba(15,23,42,.04);transition:all .25s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden;cursor:pointer}
-    .d6-kpi-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(15,23,42,.1);border-color:rgba(37,99,235,.2)}
-    .d6-kpi-card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;opacity:.8}
-    .d6-kpi-card.sales::after{background:linear-gradient(90deg,var(--d6-green),#22c55e)}
-    .d6-kpi-card.profit::after{background:linear-gradient(90deg,var(--d6-accent),#3b82f6)}
-    .d6-kpi-card.cash::after{background:linear-gradient(90deg,var(--d6-sky),#38bdf8)}
-    .d6-kpi-card.alerts::after{background:linear-gradient(90deg,var(--d6-red),#f87171)}
-    .d6-kpi-card.inventory::after{background:linear-gradient(90deg,var(--d6-purple),#a78bfa)}
-    .d6-kpi-card.users::after{background:linear-gradient(90deg,var(--d6-orange),#fb923c)}
-    .d6-kpi-card.maintenance::after{background:linear-gradient(90deg,var(--d6-yellow),#fbbf24)}
-    .d6-kpi-card.installments::after{background:linear-gradient(90deg,var(--d6-teal),#2dd4bf)}
-    .d6-kpi-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-    .d6-kpi-icon{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;font-size:1rem;background:rgba(37,99,235,.08)}
-    .d6-kpi-trend{font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:10px;background:rgba(22,163,74,.1);color:var(--d6-green)}
-    .d6-kpi-trend.down{background:rgba(220,38,38,.1);color:var(--d6-red)}
-    .d6-kpi-value{font-size:1.2rem;font-weight:800;color:var(--d6-text);line-height:1.1;margin-bottom:2px}
-    .d6-kpi-label{font-size:.68rem;color:var(--d6-muted);font-weight:500}
-    .d6-kpi-spark{height:3px;border-radius:2px;background:rgba(215,227,242,.5);margin-top:8px;overflow:hidden}
-    .d6-kpi-spark-bar{height:100%;border-radius:2px;background:var(--d6-accent);transition:width .6s ease}
-    .d6-section{display:flex;align-items:center;justify-content:space-between;padding:0 20px;margin:16px 0 10px}
-    .d6-section-title{font-size:.82rem;font-weight:800;color:var(--d6-text);display:flex;align-items:center;gap:6px}
-    .d6-section-title span{font-size:.68rem;color:var(--d6-muted);font-weight:500}
-    .d6-section-action{font-size:.68rem;color:var(--d6-accent);font-weight:600;cursor:pointer;padding:4px 10px;border-radius:8px;background:rgba(37,99,235,.08);transition:all .2s}
-    .d6-section-action:hover{background:var(--d6-accent);color:#fff}
-    .d6-chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;padding:0 20px 16px}
-    .d6-chart-card{background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-radius:16px;padding:16px;border:1px solid rgba(215,227,242,.6);box-shadow:0 2px 8px rgba(15,23,42,.04);transition:all .2s}
-    .d6-chart-card:hover{box-shadow:0 6px 20px rgba(15,23,42,.08)}
-    .d6-chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-    .d6-chart-title{font-size:.78rem;font-weight:700;color:var(--d6-text)}
-    .d6-chart-badge{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(37,99,235,.08);color:var(--d6-accent)}
-    .d6-chart-area{height:200px;position:relative}
-    .d6-chart-empty{display:grid;place-items:center;height:200px;color:var(--d6-muted);font-size:.75rem}
-    .d6-timeline{background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-radius:16px;padding:16px;margin:0 20px 16px;border:1px solid rgba(215,227,242,.6);box-shadow:0 2px 8px rgba(15,23,42,.04)}
-    .d6-timeline-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid rgba(215,227,242,.4);font-size:.75rem;transition:all .2s;cursor:pointer}
-    .d6-timeline-item:hover{background:rgba(37,99,235,.02);margin:0 -16px;padding:10px 16px;border-radius:8px}
-    .d6-timeline-item:last-child{border-bottom:none}
-    .d6-timeline-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;position:relative}
-    .d6-timeline-dot::after{content:'';position:absolute;top:10px;left:3px;width:2px;height:calc(100% + 8px);background:rgba(215,227,242,.5)}
-    .d6-timeline-item:last-child .d6-timeline-dot::after{display:none}
-    .d6-timeline-content{flex:1;min-width:0}
-    .d6-timeline-title{font-weight:700;color:var(--d6-text);font-size:.78rem;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .d6-timeline-meta{color:var(--d6-muted);font-size:.65rem;display:flex;gap:8px;flex-wrap:wrap}
-    .d6-alerts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;padding:0 20px 16px}
-    .d6-alert-card{background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-radius:14px;padding:14px;border:1px solid rgba(215,227,242,.6);box-shadow:0 2px 8px rgba(15,23,42,.04);display:flex;align-items:center;gap:12px;transition:all .2s;cursor:pointer}
-    .d6-alert-card:hover{transform:translateX(-3px);box-shadow:0 4px 16px rgba(15,23,42,.08)}
-    .d6-alert-card.critical{border-right:3px solid var(--d6-red)}
-    .d6-alert-card.warning{border-right:3px solid var(--d6-yellow)}
-    .d6-alert-card.info{border-right:3px solid var(--d6-accent)}
-    .d6-alert-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:1rem;flex-shrink:0;background:rgba(37,99,235,.08)}
-    .d6-alert-icon.critical{background:rgba(220,38,38,.1);color:var(--d6-red)}
-    .d6-alert-icon.warning{background:rgba(245,158,11,.1);color:var(--d6-yellow)}
-    .d6-alert-icon.info{background:rgba(37,99,235,.1);color:var(--d6-accent)}
-    .d6-alert-text{flex:1;min-width:0}
-    .d6-alert-title{font-weight:700;font-size:.76rem;color:var(--d6-text);margin-bottom:2px}
-    .d6-alert-desc{font-size:.68rem;color:var(--d6-muted)}
-    .d6-alert-time{font-size:.62rem;color:var(--d6-muted);white-space:nowrap;flex-shrink:0}
-    .d6-quick-actions{display:flex;gap:8px;padding:0 20px 16px;overflow-x:auto;scrollbar-width:none}
-    .d6-quick-actions::-webkit-scrollbar{display:none}
-    .d6-quick-btn{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:10px 16px;border-radius:12px;border:1px solid rgba(215,227,242,.6);background:rgba(255,255,255,.8);color:var(--d6-text2);font-size:.72rem;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap}
-    .d6-quick-btn:hover{background:var(--d6-accent);color:#fff;border-color:var(--d6-accent);transform:translateY(-2px);box-shadow:0 4px 12px rgba(37,99,235,.2)}
-    .d6-quick-btn .icon{font-size:1.1rem}
-    .d6-modules-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:0 20px 20px}
-    .d6-module-tile{background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-radius:16px;padding:16px;border:1px solid rgba(215,227,242,.6);box-shadow:0 2px 8px rgba(15,23,42,.04);transition:all .25s cubic-bezier(.4,0,.2,1);cursor:pointer;position:relative;overflow:hidden}
-    .d6-module-tile:hover{transform:translateY(-4px) scale(1.01);box-shadow:0 12px 32px rgba(15,23,42,.12);border-color:rgba(37,99,235,.15)}
-    .d6-module-tile::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:0 0 0 60px;opacity:.06}
-    .d6-module-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-    .d6-module-icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:1.2rem;background:linear-gradient(135deg,rgba(37,99,235,.1),rgba(37,99,235,.05))}
-    .d6-module-title{font-size:.82rem;font-weight:800;color:var(--d6-text)}
-    .d6-module-desc{font-size:.68rem;color:var(--d6-muted);margin-bottom:10px;line-height:1.5}
-    .d6-module-metrics{display:flex;gap:12px;font-size:.65rem;color:var(--d6-text2)}
-    .d6-module-metric{display:flex;align-items:center;gap:3px}
-    .d6-module-metric strong{color:var(--d6-text);font-weight:700}
-    .d6-empty{display:grid;place-items:center;padding:20px;color:var(--d6-muted);font-size:.75rem;text-align:center}
-    .d6-skeleton{background:linear-gradient(90deg,rgba(215,227,242,.5) 25%,rgba(238,244,251,.8) 50%,rgba(215,227,242,.5) 75%);background-size:200% 100%;animation:d6-skel 1.5s infinite;border-radius:8px}
-    @keyframes d6-skel{0%{background-position:200% 0}100%{background-position:-200% 0}}
-    .d6-fab{position:fixed;bottom:24px;left:24px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--d6-accent),var(--d6-sky));color:#fff;border:none;box-shadow:0 4px 20px rgba(37,99,235,.35);display:grid;place-items:center;font-size:1.5rem;cursor:pointer;z-index:90;transition:all .3s cubic-bezier(.4,0,.2,1)}
-    .d6-fab:hover{transform:scale(1.1) rotate(90deg);box-shadow:0 6px 28px rgba(37,99,235,.45)}
-    .d6-fab-menu{position:fixed;bottom:88px;left:24px;display:flex;flex-direction:column;gap:8px;z-index:89;opacity:0;transform:translateY(20px);pointer-events:none;transition:all .3s cubic-bezier(.4,0,.2,1)}
-    .d6-fab-menu.open{opacity:1;transform:translateY(0);pointer-events:auto}
-    .d6-fab-item{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border:1px solid var(--d6-border);box-shadow:0 4px 16px rgba(15,23,42,.1);font-size:.72rem;font-weight:700;color:var(--d6-text);cursor:pointer;transition:all .2s;white-space:nowrap}
-    .d6-fab-item:hover{background:var(--d6-accent);color:#fff}
-    .d6-fab-item .icon{font-size:1.1rem}
-    .d6-widget-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 20px 16px}
-    .d6-widget{background:rgba(255,255,255,.85);backdrop-filter:blur(12px);border-radius:14px;padding:14px;border:1px solid rgba(215,227,242,.6);box-shadow:0 2px 8px rgba(15,23,42,.04)}
-    .d6-widget-title{font-size:.72rem;font-weight:700;color:var(--d6-text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
-    .d6-widget-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(215,227,242,.3);font-size:.72rem}
-    .d6-widget-item:last-child{border-bottom:none;padding-bottom:0}
-    .d6-widget-item:first-child{padding-top:0}
-    .d6-widget-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-    .d6-widget-text{flex:1;color:var(--d6-text2)}
-    .d6-widget-value{font-size:.68rem;color:var(--d6-muted);white-space:nowrap}
-    @media(max-width:900px){.d6-chart-grid{grid-template-columns:1fr}.d6-kpi-grid{grid-template-columns:repeat(3,1fr)}.d6-modules-grid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:640px){.d6-kpi-grid{grid-template-columns:repeat(2,1fr);padding:12px}.d6-header-center{display:none}.d6-modules-grid{grid-template-columns:1fr}.d6-chart-grid{padding:0 12px 12px}.d6-timeline{margin:0 12px 12px}.d6-quick-actions{padding:0 12px 12px}.d6-alerts-grid{padding:0 12px 12px}.d6-widget-row{padding:0 12px 12px}.d6-section{padding:0 12px}}
-    @media(max-width:400px){.d6-kpi-grid{grid-template-columns:1fr}}
-
+    @media(max-width:760px){.demo-safety-badges{position:relative;top:auto;right:auto;margin:8px 54px 4px 8px;max-width:none}.demo-safety-badge{font-size:.61rem}.demo-guide-grid{grid-template-columns:1fr}}
+    @media print{.demo-safety-badges{display:none!important}}
   </style>
+  <div id="demoSafetyBadges" class="demo-safety-badges" aria-label="حالة النسخة التجريبية">
+    <span class="demo-safety-badge primary">نسخة تجريبية</span>
+    <span class="demo-safety-badge">Preview Only — No Posting</span>
+    <span class="demo-safety-badge">لا يتم حفظ قيود محاسبية</span>
+    <span class="demo-safety-badge">لا يتم ترحيل مخزون فعلي</span>
+  </div>
+  
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo">◈ OmniStore ERP</div>
     <div id="omniCompanyHeader" style="display:none;margin:0 10px 8px;padding:7px 9px;border-radius:9px;background:var(--surface2);color:var(--text2);font-size:.7rem;font-weight:700;text-align:center"></div>
@@ -1938,7 +1935,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
 
   <div class="pwa-bottom-nav no-print" id="pwaBottomNav">
     <button onclick="pwaNavigate('dashboard')"><span>📊</span><span>الرئيسية</span></button>
-    <button onclick="openNewSaleInvoiceModal()"><span>💰</span><span>بيع</span></button>
+    <button onclick="pwaNavigate('pos')"><span>💰</span><span>بيع</span></button>
     <button onclick="pwaNavigate('serialsearch')"><span>🔍</span><span>بحث</span></button>
     <button onclick="pwaNavigate('alerts-center')"><span>🔔</span><span>تنبيهات</span></button>
     <button onclick="pwaNavigate('pwa')"><span>📲</span><span>PWA</span></button>
@@ -1947,242 +1944,118 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
   <main class="main-content">
 
     <!-- DASHBOARD -->
-<div class="page" id="page-dashboard">
-      <!-- V6 Enterprise Header -->
-      <div class="d6-header">
-        <div class="d6-header-left">
-          <div class="d6-logo">
-            <div class="d6-logo-icon">◈</div>
-            OmniStore ERP
+        <div class="page" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">لوحة <span>التحكم</span></div>
+        <div id="dashDate" style="color:var(--text2);font-size:0.82rem"></div>
+      </div>
+
+      <!-- KPI ROW -->
+      <div class="stats-grid dashboard-kpi-row">
+        <div class="stat-card blue" style="cursor:pointer" onclick="showPage('invoices')">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value" id="ds-sales">0</div>
+          <div class="stat-label">Today's Sales</div>
+        </div>
+        <div class="stat-card green" style="cursor:pointer" onclick="showPage('reports')">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="ds-profit">0</div>
+          <div class="stat-label">Today's Profit</div>
+        </div>
+        <div class="stat-card yellow" style="cursor:pointer" onclick="showPage('treasury')">
+          <div class="stat-icon">🏦</div>
+          <div class="stat-value" id="ds-treasury">0</div>
+          <div class="stat-label">Cash</div>
+        </div>
+        <div class="stat-card red" style="cursor:pointer" onclick="showPage('alerts-center')">
+          <div class="stat-icon">🔔</div>
+          <div class="stat-value" id="ds-alert-lowstock">0</div>
+          <div class="stat-label">Alerts</div>
+        </div>
+        <div class="stat-card purple" style="cursor:pointer" onclick="showPage('products')">
+          <div class="stat-icon">📦</div>
+          <div class="stat-value" id="ds-products">0</div>
+          <div class="stat-label">Inventory</div>
+        </div>
+        <div class="stat-card orange" style="cursor:pointer" onclick="showPage('audit')">
+          <div class="stat-icon">👤</div>
+          <div class="stat-value" id="ds-audit-users">0</div>
+          <div class="stat-label">Active Users</div>
+        </div>
+      </div>
+
+      <!-- SALES CHART -->
+      <div class="dashboard-section">
+        <div class="dashboard-section-title">📈 Sales Chart</div>
+        <div class="dashboard-chart-wrapper">
+          <canvas id="dashboardSalesChart" style="max-height:280px"></canvas>
+        </div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="dashboard-section">
+        <div class="dashboard-section-title">⚠️ Alerts</div>
+        <div class="dashboard-alerts-grid">
+          <div class="alert-card" onclick="showPage('products')">
+            <div class="alert-card-icon">📦</div>
+            <div class="alert-card-value" id="ds-lowstock">0</div>
+            <div class="alert-card-label">Low Stock</div>
+          </div>
+          <div class="alert-card" onclick="showPage('devices')">
+            <div class="alert-card-icon">🛡️</div>
+            <div class="alert-card-value" id="ds-war-expired">0</div>
+            <div class="alert-card-label">Warranty</div>
+          </div>
+          <div class="alert-card" onclick="showPage('installments')">
+            <div class="alert-card-icon">⏰</div>
+            <div class="alert-card-value" id="ds-inst-overdue">0</div>
+            <div class="alert-card-label">Installments</div>
           </div>
         </div>
-        <div class="d6-header-center">
-          <div class="d6-search">
-            <input type="text" placeholder="بحث سريع..." id="d6GlobalSearch" onkeydown="if(event.key==='Enter')alert('البحث: '+this.value)">
-          </div>
-        </div>
-        <div class="d6-header-right">
-          <div class="d6-connection" id="d6ConnectionStatus">
-            <span>●</span> متصل
-          </div>
-          <div class="d6-clock" id="d6Clock">--:--</div>
-          <button class="d6-header-btn" onclick="toggleDarkMode()" title="الوضع الليلي">🌙</button>
-          <button class="d6-header-btn" onclick="showPage('alerts-center')" title="التنبيهات">
-            🔔
-            <span class="badge" id="d6AlertBadge">0</span>
+        <div id="dashAlerts" style="margin-top:8px"></div>
+      </div>
+
+      <!-- QUICK ACTIONS -->
+      <div class="dashboard-section">
+        <div class="dashboard-section-title">⚡ Quick Actions</div>
+        <div class="quick-actions-grid">
+          <button class="quick-action-btn" onclick="showPage('pos')">
+            <span class="quick-action-icon">+</span>
+            <span class="quick-action-label">Sale</span>
           </button>
-          <button class="d6-header-btn profile" onclick="showPage('settings')" title="الملف الشخصي">
-            <div class="avatar" id="d6HeaderAvatar">A</div>
-            <span id="d6HeaderUser">Admin</span>
+          <button class="quick-action-btn" onclick="showPage('purchases')">
+            <span class="quick-action-icon">+</span>
+            <span class="quick-action-label">Purchase</span>
+          </button>
+          <button class="quick-action-btn" onclick="showPage('crm')">
+            <span class="quick-action-icon">+</span>
+            <span class="quick-action-label">Customer</span>
+          </button>
+          <button class="quick-action-btn" onclick="showPage('products')">
+            <span class="quick-action-icon">+</span>
+            <span class="quick-action-label">Product</span>
+          </button>
+          <button class="quick-action-btn" onclick="showPage('maintenance')">
+            <span class="quick-action-icon">+</span>
+            <span class="quick-action-label">Maintenance</span>
           </button>
         </div>
       </div>
 
-      <!-- KPI Grid -->
-      <div class="d6-kpi-grid" id="d6KpiGrid">
-        <div class="d6-kpi-card sales" onclick="showPage('invoices')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">💰</div>
-            <div class="d6-kpi-trend" id="d6SalesTrend">▲ 0%</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-sales">0</div>
-          <div class="d6-kpi-label">مبيعات اليوم</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6SalesSpark" style="width:0%"></div></div>
+      <!-- RECENT ACTIVITY -->
+      <div class="dashboard-section">
+        <div class="dashboard-section-title">🕘 Recent Activity</div>
+        <div class="overflow-x">
+          <table class="data-table">
+            <thead>
+              <tr><th>#</th><th>Time</th><th>Items</th><th>Total</th><th>Payment</th><th>User</th></tr>
+            </thead>
+            <tbody id="dashInvoicesTbody"></tbody>
+          </table>
         </div>
-        <div class="d6-kpi-card profit" onclick="showPage('reports')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">📈</div>
-            <div class="d6-kpi-trend" id="d6ProfitTrend">▲ 0%</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-profit">0</div>
-          <div class="d6-kpi-label">ربح اليوم</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6ProfitSpark" style="width:0%"></div></div>
-        </div>
-        <div class="d6-kpi-card cash" onclick="showPage('treasury')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">🏦</div>
-            <div class="d6-kpi-trend" id="d6CashTrend">--</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-treasury">0</div>
-          <div class="d6-kpi-label">الخزينة</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6CashSpark" style="width:0%"></div></div>
-        </div>
-        <div class="d6-kpi-card alerts" onclick="showPage('alerts-center')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">🔔</div>
-            <div class="d6-kpi-trend down" id="d6AlertTrend">▼ 0</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-alert-lowstock">0</div>
-          <div class="d6-kpi-label">تنبيهات</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6AlertSpark" style="width:0%"></div></div>
-        </div>
-        <div class="d6-kpi-card inventory" onclick="showPage('products')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">📦</div>
-            <div class="d6-kpi-trend" id="d6InvTrend">--</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-products">0</div>
-          <div class="d6-kpi-label">المنتجات</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6InvSpark" style="width:0%"></div></div>
-        </div>
-        <div class="d6-kpi-card users" onclick="showPage('audit')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">👤</div>
-            <div class="d6-kpi-trend" id="d6UsersTrend">▲ 0</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-audit-users">0</div>
-          <div class="d6-kpi-label">نشطين</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6UsersSpark" style="width:0%"></div></div>
-        </div>
-        <div class="d6-kpi-card maintenance" onclick="showPage('maintenance')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">🔧</div>
-            <div class="d6-kpi-trend" id="d6MaintTrend">--</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-maint">0</div>
-          <div class="d6-kpi-label">صيانة</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6MaintSpark" style="width:0%"></div></div>
-        </div>
-        <div class="d6-kpi-card installments" onclick="showPage('installments')">
-          <div class="d6-kpi-top">
-            <div class="d6-kpi-icon">⏰</div>
-            <div class="d6-kpi-trend down" id="d6InstTrend">▼ 0</div>
-          </div>
-          <div class="d6-kpi-value" id="ds-inst-overdue">0</div>
-          <div class="d6-kpi-label">أقساط متأخرة</div>
-          <div class="d6-kpi-spark"><div class="d6-kpi-spark-bar" id="d6InstSpark" style="width:0%"></div></div>
-        </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="d6-quick-actions">
-        <button class="d6-quick-btn" onclick="openNewSaleInvoiceModal()">
-          <span class="icon">🛒</span> فاتورة بيع
-        </button>
-        <button class="d6-quick-btn" onclick="showPage('purchases')">
-          <span class="icon">📥</span> فاتورة شراء
-        </button>
-        <button class="d6-quick-btn" onclick="showPage('crm')">
-          <span class="icon">👤</span> عميل
-        </button>
-        <button class="d6-quick-btn" onclick="showPage('products')">
-          <span class="icon">📦</span> منتج
-        </button>
-        <button class="d6-quick-btn" onclick="showPage('maintenance')">
-          <span class="icon">🔧</span> صيانة
-        </button>
-        <button class="d6-quick-btn" onclick="showPage('treasury')">
-          <span class="icon">💵</span> تحصيل
-        </button>
-        <button class="d6-quick-btn" onclick="showPage('expenses')">
-          <span class="icon">💸</span> مصروف
-        </button>
-        <button class="d6-quick-btn" onclick="showPage('reports')">
-          <span class="icon">📊</span> تقارير
-        </button>
-      </div>
-
-      <!-- Charts -->
-      <div class="d6-section">
-        <div class="d6-section-title">📊 التحليلات <span>مؤشرات الأداء</span></div>
-        <div class="d6-section-action" onclick="showPage('reports')">عرض الكل →</div>
-      </div>
-      <div class="d6-chart-grid">
-        <div class="d6-chart-card">
-          <div class="d6-chart-header">
-            <div class="d6-chart-title">مبيعات الأسبوع</div>
-            <div class="d6-chart-badge">7 أيام</div>
-          </div>
-          <div class="d6-chart-area">
-            <canvas id="dashboardSalesChart"></canvas>
-          </div>
-        </div>
-        <div class="d6-chart-card">
-          <div class="d6-chart-header">
-            <div class="d6-chart-title">الإيرادات vs المصروفات</div>
-            <div class="d6-chart-badge">أسبوعي</div>
-          </div>
-          <div class="d6-chart-area">
-            <canvas id="dashboardRevenueChart"></canvas>
-          </div>
-        </div>
-        <div class="d6-chart-card">
-          <div class="d6-chart-header">
-            <div class="d6-chart-title">أداء المخزون</div>
-            <div class="d6-chart-badge">حي</div>
-          </div>
-          <div class="d6-chart-area">
-            <canvas id="dashboardInventoryChart"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Smart Widgets Row -->
-      <div class="d6-section">
-        <div class="d6-section-title">🧩 نظرة سريعة <span>معلومات لحظية</span></div>
-      </div>
-      <div class="d6-widget-row">
-        <div class="d6-widget">
-          <div class="d6-widget-title">⚠️ أهم التنبيهات</div>
-          <div id="d6WidgetAlerts">
-            <div class="d6-empty">لا توجد تنبيهات حالياً</div>
-          </div>
-        </div>
-        <div class="d6-widget">
-          <div class="d6-widget-title">🏆 الأكثر مبيعاً</div>
-          <div id="d6WidgetTopProducts">
-            <div class="d6-empty">لا توجد بيانات</div>
-          </div>
-        </div>
-        <div class="d6-widget">
-          <div class="d6-widget-title">👥 أفضل العملاء</div>
-          <div id="d6WidgetTopCustomers">
-            <div class="d6-empty">لا توجد بيانات</div>
-          </div>
-        </div>
-        <div class="d6-widget">
-          <div class="d6-widget-title">📋 مهام اليوم</div>
-          <div id="d6WidgetTasks">
-            <div class="d6-empty">لا توجد مهام</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Activity Timeline -->
-      <div class="d6-section">
-        <div class="d6-section-title">🕘 النشاط الأخير <span>آخر العمليات</span></div>
-        <div class="d6-section-action" onclick="showPage('audit')">السجل الكامل →</div>
-      </div>
-      <div class="d6-timeline" id="d6Timeline">
-        <div class="d6-empty">لا توجد عمليات حديثة</div>
-      </div>
-
-      <!-- Module Grid -->
-      <div class="d6-section">
-        <div class="d6-section-title">🧩 الوحدات <span>الوصول السريع</span></div>
-      </div>
-      <div class="d6-modules-grid" id="d6ModulesGrid">
-      </div>
-
-      <!-- FAB -->
-      <button class="d6-fab" id="d6Fab" onclick="toggleD6Fab()">+</button>
-      <div class="d6-fab-menu" id="d6FabMenu">
-        <button class="d6-fab-item" onclick="openNewSaleInvoiceModal();toggleD6Fab()">
-          <span class="icon">🛒</span> فاتورة بيع
-        </button>
-        <button class="d6-fab-item" onclick="showPage('purchases');toggleD6Fab()">
-          <span class="icon">📥</span> فاتورة شراء
-        </button>
-        <button class="d6-fab-item" onclick="showPage('maintenance');toggleD6Fab()">
-          <span class="icon">🔧</span> استلام جهاز
-        </button>
-        <button class="d6-fab-item" onclick="showPage('crm');toggleD6Fab()">
-          <span class="icon">👤</span> عميل جديد
-        </button>
       </div>
     </div>
-
-        <!-- SMART BUSINESS INTELLIGENCE -->
+<!-- SMART BUSINESS INTELLIGENCE -->
     <div class="page" id="page-smart-business">
       <div class="page-header">
         <div class="page-title">🧠📊 Smart <span>Business Intelligence</span></div>
@@ -6133,20 +6006,8 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
   <div class="modal-title">⚡ بيع سريع (نسخة جديدة)<button class="modal-close" onclick="closeModal('quickSaleModal')">&times;</button></div>
 
   <div class="grid-2">
-    <div class="form-group" style="position:relative">
-      <label>المنتج</label>
-      <input type="text" id="quickProdSearch" placeholder="🔍 اكتب اسم المنتج أو الباركود أو Part Number..."
-        autocomplete="off" oninput="quickSaleSearchInput(this.value)" onfocus="quickSaleSearchInput(this.value)"
-        style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-family:'Cairo',sans-serif;font-size:0.9rem;outline:none;transition:border-color .2s"
-        onkeydown="quickSaleKeyNav(event)">
-      <input type="hidden" id="quickProductId">
-      <input type="hidden" id="quickProductName">
-      <input type="hidden" id="quickProductBarcode">
-      <input type="hidden" id="quickProductPartNumber">
-      <div id="quickProdDropdown"
-        style="display:none;position:absolute;top:100%;right:0;left:0;background:var(--surface);border:1px solid var(--accent);border-radius:10px;z-index:9999;max-height:220px;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,.2);margin-top:2px"></div>
-    </div>
-    <div class="form-group"><label>السيريال</label><input type="text" id="quickSerial" placeholder="رقم السيريال (اختياري - للمنتجات المتسلسلة)"></div>
+    <div class="form-group"><label>المنتج</label><input type="text" id="quickProd" placeholder="اسم المنتج"></div>
+    <div class="form-group"><label>السيريال</label><input type="text" id="quickSerial" placeholder="رقم السيريال"></div>
   </div>
 
   <div class="grid-2">
@@ -13034,8 +12895,8 @@ function getCommandData(force = false) {
   const cash = toSafeFloat(treasury.total, 0);
   const expensesMonth = commandSum((DB.expenses || DB.financialExpenses || []).filter(e => commandInRange(e.date, 30)), e => e.amount || e.total || 0);
   const payrollMonth = commandSum((DB.payrollRuns || DB.salaryLog || []).filter(e => commandInRange(e.date || e.createdAt, 30)), e => e.finalSalary || e.salary || e.total || 0);
-  const ar = commandSum(customers, c => c.balance > 0 ? c.balance : 0);
-  const ap = commandSum(suppliers, s => s.balance > 0 ? s.balance : 0);
+  const ar = commandSum(customers, c => Math.max(0, getCustomerBalance(c)));
+  const ap = commandSum(suppliers, s => Math.max(0, getSupplierBalance(s)));
   const assets = commandSum(DB.fixedAssets || [], a => Math.max(0, toSafeFloat(a.bookValue ?? a.value ?? a.cost, 0)));
   const partnersCapital = commandSum(DB.capitalPartners || DB.partners || [], p => p.capital || p.capitalAmount || 0);
   const partnerProfitDue = commandSum((DB.capitalPartnerSettlements || []).filter(s => s.status === 'pending'), s => s.partnerShareAmount || s.amount || 0);
@@ -13118,7 +12979,7 @@ function renderEnterpriseCommandCenter(force = false) {
   document.getElementById('commandOperations').innerHTML = commandRows([['Sales', data.sales.length], ['Purchases', data.purchases.length], ['Inventory', data.products.length], ['Repairs', data.repairs.length], ['Workflow', data.pendingApprovals], ['Automation', (getAutomationState?.().queue || []).length], ['Plugin Health', (getPluginHealthRows?.() || []).filter(x => !x.ok).length], ['PWA Status', getPwaState().installed ? 'Installed' : 'Browser'], ['Supabase', getSupabaseLiveLabel()]]);
   document.getElementById('commandForecast').innerHTML = commandRows([['Sales Forecast', formatMoney(data.forecast.sales)], ['Cash Forecast', formatMoney(data.forecast.cash)], ['Installments Risk', data.forecast.installments], ['Payroll Forecast', formatMoney(data.forecast.payroll)], ['Inventory Risk', data.forecast.inventory], ['Repairs Forecast', data.forecast.repairs]]);
   document.getElementById('commandRanking').innerHTML = commandRows([['Top Branch', data.topBranch[0]], ['Top Employee', (data.employees[0]?.name || '-')], ['Top Customer', data.topCustomer[0]], ['Top Technician', topTechnicianName()], ['Top Supplier', data.topSupplier[0]], ['Top Product', data.topProduct[0]]]);
-  document.getElementById('commandQuickActions').innerHTML = `<div class="live-sync-actions"><button class="btn btn-accent btn-sm" onclick="openNewSaleInvoiceModal()">Create Sale</button><button class="btn btn-outline btn-sm" onclick="showPage('purchases')">Create Purchase</button><button class="btn btn-outline btn-sm" onclick="showPage('maintenance')">Create Repair</button><button class="btn btn-outline btn-sm" onclick="showPage('installments')">Collect Installment</button><button class="btn btn-outline btn-sm" onclick="showPage('approvals')">Approve Workflow</button><button class="btn btn-outline btn-sm" onclick="showPage('financial-center')">Partner Settlement</button><button class="btn btn-outline btn-sm" onclick="showPage('hr')">Payroll</button><button class="btn btn-green btn-sm" onclick="showPage('backup')">Backup</button></div>`;
+  document.getElementById('commandQuickActions').innerHTML = `<div class="live-sync-actions"><button class="btn btn-accent btn-sm" onclick="showPage('pos')">Create Sale</button><button class="btn btn-outline btn-sm" onclick="showPage('purchases')">Create Purchase</button><button class="btn btn-outline btn-sm" onclick="showPage('maintenance')">Create Repair</button><button class="btn btn-outline btn-sm" onclick="showPage('installments')">Collect Installment</button><button class="btn btn-outline btn-sm" onclick="showPage('approvals')">Approve Workflow</button><button class="btn btn-outline btn-sm" onclick="showPage('financial-center')">Partner Settlement</button><button class="btn btn-outline btn-sm" onclick="showPage('hr')">Payroll</button><button class="btn btn-green btn-sm" onclick="showPage('backup')">Backup</button></div>`;
   document.getElementById('commandPerformance').innerHTML = commandRows([['Render cache', commandCenterCache.data ? 'Ready' : 'Cold'], ['Sync queue', data.liveStats.pending], ['Offline queue', (getPwaState().pendingSync || []).length], ['Memory estimate', (performance?.memory?.usedJSHeapSize ? Math.round(performance.memory.usedJSHeapSize/1024/1024)+' MB' : 'N/A')], ['PWA installed', getPwaState().installed ? 'Yes' : 'No']]);
   document.getElementById('commandEnterpriseMap').innerHTML = renderCommandMap();
   renderCommandTimeline();
@@ -17933,26 +17794,6 @@ function getSaleReturnsForInvoice(invoiceId) {
   });
 }
 
-function getPurchaseReturnsForInvoice(invoiceId) {
-  const id = String(invoiceId || '').trim().toLowerCase();
-  if (!id) return [];
-  return (DB.returns || []).filter(r => {
-    const retType = (r.invoiceType || 'sale');
-    return retType === 'purchase' && String(r.invoiceId || '').trim().toLowerCase() === id;
-  });
-}
-
-// ===== ATOMIC INVOICE ID GENERATOR (Code-5 Fix) =====
-// Generates a unique invoice ID atomically to prevent race conditions
-// when multiple invoices are created simultaneously.
-function generateInvoiceId(prefix) {
-  const pref = prefix || 'INV';
-  const current = parseInt(DB.settings && DB.settings.nextInvoiceNum, 10) || 1;
-  const id = pref + '-' + String(current).padStart(6, '0');
-  DB.settings.nextInvoiceNum = current + 1;
-  return id;
-}
-
 function getSaleReturnFinancialImpact(invoice) {
   if (!invoice || !invoice.id) return { returnedTotal: 0, returnedProfit: 0 };
   const originalTotal = Number(invoice.total || 0);
@@ -17977,7 +17818,7 @@ function getSaleReturnFinancialImpact(invoice) {
     retItems.forEach(ri => {
       const qty = Math.max(0, Number(ri.qty || 0));
       const invItem = (invoice.items || []).find(it =>
-        (ri.productId && sameProductId(it.productId, ri.productId)) ||
+        (ri.productId && it.productId === ri.productId) ||
         ((it.name || '').trim() === (ri.name || '').trim())
       );
       const unitPrice = Number.isFinite(Number(ri.price))
@@ -18019,208 +17860,160 @@ function renderDashboard() {
   const todaySales = todayInvoices.reduce((sum, inv) => sum + getNetInvoiceTotal(inv), 0);
   const todayProfit = todayInvoices.reduce((sum, inv) => sum + getNetInvoiceProfit(inv), 0);
   const todayExpenses = DB.expenses.filter(e => isToday(e.date)).reduce((sum, e) => sum + (e.amount || 0), 0);
+  const netProfit = todayProfit - todayExpenses;
+  
   const totalProducts = DB.products.length;
   const lowStock = DB.products.filter(p => getProductStock(p.id) <= (p.minStock || 5)).length;
   const treasuryBalance = getTreasurySummary().total;
   const maintPending = DB.maintenance.filter(m => m.status === 'pending').length;
+  const warrantyCounts = getCachedComputation('dashboard:warrantyCounts', dashboardVersionKey, () => (DB.devices || []).reduce((acc, d) => {
+    const w = getWarrantySummary(d.warranty_start || d.warrantyStart || d.metadata?.warranty_start, d.warranty_end || d.warrantyEnd || d.metadata?.warranty_end, d.warranty_status || d.warrantyStatus);
+    if (w.status === 'active') {
+      acc.active++;
+      if (w.days !== null && w.days >= 0 && w.days <= 31) acc.ending++;
+    } else if (w.status === 'expired') {
+      acc.expired++;
+    }
+    return acc;
+  }, { active: 0, expired: 0, ending: 0 }));
+  const repairWarrantyCounts = getCachedComputation('dashboard:repairWarrantyCounts', dashboardVersionKey, () => (DB.maintenance || []).reduce((acc, m) => {
+    const status = String(m.warranty_status_at_repair || m.deviceWarrantyStatus || '').toLowerCase();
+    if (status === 'active') acc.underWarranty++;
+    else if (status === 'unknown') acc.unknown++;
+    if (m.payment === 'paid') acc.paid++;
+    return acc;
+  }, { underWarranty: 0, paid: 0, unknown: 0 }));
   
-  const setD6 = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
-  const setSpark = (id, pct, color) => { const el = document.getElementById(id); if (el) { el.style.width = pct + '%'; el.style.background = color || 'var(--d6-accent)'; } };
-  
-  setD6('ds-sales', formatMoney(todaySales));
-  setD6('ds-profit', maskMoneyIfRestricted(todayProfit));
-  setD6('ds-treasury', formatMoney(treasuryBalance));
-  setD6('ds-alert-lowstock', lowStock);
-  setD6('ds-products', totalProducts);
-  setD6('ds-maint', maintPending);
-  
-  const activeUsers = new Set(getVisibleAuditEntries().filter(e => String(e.timestamp || '').slice(0,10) === today.toISOString().slice(0,10)).map(e => e.username || '-')).size;
-  setD6('ds-audit-users', activeUsers);
-  
+  document.getElementById('ds-sales').textContent = formatMoney(todaySales);
+  document.getElementById('ds-profit').textContent = maskMoneyIfRestricted(todayProfit);
+  document.getElementById('ds-expenses').textContent = formatMoney(todayExpenses);
+  document.getElementById('ds-netprofit').textContent = maskMoneyIfRestricted(netProfit);
+  document.getElementById('ds-products').textContent = totalProducts;
+  document.getElementById('ds-lowstock').textContent = lowStock;
+  document.getElementById('ds-treasury').textContent = formatMoney(treasuryBalance);
+  document.getElementById('ds-maint').textContent = maintPending;
+  const setDash = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  try {
+    const arAp = getArApDashboardSummary();
+    const canSeeArAp = canViewArApAccounts();
+    setDash('ds-ar-receivables', canSeeArAp ? formatMoney(arAp.customerReceivables) : '***');
+    setDash('ds-ap-payables', canSeeArAp && currentUser?.role !== 'Cashier' ? formatMoney(arAp.supplierPayables) : '***');
+    setDash('ds-ar-today', canSeeArAp ? formatMoney(arAp.todayCollections) : '***');
+    setDash('ds-ap-today', canSeeArAp && currentUser?.role !== 'Cashier' ? formatMoney(arAp.todaySupplierPayments) : '***');
+  } catch(e) {}
+  try {
+    const fixedAssets = getFixedAssetsSummary();
+    const canSeeFa = canViewFixedAssets();
+    const canSeeFaMoney = canViewFixedAssetFinancials();
+    setDash('ds-fa-count', canSeeFa ? fixedAssets.count : '-');
+    setDash('ds-fa-value', canSeeFa && canSeeFaMoney ? formatMoney(fixedAssets.value) : '***');
+    setDash('ds-fa-maint', canSeeFa ? fixedAssets.maintenance : '-');
+    setDash('ds-fa-warranty-expired', canSeeFa ? fixedAssets.expired : '-');
+  } catch(e) {}
+  setDash('ds-war-active', warrantyCounts.active);
+  setDash('ds-war-expired', warrantyCounts.expired);
+  setDash('ds-war-ending', warrantyCounts.ending);
+  setDash('ds-repair-war', repairWarrantyCounts.underWarranty);
+  setDash('ds-repair-paid', repairWarrantyCounts.paid);
+  setDash('ds-repair-unknown', repairWarrantyCounts.unknown);
+  const smartAlerts = getCachedComputation('dashboard:smartAlerts', dashboardVersionKey, () => buildSmartAlerts());
+  setDash('ds-alert-lowstock', smartAlerts.filter(a => a.category === 'stock').length);
+  setDash('ds-alert-repairs', smartAlerts.filter(a => a.category === 'repairs').length);
+  setDash('ds-alert-warranty', smartAlerts.filter(a => a.category === 'warranty').length);
+  setDash('ds-alert-payments', smartAlerts.filter(a => a.category === 'payments').length);
+  const crmRows = getCachedComputation('dashboard:crmRows', dashboardVersionKey, () => getCustomerCRMRows(''));
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  setDash('ds-crm-new', (DB.customers || []).filter(c => {
+    const d = new Date(c.registrationDate || c.createdAt || c.id || 0);
+    return !isNaN(d.getTime()) && d >= monthStart;
+  }).length);
+  const topCustomer = crmRows.slice().sort((a, b) => (b.metrics.totalSpent || 0) - (a.metrics.totalSpent || 0))[0];
+  setDash('ds-crm-top', topCustomer ? (topCustomer.customer.name || '-').slice(0, 16) : '-');
+  setDash('ds-crm-repairs', crmRows.length ? Math.max(...crmRows.map(r => r.metrics.totalRepairs || 0)) : 0);
+  setDash('ds-crm-loyalty', crmRows.filter(r => ['gold', 'platinum'].includes(r.reward.code)).length);
+  const visibleAudit = getVisibleAuditEntries();
+  const todayIso = new Date().toISOString().slice(0, 10);
+  setDash('ds-audit-today', visibleAudit.filter(e => String(e.timestamp || '').slice(0, 10) === todayIso).length);
+  setDash('ds-audit-users', new Set(visibleAudit.filter(e => String(e.timestamp || '').slice(0, 10) === todayIso).map(e => e.username || '-')).size);
+  setDash('ds-audit-latest', visibleAudit[0] ? `${visibleAudit[0].module || ''}/${visibleAudit[0].action || ''}`.slice(0, 18) : '-');
+  ensureBranches();
+  const currentBranch = getCurrentBranchMeta();
+  setDash('ds-branches-active', (DB.branches || []).filter(b => b.status !== 'inactive' && (can('all') || canSeeBranch(b.id))).length);
+  setDash('ds-branch-sales', formatMoney((DB.saleInvoices || []).filter(inv => String(inv.branchId || 'MAIN') === String(currentBranch.branchId) && isToday(inv.date)).reduce((s, inv) => s + getNetInvoiceTotal(inv), 0)));
+  setDash('ds-branch-transfers', (DB.branchTransfers || []).filter(t => can('all') || String(t.fromBranchId) === String(currentBranch.branchId) || String(t.toBranchId) === String(currentBranch.branchId)).length);
+  setDash('ds-branch-repairs', (DB.maintenance || []).filter(m => String(m.branchId || 'MAIN') === String(currentBranch.branchId) && m.status === 'pending').length);
   try {
     normalizeAllInstallments();
     const instToday = localDateString();
     const visibleInst = (DB.installments || []).filter(i => can('all') || canSeeBranch(i.branchId || 'MAIN'));
-    const overdue = visibleInst.reduce((s, i) => s + getInstallmentDueStats(i, instToday).overdue, 0);
-    setD6('ds-inst-overdue', overdue);
-    setSpark('d6InstSpark', Math.min(overdue * 10, 100), 'var(--d6-teal)');
+    setDash('ds-inst-active', visibleInst.filter(i => i.status === 'active').length);
+    setDash('ds-inst-overdue', visibleInst.reduce((s, i) => s + getInstallmentDueStats(i, instToday).overdue, 0));
+    setDash('ds-inst-due-today', visibleInst.reduce((s, i) => s + getInstallmentDueStats(i, instToday).dueToday, 0));
+    setDash('ds-inst-collected-today', formatMoney(visibleInst.reduce((sum, i) => sum + (i.payments || []).filter(p => String(p.date || '').slice(0, 10) === instToday).reduce((s, p) => s + toSafeFloat(p.amount, 0), 0), 0)));
   } catch(e) {}
-  
-  // Update sparks
-  setSpark('d6SalesSpark', Math.min((todaySales / 10000) * 100, 100), 'var(--d6-green)');
-  setSpark('d6ProfitSpark', Math.min((todayProfit / 5000) * 100, 100), 'var(--d6-accent)');
-  setSpark('d6CashSpark', Math.min((treasuryBalance / 50000) * 100, 100), 'var(--d6-sky)');
-  setSpark('d6AlertSpark', Math.min(lowStock * 20, 100), 'var(--d6-red)');
-  setSpark('d6InvSpark', Math.min((totalProducts / 500) * 100, 100), 'var(--d6-purple)');
-  setSpark('d6UsersSpark', Math.min(activeUsers * 20, 100), 'var(--d6-orange)');
-  setSpark('d6MaintSpark', Math.min(maintPending * 15, 100), 'var(--d6-yellow)');
-  
-  // Header
-  const clockEl = document.getElementById('d6Clock');
-  if (clockEl) clockEl.textContent = today.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
-  
-  const avatarEl = document.getElementById('d6HeaderAvatar');
-  if (avatarEl && currentUser) avatarEl.textContent = (currentUser.name || currentUser.username || 'A').charAt(0).toUpperCase();
-  
-  const userEl = document.getElementById('d6HeaderUser');
-  if (userEl && currentUser) userEl.textContent = currentUser.name || currentUser.username || 'Admin';
-  
-  const badgeEl = document.getElementById('d6AlertBadge');
-  if (badgeEl) badgeEl.textContent = lowStock + maintPending;
-  
-  // Smart Alerts Panel
   try {
-    const smartAlerts = getCachedComputation('dashboard:smartAlerts', dashboardVersionKey, () => buildSmartAlerts());
-    const alertsPanel = document.getElementById('d6WidgetAlerts');
-    if (alertsPanel) {
-      if (smartAlerts.length === 0) {
-        alertsPanel.innerHTML = '<div class="d6-empty">لا توجد تنبيهات حالياً</div>';
-      } else {
-        alertsPanel.innerHTML = smartAlerts.slice(0, 5).map(a => {
-          const cls = a.level === 'critical' ? 'critical' : a.level === 'warning' ? 'warning' : 'info';
-          const icon = a.level === 'critical' ? '⚠️' : a.level === 'warning' ? '⏳' : 'ℹ️';
-          return '<div class="d6-alert-card ' + cls + '"><div class="d6-alert-icon ' + cls + '">' + icon + '</div><div class="d6-alert-text"><div class="d6-alert-title">' + a.title + '</div><div class="d6-alert-desc">' + a.text + '</div></div><div class="d6-alert-time">' + (a.time || '') + '</div></div>';
-        }).join('');
-      }
-    }
+    ensureHRState();
+    const hrToday = localDateString();
+    const hrEmployees = getVisibleEmployees().filter(e => (e.status || 'active') === 'active');
+    const presentIds = new Set((DB.employeeAttendance || []).filter(a => String(a.date || '').slice(0, 10) === hrToday && a.checkIn).map(a => String(a.employeeId)));
+    const paidMonth = getMonthlyPayrollKey();
+    const paidIds = new Set((DB.salaryLog || []).filter(s => String(s.date || '').slice(0, 7) === paidMonth).map(s => String(s.employeeId)));
+    setDash('ds-emp-count', hrEmployees.length);
+    setDash('ds-emp-present', hrEmployees.filter(e => presentIds.has(String(e.id))).length);
+    setDash('ds-emp-absent', can('manageEmployees') || can('all') ? hrEmployees.filter(e => !presentIds.has(String(e.id))).length : '-');
+    setDash('ds-payroll-due', can('manageEmployees') || can('all') ? hrEmployees.filter(e => !paidIds.has(String(e.id))).length : '-');
   } catch(e) {}
-  
-  // Timeline
   try {
-    const timeline = document.getElementById('d6Timeline');
-    if (timeline) {
-      const entries = [];
-      todayInvoices.slice(0, 6).forEach(inv => {
-        entries.push({ title: 'فاتورة بيع #' + inv.id, meta: (inv.items ? inv.items.length : 0) + ' صنف · ' + formatMoney(getNetInvoiceTotal(inv)) + ' · ' + (inv.user || '-'), icon: '🛒', time: new Date(inv.date).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'}), color: 'var(--d6-green)' });
-      });
-      DB.maintenance.filter(m => m.status === 'pending').slice(0, 4).forEach(m => {
-        entries.push({ title: 'صيانة: ' + (m.deviceName || m.deviceSerial || '-'), meta: (m.customerName || '-') + ' · ' + (m.issue || '-'), icon: '🔧', time: m.date ? new Date(m.date).toLocaleDateString('ar-EG') : '', color: 'var(--d6-yellow)' });
-      });
-      DB.purchaseInvoices.filter(inv => isToday(inv.date)).slice(0, 3).forEach(inv => {
-        entries.push({ title: 'فاتورة شراء #' + inv.id, meta: (inv.supplierName || '-') + ' · ' + formatMoney(inv.total || 0), icon: '📥', time: new Date(inv.date).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'}), color: 'var(--d6-sky)' });
-      });
-      if (entries.length === 0) {
-        timeline.innerHTML = '<div class="d6-empty">لا توجد عمليات حديثة</div>';
-      } else {
-        timeline.innerHTML = entries.map(e => '<div class="d6-timeline-item"><div class="d6-timeline-dot" style="background:' + e.color + '"></div><div class="d6-timeline-content"><div class="d6-timeline-title">' + e.icon + ' ' + e.title + '</div><div class="d6-timeline-meta">' + e.meta + ' · ' + e.time + '</div></div></div>').join('');
-      }
-    }
+    ensureCapitalPartnerState();
+    const capitalMonth = localDateString().slice(0, 7);
+    const canSeeCapital = canViewCapitalPartners();
+    const activePartners = (DB.capitalPartners || []).filter(p => (p.status || 'active') === 'active').length;
+    const pendingShares = (DB.capitalPartnerSettlements || []).filter(s => (s.status || 'pending') === 'pending').reduce((sum, s) => sum + toSafeFloat(s.partnerShare, 0), 0);
+    const paidThisMonth = (DB.capitalPartnerSettlements || []).filter(s => s.status === 'paid' && String(s.paidAt || '').slice(0, 7) === capitalMonth).reduce((sum, s) => sum + toSafeFloat(s.partnerShare, 0), 0);
+    const currentCapital = (DB.capitalPartners || []).filter(p => (p.status || 'active') === 'active').reduce((sum, p) => sum + toSafeFloat(getCapitalPartnerAccount(p.id)?.currentCapital, 0), 0);
+    const capitalMovements = (DB.capitalPartnerMovements || []).filter(m => canSeeBranch(m.branchId || 'MAIN')).slice().sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const latestDeposit = capitalMovements.find(m => m.type === 'deposit' || (m.type === 'adjustment' && m.direction === 'in'));
+    const latestWithdrawal = capitalMovements.find(m => m.type === 'withdrawal' || (m.type === 'adjustment' && m.direction === 'out'));
+    setDash('ds-capital-partners', canSeeCapital ? activePartners : '-');
+    setDash('ds-capital-current', canSeeCapital ? formatMoney(currentCapital) : '***');
+    setDash('ds-capital-pending', canSeeCapital ? formatMoney(pendingShares) : '***');
+    setDash('ds-capital-paid-month', canSeeCapital ? formatMoney(paidThisMonth) : '***');
+    setDash('ds-capital-latest-deposit', canSeeCapital && latestDeposit ? formatMoney(latestDeposit.amount) : (canSeeCapital ? '-' : '***'));
+    setDash('ds-capital-latest-withdrawal', canSeeCapital && latestWithdrawal ? formatMoney(latestWithdrawal.amount) : (canSeeCapital ? '-' : '***'));
   } catch(e) {}
-  
-  // Top Products
-  try {
-    const topProd = document.getElementById('d6WidgetTopProducts');
-    if (topProd) {
-      const productSales = {};
-      DB.saleInvoices.forEach(inv => {
-        (inv.items || []).forEach(item => {
-          const pid = item.productId || item.id;
-          if (pid) productSales[pid] = (productSales[pid] || 0) + (item.qty || 1);
-        });
-      });
-      const sorted = Object.entries(productSales).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      if (sorted.length === 0) {
-        topProd.innerHTML = '<div class="d6-empty">لا توجد بيانات</div>';
-      } else {
-        topProd.innerHTML = sorted.map(([pid, qty], i) => {
-          const p = DB.products.find(x => String(x.id) === String(pid));
-          const name = p ? p.name : 'منتج #' + pid;
-          const colors = ['var(--d6-green)', 'var(--d6-accent)', 'var(--d6-sky)', 'var(--d6-purple)', 'var(--d6-orange)'];
-          return '<div class="d6-widget-item"><div class="d6-widget-dot" style="background:' + colors[i % colors.length] + '"></div><div class="d6-widget-text">' + name + '</div><div class="d6-widget-value">' + qty + ' مباع</div></div>';
-        }).join('');
-      }
-    }
-  } catch(e) {}
-  
-  // Top Customers
-  try {
-    const topCust = document.getElementById('d6WidgetTopCustomers');
-    if (topCust) {
-      const custSales = {};
-      DB.saleInvoices.forEach(inv => {
-        const cid = inv.customerId || inv.customer?.id;
-        if (cid) custSales[cid] = (custSales[cid] || 0) + getNetInvoiceTotal(inv);
-      });
-      const sorted = Object.entries(custSales).sort((a, b) => b[1] - a[1]).slice(0, 5);
-      if (sorted.length === 0) {
-        topCust.innerHTML = '<div class="d6-empty">لا توجد بيانات</div>';
-      } else {
-        topCust.innerHTML = sorted.map(([cid, total], i) => {
-          const c = DB.customers.find(x => String(x.id) === String(cid));
-          const name = c ? c.name : 'عميل #' + cid;
-          const colors = ['var(--d6-green)', 'var(--d6-accent)', 'var(--d6-sky)', 'var(--d6-purple)', 'var(--d6-orange)'];
-          return '<div class="d6-widget-item"><div class="d6-widget-dot" style="background:' + colors[i % colors.length] + '"></div><div class="d6-widget-text">' + name + '</div><div class="d6-widget-value">' + formatMoney(total) + '</div></div>';
-        }).join('');
-      }
-    }
-  } catch(e) {}
-  
-  // Module Grid
-  try {
-    const modulesGrid = document.getElementById('d6ModulesGrid');
-    if (modulesGrid) {
-      const modules = [
-        { id: 'sales', title: 'المبيعات', desc: 'فواتير البيع والمردودات', icon: '🛒', color: 'linear-gradient(135deg,#16a34a,#22c55e)', metrics: [{l:'اليوم',v:formatMoney(todaySales)},{l:'الفواتير',v:todayInvoices.length}] },
-        { id: 'purchases', title: 'المشتريات', desc: 'فواتير الشراء والموردين', icon: '📥', color: 'linear-gradient(135deg,#0284c7,#38bdf8)', metrics: [{l:'المشتريات',v:(DB.purchaseInvoices||[]).length},{l:'الموردين',v:(DB.suppliers||[]).length}] },
-        { id: 'inventory', title: 'المخزون', desc: 'المنتجات والتنبيهات', icon: '📦', color: 'linear-gradient(135deg,#7c3aed,#a78bfa)', metrics: [{l:'المنتجات',v:totalProducts},{l:'منخفض',v:lowStock}] },
-        { id: 'finance', title: 'المالية', desc: 'الخزينة والتقارير', icon: '🏦', color: 'linear-gradient(135deg,#2563eb,#3b82f6)', metrics: [{l:'الرصيد',v:formatMoney(treasuryBalance)},{l:'المصروفات',v:formatMoney(todayExpenses)}] },
-        { id: 'maintenance', title: 'الصيانة', desc: 'طلبات الصيانة والضمان', icon: '🔧', color: 'linear-gradient(135deg,#d97706,#fbbf24)', metrics: [{l:'معلقة',v:maintPending},{l:'الأجهزة',v:(DB.devices||[]).length}] },
-        { id: 'customers', title: 'العملاء', desc: 'قاعدة العملاء والولاء', icon: '👤', color: 'linear-gradient(135deg,#ea580c,#fb923c)', metrics: [{l:'العملاء',v:(DB.customers||[]).length},{l:'الجديد',v:(DB.customers||[]).filter(c=>{const d=new Date(c.registrationDate||c.createdAt||c.id||0);return !isNaN(d.getTime())&&d>=new Date(today.getFullYear(),today.getMonth(),1);}).length}] },
-        { id: 'employees', title: 'الموظفين', desc: 'الحضور والرواتب', icon: '👨‍💼', color: 'linear-gradient(135deg,#0f9f9a,#2dd4bf)', metrics: [{l:'الموظفين',v:(DB.employees||[]).length},{l:'الحضور',v:'-'}] },
-        { id: 'reports', title: 'التقارير', desc: 'التقارير والتحليلات', icon: '📊', color: 'linear-gradient(135deg,#4f46e5,#818cf8)', metrics: [{l:'التقارير',v:'متاح'},{l:'التحليلات',v:'متاح'}] },
-        { id: 'settings', title: 'الإعدادات', desc: 'إعدادات النظام', icon: '⚙️', color: 'linear-gradient(135deg,#64748b,#94a3b8)', metrics: [{l:'الفروع',v:(DB.branches||[]).length},{l:'المستخدمين',v:(DB.users||[]).length}] },
-        { id: 'analytics', title: 'التحليلات', desc: 'الذكاء التجاري', icon: '💡', color: 'linear-gradient(135deg,#059669,#34d399)', metrics: [{l:'التحليلات',v:'متاح'},{l:'التنبؤات',v:'متاح'}] }
-      ];
-      modulesGrid.innerHTML = modules.map(m => '<div class="d6-module-tile" onclick="showPage(\'' + m.id + '\')" style="--tile-accent:' + m.color + '"><div class="d6-module-top"><div class="d6-module-icon" style="background:' + m.color + ';color:#fff">' + m.icon + '</div><div class="d6-module-title">' + m.title + '</div></div><div class="d6-module-desc">' + m.desc + '</div><div class="d6-module-metrics">' + m.metrics.map(me => '<div class="d6-module-metric"><span>' + me.l + ':</span> <strong>' + me.v + '</strong></div>').join('') + '</div></div>').join('');
-    }
-  } catch(e) {}
-  
+  setDash('ds-perf-render', performanceState.lastRenderMs ? `${performanceState.lastRenderMs}ms` : '-');
+  setDash('ds-perf-pending', performanceState.pendingOps || Object.values(uiStabilityState.busyActions || {}).filter(Boolean).length);
+  setDash('ds-perf-cache', getCacheStatusLabel());
   updateAlertsBell();
+  
+  document.getElementById('dashDate').textContent = today.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  
+  // Last invoices
+  const tbody = document.getElementById('dashInvoicesTbody');
+  tbody.innerHTML = todayInvoices.slice(0, 10).map(inv => {
+    const items = inv.items ? inv.items.length : 0;
+    return `<tr>
+      <td>${inv.id}</td>
+      <td>${new Date(inv.date).toLocaleTimeString('ar-EG')}</td>
+      <td>${items} صنف</td>
+      <td>${formatMoney(getNetInvoiceTotal(inv))}</td>
+      <td>${getPaymentLabel(inv.payment)}</td>
+      <td>${inv.user || '-'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center">لا توجد فواتير اليوم</td></tr>';
+  
+  // Alerts
+  const dashboardAlerts = smartAlerts.slice(0, 3);
+  const alertHtml = dashboardAlerts.map(a => {
+    const cls = a.level === 'critical' ? 'alert-warning' : 'alert-info';
+    const icon = a.level === 'critical' ? '⚠️' : a.level === 'warning' ? '⏳' : 'ℹ️';
+    return `<div class="alert ${cls}">${icon} ${a.text}</div>`;
+  }).join('');
+  document.getElementById('dashAlerts').innerHTML = alertHtml;
+  try { renderCommandCards(getCommandData()); } catch(e) {}
+  try { renderEnterpriseDocumentCenterCards(); } catch(e) {}
+  try { window.OmniDashboardBuilder?.build(); } catch(e) {}
   try { renderDashboardSalesChart(); } catch(e) {}
-  try { renderDashboardRevenueChart(); } catch(e) {}
-  try { renderDashboardInventoryChart(); } catch(e) {}
-}
-
-function toggleD6Fab() {
-  const menu = document.getElementById('d6FabMenu');
-  if (menu) menu.classList.toggle('open');
-}
-
-function renderDashboardRevenueChart() {
-  const ctx = document.getElementById('dashboardRevenueChart');
-  if (!ctx) return;
-  if (window._dashboardRevenueChart) window._dashboardRevenueChart.destroy();
-  const days = 7, labels = [], revenue = [], expenses = [];
-  const today = new Date();
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
-    labels.push(d.toLocaleDateString('ar-EG', {weekday:'short'}));
-    revenue.push((DB.saleInvoices || []).filter(inv => inv.date && inv.date.slice(0, 10) === ds).reduce((s, inv) => s + getNetInvoiceTotal(inv), 0));
-    expenses.push((DB.expenses || []).filter(e => e.date && e.date.slice(0, 10) === ds).reduce((s, e) => s + (e.amount || 0), 0));
-  }
-  window._dashboardRevenueChart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: labels, datasets: [
-      { label: 'إيرادات', data: revenue, backgroundColor: 'rgba(37,99,235,0.25)', borderColor: 'rgba(37,99,235,1)', borderWidth: 2, borderRadius: 6 },
-      { label: 'مصروفات', data: expenses, backgroundColor: 'rgba(220,38,38,0.15)', borderColor: 'rgba(220,38,38,1)', borderWidth: 2, borderRadius: 6 }
-    ]},
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, x: { grid: { display: false } } } }
-  });
-}
-
-function renderDashboardInventoryChart() {
-  const ctx = document.getElementById('dashboardInventoryChart');
-  if (!ctx) return;
-  if (window._dashboardInventoryChart) window._dashboardInventoryChart.destroy();
-  const products = DB.products.slice(0, 8);
-  const labels = products.map(p => (p.name || 'P' + p.id).slice(0, 12));
-  const data = products.map(p => getProductStock(p.id));
-  window._dashboardInventoryChart = new Chart(ctx, {
-    type: 'bar',
-    data: { labels: labels, datasets: [{ label: 'المخزون', data: data, backgroundColor: products.map((_, i) => 'hsla(' + (200 + i * 20) + ',70%,55%,0.7)'), borderRadius: 6 }] },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.04)' } }, y: { grid: { display: false } } } }
-  });
 }
 
 // Render sales chart on dashboard
@@ -18283,8 +18076,6 @@ function renderDashboardSalesChart() {
 }
 
 // ================= DAILY REPORT =================
-
-
 function renderDailyReport() {
   const dateInput = document.getElementById('dailyDate');
   if (!dateInput.value) dateInput.valueAsDate = new Date();
@@ -19046,33 +18837,6 @@ function normalizeProductNameForLink(name) {
   return String(name || '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
-// ===== Code-3: Unified Product ID Resolution =====
-// Resolves product ID from an item regardless of which field name variant is used.
-// This prevents bugs caused by mixed naming conventions (productId, product_id, legacy_product_id, legacyProductId).
-// NOTE: item.id is intentionally NOT used - it is often the invoice/serial id, not a product id,
-// and falling through to it would silently resolve the wrong product.
-function resolveProductId(item = {}) {
-  if (!item) return null;
-  // Try all known product-ID field variants in priority order (no .id fallback).
-  const id = item.productId ?? item.product_id ?? item.legacy_product_id ?? item.legacyProductId ?? null;
-  if (id == null || id === '') return null;
-  return id;
-}
-
-// ===== Code-3: Normalized productId comparison =====
-// Product ids are numeric timestamps (Date.now()), but legacy/imported invoice items may store ids as strings.
-// Comparing with === across a numeric/string boundary silently fails to match - corrupting inventory, reports,
-// returns, profit and accounting totals. Always compare through this helper.
-// Returns false if either side is null/undefined/''.
-function sameProductId(a, b) {
-  if (a == null || a === '' || b == null || b === '') return false;
-  // Coerce both sides to Number; if either is non-finite (e.g. a non-numeric legacy string id),
-  // fall back to trimmed case-insensitive string comparison so legacy string ids still match.
-  const na = Number(a), nb = Number(b);
-  if (Number.isFinite(na) && Number.isFinite(nb)) return na === nb;
-  return String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
-}
-
 function resolveProductForInvoiceItem(item = {}) {
   const productUuid = resolveSupabaseProductUuid(item);
   if (productUuid) {
@@ -19090,12 +18854,7 @@ function resolveProductForInvoiceItem(item = {}) {
   }
   const itemName = normalizeProductNameForLink(item.productName || item.name || item.product || item.itemName);
   if (!itemName) return null;
-  // Code-4: Name-based lookup is fallback only - warn if ambiguous
-  const nameMatches = (DB.products || []).filter(p => normalizeProductNameForLink(p.name) === itemName);
-  if (nameMatches.length > 1) {
-    console.warn(`[Code-4] Ambiguous product name match: "${itemName}" matches ${nameMatches.length} products. Using first match (ID: ${nameMatches[0].id}). Consider assigning unique product IDs to invoice items.`);
-  }
-  return nameMatches[0] || null;
+  return (DB.products || []).find(p => normalizeProductNameForLink(p.name) === itemName) || null;
 }
 
 function normalizeInvoiceItemProductLink(item = {}, invoice = {}) {
@@ -19595,40 +19354,14 @@ function applyPurchaseAveragesToOldCosts() {
 
 function deleteProduct(id) {
   if (!requirePermission('deleteProducts')) return;
-  const p = DB.products.find(x => sameProductId(x.id, id));
-  if (!p) { showToast('المنتج غير موجود', 'error'); return; }
-
-  // Data-5: Block deletion while the product is still referenced by accounting/inventory history.
-  // Deleting it would orphan invoice items, returns and stock movement records, corrupting
-  // reports (profit, inventory valuation, treasury reconciliation). Use sameProductId() so
-  // legacy string ids still match the numeric product id.
-  const saleRefs = (DB.saleInvoices || []).filter(inv =>
-    (inv.items || []).some(it => sameProductId(it.productId, id)));
-  const purchaseRefs = (DB.purchaseInvoices || []).filter(inv => {
-    const items = (inv.items && inv.items.length) ? inv.items : [{ productId: inv.productId, qty: inv.qty || 1, serials: [] }];
-    return items.some(it => sameProductId(it.productId, id));
-  });
-  const returnRefs = (DB.returns || []).filter(r =>
-    (r.items || []).some(it => sameProductId(it.productId, id)));
-  const stockMoveRefs = (DB.stockMovement || []).filter(m => sameProductId(m.productId, id));
-  const serialRefs = (DB.serials || []).filter(sr => sameProductId(sr.productId, id));
-
-  const blockers = [];
-  if (saleRefs.length) blockers.push(`فواتير بيع (${saleRefs.length})`);
-  if (purchaseRefs.length) blockers.push(`فواتير شراء (${purchaseRefs.length})`);
-  if (returnRefs.length) blockers.push(`مرتجعات (${returnRefs.length})`);
-  if (stockMoveRefs.length) blockers.push(`حركات مخزون (${stockMoveRefs.length})`);
-  if (serialRefs.length) blockers.push(`سيريالات (${serialRefs.length})`);
-  if (blockers.length > 0) {
-    showToast(`لا يمكن حذف المنتج "${p.name}" لأنه مستخدم داخل النظام (${blockers.join('، ')}). احذف/اربط السجلات المرتبطة أولاً.`, 'error');
-    return;
-  }
-
-  if (!confirm(`هل تريد حذف المنتج "${p.name}" نهائياً؟\nلا توجد سجلات مرتبطة به.`)) return;
-
-  DB.products = DB.products.filter(x => !sameProductId(x.id, id));
-  logProductChange('حذف منتج', p.name, 'تم حذف المنتج (لا توجد سجلات مرتبطة)');
-
+  if (!confirm('هل تريد حذف هذا المنتج؟')) return;
+  
+  const p = DB.products.find(x => x.id === id);
+  DB.products = DB.products.filter(x => x.id !== id);
+  DB.serials = DB.serials.filter(s => s.productId !== id);
+  
+  logProductChange('حذف منتج', p ? p.name : 'Unknown', 'تم حذف المنتج والسيريالات');
+  
   saveDB();
   renderProductsTable();
   showToast('تم الحذف');
@@ -20424,7 +20157,7 @@ function updatePurchaseInvoice(id) {
       DB.serials = DB.serials.filter(s => !item.serials.includes(s.serial) || s.purchaseInvoiceId !== id);
     } else {
       // Decrement no-serial stock
-      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
+      const prod = DB.products.find(p => p.id === item.productId);
       if (prod) prod.stockQty = Math.max(0, (prod.stockQty || 0) - item.qty);
     }
     addStockMovement(item.productId, 'out', item.qty, `إلغاء شراء قديم - فاتورة ${id}`, null, purchaseMeta);
@@ -20441,7 +20174,7 @@ function updatePurchaseInvoice(id) {
 
   // Apply new inventory effects
   purCart.forEach(item => {
-    const prod = DB.products.find(p => sameProductId(p.id, item.productId));
+    const prod = DB.products.find(p => p.id === item.productId);
     if (item.noSerial) {
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     } else {
@@ -21119,9 +20852,7 @@ function renderCustomersTable(filter = '') {
   if (filter) customers = customers.filter(c => c.name.toLowerCase().includes(filter.toLowerCase()) || (c.phone && c.phone.includes(filter)));
   
   tbody.innerHTML = customers.map((c, idx) => {
-    const debt = (c.balance || 0) + DB.saleInvoices
-      .filter(inv => inv.customer === c.name && inv.invoiceType === 'ajel')
-      .reduce((sum, inv) => sum + getNetInvoiceTotal(inv), 0);
+    const debt = getCustomerBalance(c);
     const dualSupplier = findMatchingSupplierForCustomer(c);
     const dualNet = dualSupplier ? getDualNetSummary(c, dualSupplier) : null;
     return `<tr>
@@ -21226,79 +20957,35 @@ function viewCustomerStatement(customerIdOrName) {
   const customer = DB.customers.find(c => c.id == customerIdOrName) || DB.customers.find(c => c.name === customerIdOrName);
   if (!customer) return;
   const customerName = customer.name || '';
-  let transactions = [];
-
-  // Sale invoices
-  DB.saleInvoices.filter(inv =>
-    inv.customer === customerName ||
-    (customer.phone && inv.customerPhone && String(inv.customerPhone).replace(/\s/g, '') === String(customer.phone).replace(/\s/g, ''))
-  ).forEach(inv => {
-    const itemsSummary = inv.items && inv.items.length > 0
-      ? inv.items.map(i => `${i.name} ×${i.qty}`).join('، ')
-      : 'بيع';
-    transactions.push({
-      date: inv.date,
-      desc: `📤 فاتورة بيع #${inv.id}`,
-      detail: itemsSummary,
-      debit: inv.invoiceType === 'ajel' ? getNetInvoiceTotal(inv) : 0,
-      credit: inv.invoiceType !== 'ajel' ? getNetInvoiceTotal(inv) : 0,
-      invoiceId: inv.id,
-      invoiceKind: 'sale',
-      badge: `<span class="badge badge-blue">بيع</span>`,
-      bg: 'rgba(0,102,255,0.05)'
-    });
-  });
-
-  // Purchase invoices (if same party supplies us too)
-  DB.purchaseInvoices.filter(p =>
-    p.supplier === customerName ||
-    (customer.phone && p.supplierPhone && String(p.supplierPhone).replace(/\s/g, '') === String(customer.phone).replace(/\s/g, ''))
-  ).forEach(p => {
-    const itemsSummary = p.items && p.items.length > 0
-      ? p.items.map(i => `${i.name} ×${i.qty}`).join('، ')
-      : (DB.products.find(prod => prod.id === p.productId)?.name || '-');
-    transactions.push({
-      date: p.date,
-      desc: `📥 فاتورة شراء #${p.id}`,
-      detail: itemsSummary,
-      debit: 0,
-      credit: p.total || 0,
-      invoiceId: p.id,
-      invoiceKind: 'purchase',
-      badge: `<span class="badge badge-yellow">شراء</span>`,
-      bg: 'rgba(249,168,37,0.05)'
-    });
-  });
-
-  // Account statement payments
-  (DB.asPayments || []).filter(p => p.entityId == customer.id && p.entityType === 'customer').forEach(p => {
-    transactions.push({
-      date: p.date,
-      desc: `💳 ${p.note || 'دفعة'}`,
-      detail: getPaymentLabel(p.method),
-      debit: p.direction === 'receive' ? p.amount : 0,
-      credit: p.direction === 'pay' ? p.amount : 0,
-      badge: `<span class="badge badge-green">دفعة</span>`,
-      bg: 'rgba(0,168,84,0.05)'
-    });
-  });
-
-  // Vouchers
-  (DB.vouchers || []).filter(v => v.partyId == customer.id && v.partyType === 'customer').forEach(v => {
-    transactions.push({
-      date: v.date,
-      desc: `🧾 سند ${v.type === 'receipt' ? 'قبض' : 'صرف'} #${v.id}`,
-      detail: v.desc || '',
-      debit: v.type === 'payment' ? v.amount : 0,
-      credit: v.type === 'receipt' ? v.amount : 0,
-      badge: `<span class="badge badge-green">سند</span>`,
-      bg: 'rgba(0,168,84,0.05)'
-    });
+  // Build the statement from the SINGLE SOURCE OF TRUTH ledger so the closing
+  // balance here matches every other screen (table, receivables, dashboard).
+  const ledgerStyle = {
+    opening:      { desc: '📂 رصيد افتتاحي',  badge: `<span class="badge badge-gray">افتتاحي</span>`,  bg: 'rgba(120,120,120,0.05)' },
+    adjustment:   { desc: '⚖️ تسوية',          badge: `<span class="badge badge-gray">تسوية</span>`,   bg: 'rgba(120,120,120,0.05)' },
+    invoice:      { desc: '📤 فاتورة بيع',     badge: `<span class="badge badge-blue">بيع</span>`,    bg: 'rgba(0,102,255,0.05)',  invoiceKind: 'sale' },
+    repair:       { desc: '🔧 صيانة',          badge: `<span class="badge badge-blue">صيانة</span>`,  bg: 'rgba(0,102,255,0.05)' },
+    return:       { desc: '↩️ مرتجع / رد',      badge: `<span class="badge badge-yellow">مرتجع</span>`,bg: 'rgba(249,168,37,0.05)' },
+    payment:      { desc: '💳 دفعة',           badge: `<span class="badge badge-green">دفعة</span>`,  bg: 'rgba(0,168,84,0.05)' },
+    installment:  { desc: '📅 قسط',            badge: `<span class="badge badge-green">قسط</span>`,   bg: 'rgba(0,168,84,0.05)' }
+  };
+  const transactions = getCustomerArApTransactions(customer).map(t => {
+    const style = ledgerStyle[t.kind] || { desc: t.label || '-', badge: '', bg: '' };
+    return {
+      date: t.date,
+      desc: `${style.desc}${t.reference ? ' #' + t.reference : ''}`,
+      detail: t.label || t.notes || '',
+      debit: toSafeFloat(t.debit, 0),
+      credit: toSafeFloat(t.credit, 0),
+      invoiceId: t.invoice || t.reference || '',
+      invoiceKind: style.invoiceKind || '',
+      badge: style.badge,
+      bg: style.bg
+    };
   });
 
   transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  let running = customer.balance || 0;
+  let running = 0;
   let totalDebit = 0, totalCredit = 0;
   const rows = transactions.map(t => {
     running += t.debit - t.credit;
@@ -21631,6 +21318,8 @@ function saveInstallmentPayment() {
     direction: 'pay',
     amount,
     method,
+    source: 'installment',
+    installmentId: inst.id,
     note: `تحصيل قسط ${inst.id}${inst.invoiceId ? ' - فاتورة ' + inst.invoiceId : ''}`,
     user: currentUser ? currentUser.username : 'system',
     ...getCurrentBranchMeta()
@@ -21961,7 +21650,7 @@ function saveReturnImpl() {
       returnedItems.push({ productId: item.productId, name: item.name, qty: selectedSerials.length, serials: selectedSerials, price: item.price || 0, buyPrice: item.buyPrice || 0, refund: itemRefund });
     } else {
       const qty = parseInt(document.getElementById(`retQty_${idx}`)?.value) || item.qty;
-      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
+      const prod = DB.products.find(p => p.id === item.productId);
       if (prod) prod.stockQty = (prod.stockQty || 0) + qty;
       const itemRefund = item.price * qty;
       totalRefundCalc += itemRefund;
@@ -23831,12 +23520,12 @@ function renderReports() {
   
   const slowMovers = DB.products.filter(p => {
     const lastSale = DB.saleInvoices
-      .filter(inv => inv.items && inv.items.some(i => sameProductId(i.productId, p.id)))
+      .filter(inv => inv.items && inv.items.some(i => i.productId === p.id))
       .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
     return !lastSale || new Date(lastSale.date) < thirtyDaysAgo;
   }).map(p => {
     const lastSale = DB.saleInvoices
-      .filter(inv => inv.items && inv.items.some(i => sameProductId(i.productId, p.id)))
+      .filter(inv => inv.items && inv.items.some(i => i.productId === p.id))
       .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
     const days = lastSale ? Math.floor((new Date() - new Date(lastSale.date)) / (1000 * 60 * 60 * 24)) : 'لم يُباع';
     const stock = getProductStock(p.id);
@@ -24270,7 +23959,7 @@ function renderForecastPage() {
     const sold90 = (DB.saleInvoices || []).reduce((sum, inv) => {
       const ageDays = (Date.now() - new Date(inv.date).getTime()) / (1000 * 60 * 60 * 24);
       if (ageDays > 90) return sum;
-      const item = (inv.items || []).find(i => sameProductId(i.productId, p.id));
+      const item = (inv.items || []).find(i => i.productId === p.id);
       return sum + (item ? (item.qty || 0) : 0);
     }, 0);
     const monthlyAvg = sold90 / 3;
@@ -27638,12 +27327,7 @@ function renderTransfers() {
 function renderFinancial() {
   // Calculate all financial data
   const totalAssets = DB.products.reduce((sum, p) => sum + (p.buyPrice || 0) * getProductStock(p.id), 0);
-  const totalReceivables = DB.customers.reduce((sum, c) => {
-    const customerDebt = (c.balance || 0) + DB.saleInvoices
-      .filter(inv => inv.customer === c.name && inv.invoiceType === 'ajel')
-      .reduce((s, inv) => s + getNetInvoiceTotal(inv), 0);
-    return sum + customerDebt;
-  }, 0);
+  const totalReceivables = DB.customers.reduce((sum, c) => sum + Math.max(0, getCustomerBalance(c)), 0);
   
   const treasuryBalance = DB.cashFlow.reduce((sum, c) => sum + (c.type === 'in' ? (c.amount || 0) : -(c.amount || 0)), 0);
   
@@ -27652,10 +27336,7 @@ function renderFinancial() {
   const totalExpenses = DB.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalPurchases = DB.purchaseInvoices.reduce((sum, p) => sum + (p.total || 0), 0);
   
-  const totalPayables = DB.suppliers.reduce((sum, s) => {
-    const supplierDebt = (s.balance || 0) + DB.purchaseInvoices.filter(p => p.supplierId == s.id && p.invoiceType === 'ajel').reduce((d, inv) => d + (inv.total || 0), 0);
-    return sum + supplierDebt;
-  }, 0);
+  const totalPayables = DB.suppliers.reduce((sum, s) => sum + Math.max(0, getSupplierBalance(s)), 0);
   
   const installmentRemaining = DB.installments.filter(i => i.status === 'active').reduce((sum, i) => sum + (i.remaining || 0), 0);
   
@@ -27890,10 +27571,12 @@ function getCustomerPaymentsForName(name) {
 
 function getFinancialCustomerRows(filters = getFinancialFilters()) {
   const names = new Map();
-  (DB.customers || []).forEach(c => names.set(String(c.name || '').trim(), { name: c.name, phone: c.phone, opening: toSafeFloat(c.balance, 0) }));
+  // opening now derives from the AR/AP ledger (getArApOpeningBalance), NOT customer.balance,
+  // so this table's balance matches the single source of truth on every screen.
+  (DB.customers || []).forEach(c => names.set(String(c.name || '').trim(), { name: c.name, phone: c.phone, entity: c, opening: getArApOpeningBalance('customer', c) }));
   (DB.saleInvoices || []).forEach(inv => {
     const name = String(inv.customer || 'عميل نقدي').trim();
-    if (!names.has(name)) names.set(name, { name, phone: inv.phone || inv.customerPhone || '', opening: 0 });
+    if (!names.has(name)) names.set(name, { name, phone: inv.phone || inv.customerPhone || '', entity: null, opening: 0 });
   });
   return Array.from(names.values()).map(c => {
     const invoices = (DB.saleInvoices || []).filter(inv =>
@@ -27901,12 +27584,14 @@ function getFinancialCustomerRows(filters = getFinancialFilters()) {
       && financialInRange(inv.date || inv.createdAt, filters)
       && financialBranchMatches(inv, filters)
     );
-    const credit = invoices.filter(inv => ['ajel', 'installment'].includes(String(inv.invoiceType || inv.payment || '').toLowerCase()))
-      .reduce((sum, inv) => sum + getNetInvoiceTotal(inv), 0);
     const returns = invoices.reduce((sum, inv) => sum + getSaleReturnAmountForInvoice(inv), 0);
     const payments = getCustomerPaymentsForName(c.name);
     const totalSpent = invoices.reduce((sum, inv) => sum + getNetInvoiceTotal(inv), 0);
-    const balance = roundMoney(toSafeFloat(c.opening, 0) + credit - payments - returns);
+    // Balance = the single source of truth full-ledger balance for this customer.
+    const entity = c.entity || (DB.customers || []).find(x => String(x.name || '').trim() === String(c.name || '').trim());
+    const balance = entity ? getCustomerBalance(entity) : roundMoney(toSafeFloat(c.opening, 0)
+      + invoices.filter(inv => ['ajel', 'installment'].includes(String(inv.invoiceType || inv.payment || '').toLowerCase())).reduce((sum, inv) => sum + getNetInvoiceTotal(inv), 0)
+      - payments - returns);
     return { ...c, invoices: invoices.length, payments, returns, totalSpent, balance, branchId: 'MAIN', branchName: getBranchNameById('MAIN') };
   }).filter(row => financialTextMatches(row, filters));
 }
@@ -28038,7 +27723,8 @@ function getCustomerArApTransactions(customer) {
   ensureArApState();
   const rows = [];
   const push = row => rows.push({ branchId: row.branchId || 'MAIN', branchName: row.branchName || getBranchNameById(row.branchId || 'MAIN'), ...row });
-  getArApBalanceEntries('customer', customer).forEach(r => push({
+  const openingEntries = getArApBalanceEntries('customer', customer);
+  openingEntries.forEach(r => push({
     date: r.date,
     kind: r.kind || 'opening',
     label: r.kind === 'adjustment' ? 'تسوية' : 'رصيد افتتاحي',
@@ -28047,6 +27733,22 @@ function getCustomerArApTransactions(customer) {
     credit: r.direction === 'credit' ? toSafeFloat(r.amount, 0) : 0,
     notes: r.reason || r.notes || ''
   }));
+  // Backward-compat opening balance: customer.balance is a manual opening-balance seed
+  // (set via the customer form / opening-balance editor). It is treated as an opening
+  // ledger entry ONLY when no explicit arApOpeningBalances record exists, so it is never
+  // double-counted. Sales/payments/vouchers no longer write to customer.balance.
+  const seedOpening = toSafeFloat(customer && customer.balance, 0);
+  if (seedOpening !== 0 && !openingEntries.some(r => (r.kind || 'opening') === 'opening')) {
+    push({
+      date: customer.createdAt || customer.registrationDate || '',
+      kind: 'opening',
+      label: 'رصيد افتتاحي',
+      reference: 'seed-' + (customer.id || ''),
+      debit: seedOpening > 0 ? seedOpening : 0,
+      credit: seedOpening < 0 ? -seedOpening : 0,
+      notes: 'رصيد افتتاحي'
+    });
+  }
   (DB.saleInvoices || []).filter(inv => arApSameParty(inv, customer, ['customer', 'customerName']) || arApClean(inv.customer) === arApClean(customer.name)).forEach(inv => {
     const total = getNetInvoiceTotal(inv);
     const kind = String(inv.invoiceType || inv.payment || '').toLowerCase();
@@ -28083,7 +27785,14 @@ function getCustomerArApTransactions(customer) {
     credit: toSafeFloat(r.amount || r.refundAmount || r.total, 0),
     notes: r.reason || ''
   }));
-  (DB.asPayments || []).filter(p => p.entityType === 'customer' && arApSameParty(p, customer, ['entityName', 'partyName', 'customer'])).forEach(p => push({
+  (DB.asPayments || []).filter(p => {
+    if (p.entityType !== 'customer' || !arApSameParty(p, customer, ['entityName', 'partyName', 'customer'])) return false;
+    // Installment payments are logged in BOTH asPayments and installments[].payments.
+    // Count them ONLY via the installments branch below to avoid a double credit.
+    if (p.source === 'installment' || p.installmentId) return false;
+    if (typeof p.note === 'string' && p.note.indexOf('تحصيل قسط') === 0) return false;
+    return true;
+  }).forEach(p => push({
     date: p.date,
     kind: 'payment',
     label: p.direction === 'pay' ? 'تحصيل دفعة' : 'استرداد للعميل',
@@ -28120,7 +27829,8 @@ function getSupplierArApTransactions(supplier) {
   ensureArApState();
   const rows = [];
   const push = row => rows.push({ branchId: row.branchId || 'MAIN', branchName: row.branchName || getBranchNameById(row.branchId || 'MAIN'), ...row });
-  getArApBalanceEntries('supplier', supplier).forEach(r => push({
+  const openingEntries = getArApBalanceEntries('supplier', supplier);
+  openingEntries.forEach(r => push({
     date: r.date,
     kind: r.kind || 'opening',
     label: r.kind === 'adjustment' ? 'تسوية' : 'رصيد افتتاحي',
@@ -28129,6 +27839,20 @@ function getSupplierArApTransactions(supplier) {
     credit: r.direction === 'credit' ? toSafeFloat(r.amount, 0) : 0,
     notes: r.reason || r.notes || ''
   }));
+  // Backward-compat opening balance seed (see customer equivalent). For suppliers a
+  // positive supplier.balance means we owe the supplier (a payable = credit side here).
+  const seedOpening = toSafeFloat(supplier && supplier.balance, 0);
+  if (seedOpening !== 0 && !openingEntries.some(r => (r.kind || 'opening') === 'opening')) {
+    push({
+      date: supplier.createdAt || '',
+      kind: 'opening',
+      label: 'رصيد افتتاحي',
+      reference: 'seed-' + (supplier.id || ''),
+      debit: seedOpening > 0 ? seedOpening : 0,
+      credit: seedOpening < 0 ? -seedOpening : 0,
+      notes: 'رصيد افتتاحي'
+    });
+  }
   (DB.purchaseInvoices || []).filter(inv => arApSameParty(inv, supplier, ['supplier', 'supplierName'])).forEach(inv => {
     const isCredit = ['ajel', 'credit'].includes(String(inv.invoiceType || '').toLowerCase());
     push({
@@ -28181,6 +27905,34 @@ function getSupplierArApTransactions(supplier) {
     notes: v.desc || ''
   }));
   return rows.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+}
+
+// ================= SINGLE SOURCE OF TRUTH: CUSTOMER / SUPPLIER BALANCE =================
+// Design decision: the transaction ledger (AR/AP transactions) is the ONE source of
+// truth for customer/supplier debt. customer.balance is NOT summed anywhere anymore;
+// any opening balance lives as an arApOpeningBalances record consumed by the ledger.
+// Every screen (table, statement, receivables, aging, dashboard, vouchers, broadcast)
+// must derive debt through these helpers so all screens agree exactly.
+function getEntityLedgerBalance(entityType, entity) {
+  if (!entity) return 0;
+  const txs = entityType === 'supplier'
+    ? getSupplierArApTransactions(entity)
+    : getCustomerArApTransactions(entity);
+  return roundMoney(txs.reduce((sum, t) => sum + toSafeFloat(t.debit, 0) - toSafeFloat(t.credit, 0), 0));
+}
+
+function getCustomerBalance(customerOrId) {
+  const customer = (customerOrId && typeof customerOrId === 'object')
+    ? customerOrId
+    : (DB.customers || []).find(c => c.id == customerOrId) || (DB.customers || []).find(c => c.name === customerOrId);
+  return getEntityLedgerBalance('customer', customer);
+}
+
+function getSupplierBalance(supplierOrId) {
+  const supplier = (supplierOrId && typeof supplierOrId === 'object')
+    ? supplierOrId
+    : (DB.suppliers || []).find(s => s.id == supplierOrId) || (DB.suppliers || []).find(s => s.name === supplierOrId);
+  return getEntityLedgerBalance('supplier', supplier);
 }
 
 function getArApAccountRows(entityType, filters = getFinancialFilters()) {
@@ -31225,7 +30977,7 @@ function legacyFinalizeSaleTransaction(payload) {
   const issueDateIso = payload.issueDateIso || (payload.issueDate ? localDateWithCurrentTime(payload.issueDate) : localDateTimeString());
   const createdAt = payload.createdAt || localDateTimeString();
   const saleItems = Array.isArray(payload.items) ? payload.items.map(item => {
-    const product = DB.products.find(p => sameProductId(p.id, item.productId));
+    const product = DB.products.find(p => p.id === item.productId);
     const fallbackSell = product ? ((parseFloat(product.sellPrice) > 0) ? parseFloat(product.sellPrice) : (parseFloat(product.buyPrice) || 0)) : 0;
     return {
       ...item,
@@ -31247,15 +30999,15 @@ function legacyFinalizeSaleTransaction(payload) {
   const total = roundMoney(Math.max(0, subtotal - discount));
   const profit = calculateSaleInvoiceProfit({ items: saleItems, discount });
 
-  const invoiceId = payload.invoiceId || generateInvoiceId('INV');
+  const invoiceId = payload.invoiceId || ('INV-' + String(DB.settings.nextInvoiceNum).padStart(6, '0'));
   const invoiceNumMatch = String(invoiceId).match(/(\d+)$/);
-  const invoiceNum = invoiceNumMatch ? parseInt(invoiceNumMatch[1], 10) : (parseInt(DB.settings && DB.settings.nextInvoiceNum, 10) || 1);
+  const invoiceNum = invoiceNumMatch ? parseInt(invoiceNumMatch[1], 10) : DB.settings.nextInvoiceNum;
   DB.settings.nextInvoiceNum = Math.max(parseInt(DB.settings.nextInvoiceNum, 10) || 1, (invoiceNum || 0) + 1);
   const saleMeta = { referenceType: 'sale', referenceId: invoiceId, entryKind: 'sale', sourceModule: 'sales', transactionDate: issueDateIso, saleDate: issueDateIso.slice(0, 10), ...getCurrentBranchMeta(), cashier: payload.user || (currentUser ? currentUser.username : 'system') };
 
   saleItems.forEach(item => {
     if (item.noSerial) {
-      const product = DB.products.find(p => sameProductId(p.id, item.productId));
+      const product = DB.products.find(p => p.id === item.productId);
       if (product) {
         if (item.isAmanat) product.stockQty = (product.stockQty || 0) - item.qty;
         else product.stockQty = Math.max(0, (product.stockQty || 0) - item.qty);
@@ -31270,7 +31022,7 @@ function legacyFinalizeSaleTransaction(payload) {
         });
       });
       if (item.isAmanat && (!item.serials || item.serials.length === 0)) {
-        const product = DB.products.find(p => sameProductId(p.id, item.productId));
+        const product = DB.products.find(p => p.id === item.productId);
         if (product) product.stockQty = (product.stockQty || 0) - item.qty;
       }
     }
@@ -31359,10 +31111,9 @@ function legacyFinalizeSaleTransaction(payload) {
     invoice.remainingBalance = installmentPlan.remaining;
   }
 
-  if (invoiceType === 'ajel') {
-    const cust = DB.customers.find(c => c.name === customer);
-    if (cust) cust.balance = (cust.balance || 0) + total;
-  }
+  // NOTE: customer debt is derived from the transaction ledger (the saleInvoices
+  // record pushed above). Do NOT add the ajel total to customer.balance here — doing
+  // so double-counts the sale (see getCustomerBalance / getArApAccountRows).
 
   saleItems.forEach(item => addStockMovement(item.productId, 'out', item.qty, `بيع - فاتورة ${invoiceId}`, null, saleMeta));
   const auditSerials = saleItems.flatMap(item => item.serials || []).filter(Boolean).join(', ');
@@ -31564,7 +31315,7 @@ function buildPurchasePayloadFromPOS() {
 
   const serialWithoutSerial = normalizedCart.filter(item => {
     if (!item || item.productId == null) return false;
-    const prod = DB.products.find(p => sameProductId(p.id, item.productId));
+    const prod = DB.products.find(p => p.id === item.productId);
     if (!prod) return false;
     const serials = Array.isArray(item.serials) ? item.serials.filter(Boolean) : [];
     return prod.hasSerial !== false && serials.length === 0;
@@ -32341,14 +32092,6 @@ function deleteSaleInvoice(id) {
   if (!requirePermission('deleteData')) return;
   const inv = DB.saleInvoices.find(i => i.id === id);
   if (!inv) return;
-  
-  // MI-6: Check if invoice has returns - deleting would corrupt data
-  const returns = getSaleReturnsForInvoice(id);
-  if (returns.length > 0) {
-    showToast(`لا يمكن حذف الفاتورة #${id} لأنها مرتبطة بمرتجع بيع (${returns.length} مرتجع). قم بحذف المرتجعات أولاً.`, 'error');
-    return;
-  }
-  
   if (!confirm(`⚠️ هل تريد حذف فاتورة البيع #${id} نهائياً؟\n\nسيتم:\n• إعادة السيريالات للمخزون\n• خصم المبلغ من الخزنة\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
 
   // Reverse inventory effects
@@ -32359,7 +32102,7 @@ function deleteSaleInvoice(id) {
         if (s) { s.status = 'available'; s.saleInvoiceId = null; }
       });
     } else if (item.productId) {
-      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
+      const prod = DB.products.find(p => p.id === item.productId);
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     }
     if (item.productId) addStockMovement(item.productId, 'in', item.qty, `إلغاء فاتورة بيع #${id}`);
@@ -32384,14 +32127,6 @@ function deletePurchaseInvoice(id) {
   if (!requirePermission('deleteData')) return;
   const inv = DB.purchaseInvoices.find(p => p.id === id);
   if (!inv) return;
-  
-  // MI-6b: Check if invoice has purchase returns - deleting would corrupt data
-  const returns = getPurchaseReturnsForInvoice(id);
-  if (returns.length > 0) {
-    showToast(`لا يمكن حذف الفاتورة #${id} لأنها مرتبطة بمرتجع شراء (${returns.length} مرتجع). قم بحذف المرتجعات أولاً.`, 'error');
-    return;
-  }
-  
   if (!confirm(`⚠️ هل تريد حذف فاتورة الشراء #${id} نهائياً؟\n\nسيتم:\n• حذف السيريالات المرتبطة بها\n• إرجاع المبلغ للخزنة\n\nهذا الإجراء لا يمكن التراجع عنه!`)) return;
 
   // Reverse inventory effects
@@ -32402,7 +32137,7 @@ function deletePurchaseInvoice(id) {
     if (item.serials && item.serials.length > 0) {
       DB.serials = DB.serials.filter(s => !(item.serials.includes(s.serial) && s.purchaseInvoiceId === id));
     } else if (item.productId) {
-      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
+      const prod = DB.products.find(p => p.id === item.productId);
       if (prod) prod.stockQty = Math.max(0, (prod.stockQty || 0) - item.qty);
     }
     if (item.productId) addStockMovement(item.productId, 'out', item.qty, `إلغاء فاتورة شراء #${id}`);
@@ -32515,7 +32250,7 @@ function saveEditSaleInvoice() {
         if (s) { s.status = 'available'; s.saleInvoiceId = null; }
       });
     } else if (item.productId) {
-      const prod = DB.products.find(p => sameProductId(p.id, item.productId));
+      const prod = DB.products.find(p => p.id === item.productId);
       if (prod) prod.stockQty = (prod.stockQty || 0) + item.qty;
     }
   });
@@ -32655,119 +32390,19 @@ async function saveNewSaleInvoiceFromModal() {
 // ================= QUICK SALE =================
 function openQuickSaleModal() {
   if (!requirePermission('viewFinancial')) return;
-  document.getElementById('quickProdSearch').value = '';
-  document.getElementById('quickProductId').value = '';
-  document.getElementById('quickProductName').value = '';
-  document.getElementById('quickProductBarcode').value = '';
-  document.getElementById('quickProductPartNumber').value = '';
+  document.getElementById('quickProd').value = '';
   document.getElementById('quickSerial').value = '';
   document.getElementById('quickPrice').value = '';
   document.getElementById('quickCost').value = '';
   document.getElementById('quickCustomer').value = '';
   document.getElementById('quickPayment').value = 'cash';
   const qn = document.getElementById('quickNote'); if (qn) qn.value = '';
-  const qd = document.getElementById('quickProdDropdown'); if (qd) { qd.style.display = 'none'; qd.innerHTML = ''; }
   openModal('quickSaleModal');
-}
-
-let _quickSaleDropIdx = -1;
-let _quickSaleDropdownHover = false;
-let _quickSaleDropdownHideTimer = null;
-let _quickSaleSelectedProduct = null;
-
-function quickSaleCancelHideDropdown() {
-  if (_quickSaleDropdownHideTimer) { clearTimeout(_quickSaleDropdownHideTimer); _quickSaleDropdownHideTimer = null; }
-}
-
-function quickSaleHideDropdownDelayed(ms = 220) {
-  quickSaleCancelHideDropdown();
-  _quickSaleDropdownHideTimer = setTimeout(() => {
-    if (_quickSaleDropdownHover) return;
-    const d = document.getElementById('quickProdDropdown');
-    if (d) d.style.display = 'none';
-  }, ms);
-}
-
-function quickSaleSearchInput(val) {
-  quickSaleCancelHideDropdown();
-  _quickSaleDropIdx = -1;
-  const typedValue = String(val || '').trim();
-  if (_quickSaleSelectedProduct && typedValue.toLowerCase() !== String(_quickSaleSelectedProduct.name || '').trim().toLowerCase()) {
-    _quickSaleSelectedProduct = null;
-    document.getElementById('quickProductId').value = '';
-    document.getElementById('quickProductName').value = '';
-    document.getElementById('quickProductBarcode').value = '';
-    document.getElementById('quickProductPartNumber').value = '';
-  }
-  const drop = document.getElementById('quickProdDropdown');
-  if (!drop) return;
-  const q = (val || '').trim().toLowerCase();
-  const matches = q.length >= 1
-    ? DB.products.filter(p => 
-        p.name.toLowerCase().includes(q) || 
-        String(p.id).includes(q) ||
-        String(p.barcode || '').toLowerCase().includes(q) ||
-        String(p.partNumber || '').toLowerCase().includes(q)
-      ).slice(0, 40)
-    : DB.products.slice(0, 40);
-  if (!matches.length) {
-    drop.innerHTML = '<div style="padding:12px 14px;color:var(--text2);font-size:0.82rem;text-align:center">لا يوجد منتج مطابق</div>';
-    drop.style.display = 'block'; return;
-  }
-  drop.innerHTML = matches.map((p, i) => {
-    const stock = typeof getProductStock === 'function' ? getProductStock(p.id) : '?';
-    const safe = p.name.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    return `<div id="quickSaleDrop_${i}" onclick="quickSaleSelectProduct(${p.id})"
-      style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;transition:background .12s"
-      onmouseover="quickSaleDropHover(${i})" onmouseout="this.style.background=''">
-      <span style="font-weight:700">${escapeHtml(p.name)}</span>
-      <span style="font-size:0.72rem;color:var(--text2);white-space:nowrap;margin-right:8px">شراء: ${formatMoney(p.buyPrice||0)} | مخزون: ${stock}</span>
-    </div>`;
-  }).join('');
-  drop.style.display = 'block';
-  drop.onmouseenter = function() { _quickSaleDropdownHover = true; quickSaleCancelHideDropdown(); };
-  drop.onmouseleave = function() { _quickSaleDropdownHover = false; quickSaleHideDropdownDelayed(180); };
-}
-
-function quickSaleDropHover(i) {
-  _quickSaleDropIdx = i;
-  document.querySelectorAll('#quickProdDropdown > div').forEach((el,j) => {
-    el.style.background = j === i ? 'var(--surface2)' : '';
-  });
-}
-
-function quickSaleKeyNav(e) {
-  const drop = document.getElementById('quickProdDropdown');
-  if (!drop || drop.style.display === 'none') return;
-  const items = drop.querySelectorAll('div[id^="quickSaleDrop_"]');
-  if (!items.length) return;
-  if (e.key === 'ArrowDown')  { e.preventDefault(); _quickSaleDropIdx = Math.min(_quickSaleDropIdx+1, items.length-1); quickSaleDropHover(_quickSaleDropIdx); items[_quickSaleDropIdx]?.scrollIntoView({block:'nearest'}); }
-  if (e.key === 'ArrowUp')    { e.preventDefault(); _quickSaleDropIdx = Math.max(_quickSaleDropIdx-1, 0); quickSaleDropHover(_quickSaleDropIdx); items[_quickSaleDropIdx]?.scrollIntoView({block:'nearest'}); }
-  if (e.key === 'Enter' && _quickSaleDropIdx >= 0) { e.preventDefault(); items[_quickSaleDropIdx]?.click(); }
-  if (e.key === 'Escape')     { drop.style.display = 'none'; }
-}
-
-function quickSaleSelectProduct(id) {
-  quickSaleCancelHideDropdown();
-  const selected = DB.products.find(product => Number(product.id) === Number(id)) || null;
-  _quickSaleSelectedProduct = selected ? { ...selected } : null;
-  const h = document.getElementById('quickProductId'); if(h) h.value = id;
-  const n = document.getElementById('quickProductName'); if(n) n.value = selected?.name || '';
-  const b = document.getElementById('quickProductBarcode'); if(b) b.value = selected?.barcode || '';
-  const p = document.getElementById('quickProductPartNumber'); if(p) p.value = selected?.partNumber || '';
-  const s = document.getElementById('quickProdSearch');  if(s) s.value = selected?.name || '';
-  const price = document.getElementById('quickPrice'); if(price) price.value = selected?.sellPrice || '';
-  const cost = document.getElementById('quickCost'); if(cost) cost.value = selected?.buyPrice || '';
-  const d = document.getElementById('quickProdDropdown'); if(d) d.style.display = 'none';
-  _quickSaleDropIdx = -1;
 }
 
 function saveQuickSale() {
   if (!requirePermission('createInvoices') || !requirePermission('viewFinancial')) return;
-  const productId = document.getElementById('quickProductId').value;
-  const productName = document.getElementById('quickProductName').value.trim();
-  const productBarcode = document.getElementById('quickProductBarcode').value.trim();
-  const productPartNumber = document.getElementById('quickProductPartNumber').value.trim();
+  const product = document.getElementById('quickProd').value.trim();
   const serial = document.getElementById('quickSerial').value.trim();
   const price = Math.max(0, roundMoney(toSafeFloat(document.getElementById('quickPrice').value, 0)));
   const cost = Math.max(0, roundMoney(toSafeFloat(document.getElementById('quickCost').value, 0)));
@@ -32775,52 +32410,10 @@ function saveQuickSale() {
   const payment = document.getElementById('quickPayment').value;
   const note = (document.getElementById('quickNote')?.value || '').trim();
   
-  if (!productId || !productName || !price) { showToast('اختر المنتج وأدخل السعر', 'error'); return; }
+  if (!product || !price) { showToast('أدخل المنتج والسعر', 'error'); return; }
   
-  const stockProduct = DB.products.find(p => Number(p.id) === Number(productId));
-  if (!stockProduct) { showToast('المنتج غير موجود', 'error'); return; }
-  
-  // ===== STOCK VALIDATION (CR-2) =====
-  // Use getProductStock() - same function used by POS system
-  const currentStock = getProductStock(Number(productId));
-  
-  if (serial) {
-    // Serial-tracked product: validate serial availability using same logic as POS
-    const serialRecord = findSerialRecordByIdentifier(serial);
-    if (!serialRecord) {
-      showToast('لا يمكن إتمام عملية البيع، السيريال غير مسجل في النظام.', 'error');
-      return;
-    }
-    const info = getSerialSaleBlockInfo(serial);
-    const deviceStatus = String(info.deviceRecord?.status || '').toLowerCase();
-    const serialStatus = String(info.serialRecord?.status || serialRecord.status || '').toLowerCase();
-    if (['sold', 'resold'].includes(deviceStatus) || ['sold', 'resold'].includes(serialStatus)) {
-      showToast('لا يمكن إتمام عملية البيع، السيريال تم بيعه بالفعل.', 'error');
-      return;
-    }
-    if ((deviceStatus || serialStatus) && !['available', 'in_stock', 'returned'].includes(deviceStatus || serialStatus)) {
-      showToast('لا يمكن إتمام عملية البيع، السيريال غير متاح للبيع حالياً.', 'error');
-      return;
-    }
-  } else {
-    // Quantity product: validate stock availability
-    if (currentStock < 1) {
-      showToast('لا يمكن إتمام عملية البيع، الكمية المتوفرة غير كافية.', 'error');
-      return;
-    }
-  }
-  // ===== END STOCK VALIDATION =====
-
-  // Feat-3 (validation): an installment sale needs a real named customer to carry the debt.
-  // Reject early (before any state mutation) to keep inventory/treasury/invoices consistent.
-  // Quick Sale has no down-payment/term UI, so the full price becomes the customer's debt
-  // (recorded after invoice creation below).
-  if (payment === 'installment' && (!customer || customer === 'عميل نقدي')) {
-    showToast('بيع التقسيط يتطلب اختيار عميل محدد (لا يمكن استخدامه مع عميل نقدي).', 'error');
-    return;
-  }
-
-  const invoiceId = generateInvoiceId('INV');
+  const invoiceId = 'INV-' + String(DB.settings.nextInvoiceNum).padStart(6, '0');
+  DB.settings.nextInvoiceNum++;
   const saleMeta = { referenceType: 'sale', referenceId: invoiceId, entryKind: 'quick_sale', sourceModule: 'sales', ...getCurrentBranchMeta(), cashier: currentUser ? currentUser.username : 'system' };
   
   const profit = roundMoney(price - cost);
@@ -32831,26 +32424,19 @@ function saveQuickSale() {
     customer,
     customerPhone: '',
     items: [{
-      productId: Number(productId),
-      product_id: resolveSupabaseProductUuid(stockProduct),
-      legacy_product_id: String(productId),
-      productName: productName,
-      name: productName,
+      productId: null,
+      name: product,
       qty: 1,
       price,
       buyPrice: cost,
-      serials: serial ? [serial] : [],
-      noSerial: !serial,
-      saleTrackingMode: serial ? 'serial' : 'quantity',
-      barcode: productBarcode,
-      partNumber: productPartNumber
+      serials: serial ? [serial] : []
     }],
     subtotal: price,
     discount: 0,
     total: price,
     profit,
     payment,
-    invoiceType: payment === 'installment' || payment === 'ajel' ? payment : 'cash',
+    invoiceType: 'cash',
     note,
     user: currentUser ? currentUser.username : 'system'
   };
@@ -32868,32 +32454,10 @@ function saveQuickSale() {
   }
   
   if (payment !== 'installment') {
-    addCashEntry('in', price, payment, `بيع سريع - ${productName}`, null, saleMeta);
-  }
-
-  // Feat-3: Quick Sale Installment must record the financed amount on the customer.
-  // Quick Sale has no down-payment/term UI, so the full price is treated as a credit
-  // sale: the customer's balance increases by the full sale price (mirrors the main
-  // sale flow's 'ajel' credit treatment). Without this, goods are sold on credit
-  // terms but no debt is recorded anywhere — a real accounting leak.
-  if (payment === 'installment') {
-    autoSaveCustomer(customer, '');
-    const cust = DB.customers.find(c => (c.name || '').trim().toLowerCase() === String(customer).trim().toLowerCase());
-    if (cust) cust.balance = (cust.balance || 0) + price;
+    addCashEntry('in', price, payment === 'ajel' ? 'cash' : payment, `بيع سريع - ${product}`, null, saleMeta);
   }
   
-  // Deduct stock using productId (matches legacyFinalizeSaleTransaction behavior)
-  if (stockProduct) {
-    if (serial) {
-      // Serial product: stock deducted via markSoldSerialForSale, no quantity deduction
-    } else {
-      // Quantity product: deduct from stockQty
-      stockProduct.stockQty = Math.max(0, (stockProduct.stockQty || 0) - 1);
-    }
-  }
-  addStockMovement(Number(productId), 'out', 1, `بيع سريع - ${productName}`, null, saleMeta);
-  
-  logActivity('بيع سريع', `${productName} - ${formatMoney(price)}`);
+  logActivity('بيع سريع', `${product} - ${formatMoney(price)}`);
   
   saveDB();
   closeModal('quickSaleModal');
@@ -33861,21 +33425,8 @@ function onVoucherPartySelect() {
 
   document.getElementById('vchPhone').value = entity.phone || '';
 
-  // Calculate balance
-  let balance = 0;
-  if (partyType === 'customer') {
-    const invoiceDebt = DB.saleInvoices
-      .filter(inv => inv.customer === entity.name && inv.invoiceType === 'ajel')
-      .reduce((s, inv) => s + getNetInvoiceTotal(inv), 0);
-    const payments = (DB.asPayments || []).filter(p => p.entityId == entity.id && p.entityType === 'customer').reduce((s, p) => s + (p.direction === 'pay' ? p.amount : -p.amount), 0);
-    const vchPayments = (DB.vouchers || []).filter(v => v.partyId == entity.id && v.partyType === 'customer').reduce((s, v) => s + (v.type === 'receipt' ? -v.amount : v.amount), 0);
-    balance = (entity.balance || 0) + invoiceDebt - payments + vchPayments;
-  } else {
-    const purchaseDebt = DB.purchaseInvoices.filter(p => p.supplierId == entity.id && p.invoiceType === 'ajel').reduce((s, p) => s + p.total, 0);
-    const payments = DB.supplierPayments.filter(p => p.supplierId == entity.id && p.type === 'payment').reduce((s, p) => s + p.amount, 0);
-    const vchPayments = (DB.vouchers || []).filter(v => v.partyId == entity.id && v.partyType === 'supplier').reduce((s, v) => s + (v.type === 'payment' ? -v.amount : v.amount), 0);
-    balance = (entity.balance || 0) + purchaseDebt - payments + vchPayments;
-  }
+  // Balance from the single source of truth (AR/AP transaction ledger).
+  const balance = partyType === 'customer' ? getCustomerBalance(entity) : getSupplierBalance(entity);
 
   const balanceColor = balance > 0 ? 'var(--red)' : 'var(--green)';
   const balanceLabel = partyType === 'customer'
@@ -33942,16 +33493,10 @@ function saveVoucher() {
     `${type === 'receipt' ? 'سند قبض' : 'سند صرف'} #${vchId} - ${partyName} - ${desc}`,
     voucherDate);
 
-  // Update supplier balance if payment to supplier
-  if (type === 'payment' && partyType === 'supplier' && partyId) {
-    const supp = DB.suppliers.find(s => s.id == partyId);
-    if (supp) supp.balance = Math.max(0, (supp.balance || 0) - amount);
-  }
-  // Update customer balance if receipt from customer
-  if (type === 'receipt' && partyType === 'customer' && partyId) {
-    const cust = DB.customers.find(c => c.id == partyId);
-    if (cust) cust.balance = Math.max(0, (cust.balance || 0) - amount);
-  }
+  // NOTE: the voucher record pushed above is already part of the AR/AP transaction
+  // ledger (getCustomerArApTransactions / getSupplierArApTransactions). Debt is derived
+  // from that ledger, so we must NOT also mutate customer.balance / supplier.balance
+  // here — doing so double-counts the payment.
 
   logActivity(type === 'receipt' ? 'سند قبض' : 'سند صرف',
     `#${vchId} - ${partyName} - ${formatMoney(amount)}`);
@@ -35164,9 +34709,7 @@ function initBroadcast() {
       broadcastContacts = broadcastContacts.filter(c => {
         if (c.type === 'customer') {
           const cust = DB.customers.find(x => x.id === c.id);
-          const debt = (cust?.balance || 0) + DB.saleInvoices
-            .filter(inv => inv.customer === cust?.name && inv.invoiceType === 'ajel')
-            .reduce((s, inv) => s + getNetInvoiceTotal(inv), 0);
+          const debt = getCustomerBalance(cust);
           return debt > 0;
         }
         return false;
@@ -35212,9 +34755,7 @@ function filterBroadcast(type) {
     broadcastContacts = broadcastContacts.filter(c => {
       if (c.type === 'customer') {
         const cust = DB.customers.find(x => x.id === c.id);
-        const debt = (cust?.balance || 0) + DB.saleInvoices
-          .filter(inv => inv.customer === cust?.name && inv.invoiceType === 'ajel')
-          .reduce((s, inv) => s + getNetInvoiceTotal(inv), 0);
+        const debt = getCustomerBalance(cust);
         return debt > 0;
       }
       return false;
@@ -35884,7 +35425,7 @@ document.addEventListener('keydown', function(e) {
   }
   if (e.key === 'F1') {
     e.preventDefault();
-    openNewSaleInvoiceModal();
+    showPage('pos');
   }
   if (e.key === 'F2') {
     e.preventDefault();
@@ -36098,13 +35639,6 @@ setInterval(() => {
 setInterval(() => {
   try { autoEnterprisePerformanceMaintenance(); } catch (error) { logAppError('performance.engine_auto_maintenance', error); }
 }, 300000);
-
-
-// Dashboard V6 clock updater
-setInterval(() => {
-  const el = document.getElementById('d6Clock');
-  if (el) el.textContent = new Date().toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
-}, 30000);
 
 </script>
 </body>
