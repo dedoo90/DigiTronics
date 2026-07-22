@@ -7561,7 +7561,7 @@ function withButtonBusy(actionKey, buttonId, fn, busyText = '⏳ جاري الح
   const oldHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = busyText; }
   return Promise.resolve()
-    .then(fn)
+    .then(() => { console.log('[TRACE] withButtonBusy invoking fn=' + (fn && fn.name) + ' (caller: ' + (new Error().stack) + ')'); return fn(); })
     .catch(error => {
       logAppError(actionKey, error);
       showToast('حدث خطأ أثناء الحفظ - يرجى المحاولة مرة أخرى', 'error');
@@ -21544,6 +21544,7 @@ function loadReturnInvoice() {
   document.getElementById('retSaveBtn').style.display = 'inline-flex';
   document.getElementById('retSaveBtn').dataset.invoiceId = inv.id;
   document.getElementById('retSaveBtn').dataset.invType = isPurchase ? 'purchase' : 'sale';
+  document.getElementById('retInvoiceId').value = inv.id;
   // Pre-fill refund amount
   document.getElementById('retRefund').value = isPurchase ? (inv.total || 0) : getNetInvoiceTotal(inv);
 }
@@ -21554,23 +21555,109 @@ function onRetItemCheck(idx) {
 }
 
 function saveReturn() {
+  console.log('[TRACE] >>> saveReturn ENTER (caller: ' + (new Error().stack) + ')');
+  console.log('[TRACE] saveReturn -> withButtonBusy(actionKey=saveReturn, buttonId=retSaveBtn, fn=saveReturnImpl)');
   return withButtonBusy('saveReturn', 'retSaveBtn', saveReturnImpl);
 }
 
 function saveReturnImpl() {
-  const invoiceId = document.getElementById('retInvoiceId').value.trim();
+  const _TRACE = (label, extra) => console.log('[TRACE][' + label + '] ' + (extra || ''));
+  console.group('[TRACE] >>> saveReturnImpl ENTER');
+  console.log('[TRACE] caller stack:\n' + new Error().stack);
+  // Resolve the invoice id from the input, falling back to the value pinned
+  // by loadReturnInvoice (retSaveBtn.dataset.invoiceId). The input is cleared
+  // by setReturnType during the load flow, so trusting only the input caused
+  // returns to fail with "invoice not found" (Bug: returns broken).
+  const retSaveBtnEl = document.getElementById('retSaveBtn');
+  const datasetInvoiceId = retSaveBtnEl ? (retSaveBtnEl.dataset.invoiceId || '') : '';
+  const invoiceId = (document.getElementById('retInvoiceId').value || '').trim() || datasetInvoiceId;
   const reason = document.getElementById('retReason').value.trim();
   const action = document.getElementById('retAction').value;
   const refund = parseFloat(document.getElementById('retRefund').value) || 0;
   const refundMethod = document.getElementById('retRefundMethod').value;
   const invType = document.getElementById('retSaveBtn').dataset.invType || 'sale';
+  const _invObj = (typeof DB !== 'undefined' && DB.invoices) ? DB.invoices.find(i => String(i.id).toLowerCase() === String(invoiceId).toLowerCase()) : undefined;
+  console.log('[TRACE] saveReturnImpl vars:',
+    'invoiceId=', JSON.stringify(invoiceId),
+    '| invType=', JSON.stringify(invType),
+    '| dataset.invoiceId=', JSON.stringify(retSaveBtnEl && retSaveBtnEl.dataset.invoiceId),
+    '| dataset.invType=', JSON.stringify(document.getElementById('retSaveBtn').dataset.invType),
+    '| reason=', JSON.stringify(reason),
+    '| hasReturnedObject(DB.invoices)=', !!_invObj,
+    '| DB.purchaseInvoices.length=', (DB.purchaseInvoices || []).length,
+    '| DB.saleInvoices.length=', (DB.saleInvoices || []).length);
 
-  if (!reason) { showToast('أدخل سبب المرتجع', 'error'); return; }
+  if (!reason) { _TRACE('RETURN @reason-empty', 'why=reason empty -> showToast(أدخل سبب المرتجع)'); console.groupEnd(); showToast('أدخل سبب المرتجع', 'error'); return; }
+
+  // ===== [RET DEBUG] comprehensive diagnostics (temporary, do NOT remove) =====
+  (function RET_DEBUG() {
+    const _id = String(invoiceId);
+    const _lcId = _id.toLowerCase();
+    const _purArr = Array.isArray(DB.purchaseInvoices) ? DB.purchaseInvoices : [];
+    console.log('\n==============================\n[RET DEBUG]\n==============================');
+    console.log('invoiceId(input):', JSON.stringify(document.getElementById('retInvoiceId').value));
+    console.log('dataset.invoiceId:', JSON.stringify((retSaveBtnEl && retSaveBtnEl.dataset.invoiceId) || ''));
+    console.log('dataset.invType:', JSON.stringify((retSaveBtnEl && retSaveBtnEl.dataset.invType) || ''));
+    console.log('DB.purchaseInvoices.length:', _purArr.length);
+    console.log('First 20 invoice IDs:', JSON.stringify(_purArr.slice(0, 20).map(p => p.id)));
+    console.log('Last 20 invoice IDs:', JSON.stringify(_purArr.slice(-20).map(p => p.id)));
+    const _exact = _purArr.find(p => String(p.id).toLowerCase() === _lcId);
+    const _incl = _purArr.find(p => String(p.id).toLowerCase().includes(_lcId));
+    const _trim = _purArr.find(p => String(p.id).trim().toLowerCase() === _lcId.trim());
+    const _ws = _purArr.find(p => String(p.id).replace(/\s+/g, '').toLowerCase() === _id.replace(/\s+/g, '').toLowerCase());
+    console.log('exact match:', !!_exact, _exact ? '-> ' + _exact.id : '');
+    console.log('includes() match:', !!_incl, _incl ? '-> ' + _incl.id : '');
+    console.log('trim().toLowerCase() match:', !!_trim, _trim ? '-> ' + _trim.id : '');
+    console.log('normalized whitespace match:', !!_ws, _ws ? '-> ' + _ws.id : '');
+    if (!_exact && !_incl && !_trim && !_ws) {
+      const purIds = _purArr.map(p => String(p.id));
+      console.log('Array of ALL purchase invoice IDs containing "PUR":', JSON.stringify(purIds.filter(x => x.toLowerCase().includes('pur'))));
+      const numPart = _id.replace(/[^0-9]/g, '');
+      console.log('Array of ALL invoice IDs whose numeric portion matches (' + JSON.stringify(numPart) + '):', JSON.stringify(purIds.filter(x => numPart && x.replace(/[^0-9]/g, '') === numPart)));
+      console.log('input invoiceId charcodes:', Array.from(_id).map(c => c + '=U+' + c.charCodeAt(0).toString(16).toUpperCase()).join(' '));
+      console.log('candidate ids charcodes (hidden/unicode flagged):');
+      _purArr.slice(0, 50).forEach(p => {
+        const cid = String(p.id);
+        const hidden = Array.from(cid).filter(c => c.charCodeAt(0) > 127 || /\s/.test(c) || c.charCodeAt(0) < 32);
+        if (hidden.length) console.log('  HIDDEN/UNICODE in', JSON.stringify(cid), '->', Array.from(cid).map(c => c + '=U+' + c.charCodeAt(0).toString(16).toUpperCase()).join(' '));
+      });
+    }
+    console.log('typeof invoiceId:', typeof invoiceId);
+    console.log('typeof every p.id:', JSON.stringify(_purArr.slice(0, 10).map(p => typeof p.id)));
+    console.log('DB.purchaseInvoices is Array:', Array.isArray(DB.purchaseInvoices));
+    console.log('DB.purchaseInvoices objects have id:', _purArr.every(p => p && 'id' in p));
+    console.table(_purArr.slice(0, 20));
+    console.log('-------------------------------------------------');
+  })();
+  // ===== end [RET DEBUG] =====
 
   // Handle Purchase Return
   if (invType === 'purchase') {
-    const purInv = DB.purchaseInvoices.find(p => p.id.toLowerCase() === invoiceId.toLowerCase());
-    if (!purInv) { showToast('فاتورة الشراء غير موجودة', 'error'); return; }
+    _TRACE('enter purchase branch', 'invType===purchase evaluated TRUE');
+    const _pur = Array.isArray(DB.purchaseInvoices) ? DB.purchaseInvoices : [];
+    const _lc = String(invoiceId).toLowerCase();
+    const _exact = _pur.find(p => String(p.id).toLowerCase() === _lc);
+    const _incl = _pur.find(p => String(p.id).toLowerCase().includes(_lc));
+    console.log('[TRACE] purchase lookup:',
+      'datasource=DB.purchaseInvoices',
+      '| searchedId=', JSON.stringify(invoiceId),
+      '| exact=', !!_exact, _exact ? '->' + _exact.id : '',
+      '| includes=', !!_incl, _incl ? '->' + _incl.id : '',
+      '| length=', _pur.length);
+    const purInv = _exact || _incl;
+    if (!purInv) {
+      _TRACE('REACHED TOAST', 'why=invType===purchase AND purInv is falsy (both exact and includes lookups returned undefined)');
+      console.log('[TRACE] FAILURE DETAIL:',
+        'invoiceId=', JSON.stringify(invoiceId),
+        '| invType=', JSON.stringify(invType),
+        '| dataset.invoiceId=', JSON.stringify(retSaveBtnEl && retSaveBtnEl.dataset.invoiceId),
+        '| DB.purchaseInvoices.length=', _pur.length,
+        '| sampleIds=', JSON.stringify(_pur.slice(0, 20).map(x => x.id)),
+        '| invoiceId charcodes=', JSON.stringify(Array.from(String(invoiceId)).map(c => c + '=U+' + c.charCodeAt(0).toString(16).toUpperCase())),
+        '| stack=', new Error().stack);
+      console.groupEnd();
+      showToast('فاتورة الشراء غير موجودة', 'error'); return;
+    }
     const items = purInv.items || [];
     let returnedItems = [];
     let totalRefundCalc = 0;
@@ -21625,7 +21712,8 @@ function saveReturnImpl() {
   }
 
   // Original sale return logic below
-  const inv = DB.saleInvoices.find(i => i.id.toLowerCase() === invoiceId.toLowerCase());
+  const inv = DB.saleInvoices.find(i => i.id.toLowerCase() === invoiceId.toLowerCase())
+     || DB.saleInvoices.find(i => i.id.toLowerCase().includes(invoiceId.toLowerCase()));
   if (!inv) { showToast('الفاتورة غير موجودة', 'error'); return; }
 
   const items = inv.items || [];
@@ -27872,7 +27960,7 @@ function getSupplierArApTransactions(supplier) {
     label: 'مرتجع شراء',
     reference: r.id || r.returnId || r.invoiceId,
     debit: 0,
-    credit: toSafeFloat(r.amount || r.refundAmount || r.refund || r.total, 0),
+    credit: toSafeFloat(r.amount || r.refundAmount || r.total, 0),
     notes: r.reason || ''
   }));
   (DB.supplierPayments || []).filter(p => arApSameParty(p, supplier, ['supplierName', 'name'])).forEach(p => push({
