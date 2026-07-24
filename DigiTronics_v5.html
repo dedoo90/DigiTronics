@@ -11774,6 +11774,17 @@ setInterval(async () => {
 
   // PULL: استعادة من GitHub كل 3 ثوانٍ لاستقبال تغييرات الأجهزة الأخرى
   if (now - ghLastPullTime >= 3000) {
+    // Do NOT pull while a purchase return is active — ghPull replaces
+    // DB.purchaseInvoices by reference, invalidating the invoice object
+    // the active return workflow is operating on.
+    const _retBtn = document.getElementById('retSaveBtn');
+    const _retModal = document.getElementById('returnModal');
+    if (_retModal?.classList.contains('show') &&
+        _retBtn?.dataset?.invType === 'purchase' &&
+        _retBtn?.dataset?.invoiceId &&
+        _retBtn.style.display !== 'none') {
+      return;
+    }
     ghLastPullTime = now;
     const ok = await ghPull(true);
     if (ok && currentUser) {
@@ -17884,14 +17895,15 @@ function renderDashboard() {
     return acc;
   }, { underWarranty: 0, paid: 0, unknown: 0 }));
   
-  document.getElementById('ds-sales').textContent = formatMoney(todaySales);
-  document.getElementById('ds-profit').textContent = maskMoneyIfRestricted(todayProfit);
-  document.getElementById('ds-expenses').textContent = formatMoney(todayExpenses);
-  document.getElementById('ds-netprofit').textContent = maskMoneyIfRestricted(netProfit);
-  document.getElementById('ds-products').textContent = totalProducts;
-  document.getElementById('ds-lowstock').textContent = lowStock;
-  document.getElementById('ds-treasury').textContent = formatMoney(treasuryBalance);
-  document.getElementById('ds-maint').textContent = maintPending;
+  var _setDash = function(id, value) { var el = document.getElementById(id); if (el) el.textContent = value; };
+  _setDash('ds-sales', formatMoney(todaySales));
+  _setDash('ds-profit', maskMoneyIfRestricted(todayProfit));
+  _setDash('ds-expenses', formatMoney(todayExpenses));
+  _setDash('ds-netprofit', maskMoneyIfRestricted(netProfit));
+  _setDash('ds-products', totalProducts);
+  _setDash('ds-lowstock', lowStock);
+  _setDash('ds-treasury', formatMoney(treasuryBalance));
+  _setDash('ds-maint', maintPending);
   const setDash = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
   try {
     const arAp = getArApDashboardSummary();
