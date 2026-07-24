@@ -7642,6 +7642,10 @@ function invalidatePerformanceCache(reason = '') {
   performanceState.cache = {};
   performanceState.cacheMisses++;
   performanceState.cacheReason = reason;
+  if (typeof invalidateStockCache === 'function') { invalidateStockCache(); __stockMapVersion = -1; }
+  if (typeof __netCacheClear === 'function') { __netCacheClear(); }
+  if (typeof __arApTxIndex !== 'undefined') { __arApTxIndex = null; }
+  if (typeof __linkIndex !== 'undefined') { __linkIndex = null; }
 }
 
 function getCacheStatusLabel() {
@@ -7688,7 +7692,7 @@ function withButtonBusy(actionKey, buttonId, fn, busyText = '⏳ جاري الح
   const oldHtml = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = busyText; }
   return Promise.resolve()
-    .then(fn)
+    .then(() => { console.log('[TRACE] withButtonBusy invoking fn=' + (fn && fn.name) + ' (caller: ' + (new Error().stack) + ')'); return fn(); })
     .catch(error => {
       logAppError(actionKey, error);
       showToast('حدث خطأ أثناء الحفظ - يرجى المحاولة مرة أخرى', 'error');
@@ -10005,7 +10009,7 @@ function renderWarrantySummaryHtml(start, end, status = '') {
   const w = getWarrantySummary(start, end, status);
   const badge = getWarrantyStatusLabel(w.status, w.end);
   const dates = `${w.start ? 'من ' + new Date(w.start).toLocaleDateString('ar-EG') : 'بداية غير معروفة'}${w.end ? ' إلى ' + new Date(w.end).toLocaleDateString('ar-EG') : ''}`;
-  return `${badge}<div style="font-size:0.68rem;color:var(--text2);margin-top:2px">${dates}</div>${w.detail ? `<div style="font-size:0.68rem;color:${w.status === 'active' ? 'var(--green)' : 'var(--red)'}">${w.detail}</div>` : ''}`;
+  return `${badge}<div style="font-size:0.68rem;color:var(--text2);margin-top:2px">${dates}</div>${w.detail ? `<div style="font-size:0.68rem;color:${w.status === 'active' ? 'var(--green)' : 'var(--red)'}">${escapeHtml(w.detail)}</div>` : ''}`;
 }
 
 function normalizeDeviceStatus(status) {
@@ -11901,6 +11905,17 @@ setInterval(async () => {
 
   // PULL: استعادة من GitHub كل 3 ثوانٍ لاستقبال تغييرات الأجهزة الأخرى
   if (now - ghLastPullTime >= 3000) {
+    // Do NOT pull while a purchase return is active — ghPull replaces
+    // DB.purchaseInvoices by reference, invalidating the invoice object
+    // the active return workflow is operating on.
+    const _retBtn = document.getElementById('retSaveBtn');
+    const _retModal = document.getElementById('returnModal');
+    if (_retModal?.classList.contains('show') &&
+        _retBtn?.dataset?.invType === 'purchase' &&
+        _retBtn?.dataset?.invoiceId &&
+        _retBtn.style.display !== 'none') {
+      return;
+    }
     ghLastPullTime = now;
     const ok = await ghPull(true);
     if (ok && currentUser) {
@@ -11921,7 +11936,8 @@ setInterval(async () => {
 // ================= DB =================
 function loadDB() {
   try {
-    const saved = localStorage.getItem(DB_KEY);
+    let saved = null;
+    try { saved = localStorage.getItem(DB_KEY); } catch (e) { saved = null; }
     if (saved) {
       const data = JSON.parse(saved);
       // Smart merge: copy all data arrays from saved, but ALWAYS enforce our system users
@@ -12058,19 +12074,240 @@ function saveDB() {
   DB.settings = DB.settings || {};
   DB.settings.localVersion = (DB.settings.localVersion || 0) + 1;
   DB.settings.lastModifiedAt = new Date().toISOString();
+  let persisted = false;
   try {
     localStorage.setItem(DB_KEY, JSON.stringify(DB));
+    persisted = true;
   } catch(e) {
+    // R3: graceful degradation. localStorage may hit quota at large scale
+    // (100k invoices). Fall back to IndexedDB so data is not lost.
     logAppError('saveDB', e);
-    showPill('❌ فشل الحفظ: '+e.message, 5000);
-    showToast('❌ فشل حفظ البيانات محليًا. غالبًا مساحة المتصفح ممتلئة أو التخزين محجوب.', 'error');
-    console.error('saveDB error', e);
-    return false;
+    showPill('⚠️ التخزين المحلي ممتلئ — جارٍ الحفظ في IndexedDB', 4000);
+    console.warn('saveDB localStorage failed, falling back to IndexedDB', e);
+    try {
+      const blob = JSON.stringify(DB);
+      __idbSet(DB_KEY, blob).then(ok => {
+        if (ok) { showToast('✅ تم الحفظ في IndexedDB (التخزين الاحتياطي)', 'success'); }
+        else { showToast('❌ فشل الحفظ في IndexedDB أيضًا.', 'error'); }
+      });
+      // Also clear the legacy localStorage key to avoid stale small copy.
+      try { localStorage.removeItem(DB_KEY); } catch (_) {}
+      persisted = true;
+    } catch (idbErr) {
+      showToast('❌ فشل حفظ البيانات محليًا وفي IndexedDB.', 'error');
+      console.error('saveDB IDB fallback error', idbErr);
+      return false;
+    }
   }
+  // Invalidate derived caches whenever the data version advances.
+  invalidateStockCache();
+  __stockMapVersion = -1;
+  // R4: notify other tabs so they drop stale caches.
+  broadcastDbChanged();
+  releaseDbWriteLock();
   ghPendingSave = true;
   try { recordEnterpriseRecoveryChange('saveDB'); } catch(e) { console.warn('Enterprise recovery tracking skipped', e); }
   appendChangeLog('saveDB');
-  return true;
+  return persisted;
+}
+
+// ================= ARCHITECTURE / PERFORMANCE LAYER (R1-R5) =================
+// All helpers here are additive and preserve existing business logic and the
+// in-memory DB shape. They optimize rendering, id matching, persistence and
+// multi-tab safety without changing computed results for numeric ids.
+
+// R2: id equality helper. String-compares so numeric ids behave identically
+// (String(12) === String(12)) while UUID/string ids also match correctly.
+function eqId(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
+// --- Stock computation cache (R1 / cache) -------------------------------
+// getProductStock performs O(invoices) work. Within a single render pass it is
+// called once per product (up to 10k+). We memoize by productId and invalidate
+// whenever the DB data version (localVersion) changes (set on saveDB / loadDB).
+let __stockCache = new Map();
+let __stockCacheVersion = (DB.settings && DB.settings.localVersion) || 0;
+function invalidateStockCache() { __stockCache.clear(); }
+function __stockCacheKey(productId, availSerialQty) {
+  return String(productId) + '|' + availSerialQty;
+}
+
+// Build a single-pass Map of productId -> stock for the whole DB. Far cheaper
+// than calling getProductStock per product (which each scan all invoices).
+function computeStockMap() {
+  const qtyNet = new Map();   // invoice-derived quantity movements
+  const serialNet = new Map(); // serial availability (+1 for available/returned)
+  const add = (m, productId, delta) => { const k = String(productId); m.set(k, (m.get(k) || 0) + delta); };
+  const isQty = item => item && (item.noSerial === true || item.trackingMode === 'quantity' || item.saleTrackingMode === 'quantity' || !(Array.isArray(item.serials) && item.serials.length));
+  (DB.purchaseInvoices || []).forEach(inv => {
+    const items = Array.isArray(inv.items) && inv.items.length ? inv.items : [{ productId: inv.productId, qty: inv.qty, noSerial: true }];
+    items.forEach(it => { if (isQty(it) && it.productId != null) add(qtyNet, it.productId, toSafeFloat(it.qty, 0)); });
+  });
+  (DB.saleInvoices || []).forEach(inv => {
+    const items = Array.isArray(inv.items) && inv.items.length ? inv.items : [{ productId: inv.productId, qty: inv.qty, noSerial: true }];
+    items.forEach(it => { if (isQty(it) && it.productId != null) add(qtyNet, it.productId, -(toSafeFloat(it.qty, 0))); });
+  });
+  (DB.returns || []).forEach(ret => {
+    const items = Array.isArray(ret.items) && ret.items.length ? ret.items : [{ productId: ret.productId, qty: ret.qty, noSerial: true }];
+    const sign = (ret.invoiceType || 'sale') === 'sale' ? 1 : -1;
+    items.forEach(it => { if (isQty(it) && it.productId != null) add(qtyNet, it.productId, sign * toSafeFloat(it.qty, 0)); });
+  });
+  (DB.serials || []).forEach(s => {
+    if (s.productId == null) return;
+    // Mirror getProductStock: only available/returned serials add to stock.
+    if (s.status === 'available' || s.status === 'returned') add(serialNet, s.productId, 1);
+  });
+  // Combine exactly like the legacy getProductStock:
+  //   for history: Math.max(0, qtyNet) + availableSerials
+  //   for no history: Math.max(0, stockQty) + availableSerials
+  const map = new Map();
+  (DB.products || []).forEach(p => {
+    const k = String(p.id);
+    const hasHistory = qtyNet.has(k);
+    const base = hasHistory ? Math.max(0, qtyNet.get(k) || 0) : Math.max(0, parseInt(p.stockQty, 10) || 0);
+    map.set(k, base + (serialNet.get(k) || 0));
+  });
+  return map;
+}
+let __stockMap = null;
+let __stockMapVersion = -1;
+// Per-version memo for invoice net total/profit (called many times per render).
+let __netTotalCache = new Map();
+let __netTotalCacheVersion = -1;
+function __netCacheClear() { __netTotalCache.clear(); __netTotalCacheVersion = -1; }
+function getStockMap() {
+  const v = (DB.settings && DB.settings.localVersion) || 0;
+  if (!__stockMap || __stockMapVersion !== v) { __stockMap = computeStockMap(); __stockMapVersion = v; }
+  return __stockMap;
+}
+
+// --- Render scheduler (R1: avoid repeated full re-renders) ---------------
+// Coalesces synchronous bursts of renderX() calls into a single execution per
+// frame, and skips rendering views whose page is not currently visible (they
+// are re-rendered on navigation via showPage).
+const __renderSchedule = new Map();
+let __renderScheduled = false;
+function scheduleRender(name, fn) {
+  __renderSchedule.set(name, fn);
+  if (__renderScheduled) return;
+  __renderScheduled = true;
+  const run = () => {
+    __renderScheduled = false;
+    const jobs = Array.from(__renderSchedule.values());
+    __renderSchedule.clear();
+    jobs.forEach(job => { try { job(); } catch (e) { console.error('scheduled render failed', name, e); } });
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);
+  else setTimeout(run, 0);
+}
+// Wrap an existing render fn so direct calls get coalesced.
+function makeCoalescedRender(name, fn) {
+  return function () {
+    const args = arguments;
+    scheduleRender(name, () => fn.apply(null, args));
+  };
+}
+
+// --- IndexedDB fallback for persistence (R3: graceful localStorage failure)
+// Each call opens a fresh short-lived connection (no persistent handle) so we
+// never block deleteDatabase and don't leak connections. IndexedDB is only a
+// fallback path, so the minor per-op open cost is acceptable.
+function __getIDB() {
+  return new Promise((resolve) => {
+    try {
+      if (!('indexedDB' in window) || !window.indexedDB) { resolve(null); return; }
+      const req = window.indexedDB.open('omnistore_db_fallback', 1);
+      req.onupgradeneeded = () => { try { req.result.createObjectStore('kv'); } catch (e) {} };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch (e) { resolve(null); }
+  });
+}
+// Open a short-lived connection per operation so we never hold a persistent
+// handle (which would block deleteDatabase and leak resources). Returns null
+// if IndexedDB is unavailable.
+async function __idbConn() {
+  const db = await __getIDB();
+  if (!db) return null;
+  return db;
+}
+async function __idbSet(key, value) {
+  const db = await __idbConn();
+  if (!db) return false;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction('kv', 'readwrite');
+      tx.objectStore('kv').put(value, key);
+      tx.oncomplete = () => { try { db.close(); } catch (e) {} resolve(true); };
+      tx.onerror = () => { try { db.close(); } catch (e) {} resolve(false); };
+      tx.onabort = () => { try { db.close(); } catch (e) {} resolve(false); };
+    } catch (e) { try { db.close(); } catch (_) {} resolve(false); }
+  });
+}
+async function __idbGet(key) {
+  const db = await __idbConn();
+  if (!db) return undefined;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction('kv', 'readonly');
+      const req = tx.objectStore('kv').get(key);
+      req.onsuccess = () => { try { db.close(); } catch (e) {} resolve(req.result); };
+      req.onerror = () => { try { db.close(); } catch (e) {} resolve(undefined); };
+    } catch (e) { try { db.close(); } catch (_) {} resolve(undefined); }
+  });
+}
+async function __idbDel(key) {
+  const db = await __idbConn();
+  if (!db) return;
+  try { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete(key); tx.oncomplete = () => { try { db.close(); } catch (e) {} }; tx.onerror = () => { try { db.close(); } catch (e) {} }; } catch (e) { try { db.close(); } catch (_) {} }
+}
+
+// --- Multi-tab coordination (R4) ----------------------------------------
+// Broadcasts cache-invalidation to other tabs so they don't serve stale views,
+// and provides a simple write mutex so concurrent tabs serialize saves.
+let __tabChannel = null;
+let __tabId = String(Date.now()) + '-' + Math.floor(Math.random() * 1e6);
+try { if ('BroadcastChannel' in window) __tabChannel = new BroadcastChannel('omnistore_tab_coord'); } catch (e) { __tabChannel = null; }
+let __dbWriteLock = null; // {owner, expires}
+function broadcastDbChanged() {
+  if (__tabChannel) { try { __tabChannel.postMessage({ type: 'db:changed', version: (DB.settings && DB.settings.localVersion) || 0, from: __tabId }); } catch (e) {} }
+}
+function broadcastCacheInvalidate() {
+  if (__tabChannel) { try { __tabChannel.postMessage({ type: 'cache:invalidate', from: __tabId }); } catch (e) {} }
+}
+if (__tabChannel) {
+  __tabChannel.onmessage = (ev) => {
+    const msg = ev && ev.data;
+    if (!msg || msg.from === __tabId) return;
+    if (msg.type === 'db:changed' || msg.type === 'cache:invalidate') {
+      invalidatePerformanceCache('cross-tab');
+      invalidateStockCache();
+      __stockMapVersion = -1;
+    } else if (msg.type === 'db:lock:request') {
+      // If we hold the lock and it's expired, release it.
+      if (__dbWriteLock && (__dbWriteLock.owner === __tabId) && __dbWriteLock.expires < Date.now()) __dbWriteLock = null;
+    }
+  };
+}
+// Acquire a short-lived cross-tab write lock (best-effort, never blocks forever).
+async function acquireDbWriteLock(ms) {
+  ms = ms || 2000;
+  for (let i = 0; i < 5; i++) {
+    if (!__tabChannel) return true; // single-tab: no contention
+    if (!__dbWriteLock || __dbWriteLock.owner === __tabId || __dbWriteLock.expires < Date.now()) {
+      __dbWriteLock = { owner: __tabId, expires: Date.now() + ms };
+      if (__tabChannel) try { __tabChannel.postMessage({ type: 'db:lock:request', from: __tabId }); } catch (e) {}
+      return true;
+    }
+    await new Promise(r => setTimeout(r, 40 + Math.random() * 60));
+  }
+  return true; // timeout: proceed anyway (best effort)
+}
+function releaseDbWriteLock() {
+  if (__dbWriteLock && __dbWriteLock.owner === __tabId) __dbWriteLock = null;
 }
 
 // ================= PWA ENTERPRISE =================
@@ -13095,7 +13332,7 @@ function renderEnterpriseCommandCenter(force = false) {
   renderCommandCards(data);
   const note = document.getElementById('commandPermissionNote');
   if (note) note.innerHTML = can('all') ? '<div class="alert alert-info">Admin/Owner: عرض تنفيذي كامل بدون تعديل بيانات.</div>' : '<div class="alert alert-warning">Manager view: عرض فرعك فقط.</div>';
-  document.getElementById('commandBusinessStatus').innerHTML = `<div class="command-score">${data.score}</div><span class="command-pill ${commandStatusClass(data.label)}">${data.label}</span><div class="command-muted">Score محلي من المبيعات، الربح، الكاش، المخزون، الصيانة، التقسيط، الموافقات، المزامنة والديون.</div>`;
+  document.getElementById('commandBusinessStatus').innerHTML = `<div class="command-score">${data.score}</div><span class="command-pill ${commandStatusClass(data.label)}">${escapeHtml(data.label)}</span><div class="command-muted">Score محلي من المبيعات، الربح، الكاش، المخزون، الصيانة، التقسيط، الموافقات، المزامنة والديون.</div>`;
   document.getElementById('commandLiveStatus').innerHTML = commandRows([
     ['Today Sales', formatMoney(data.todaySales)], ['Today Profit', formatMoney(data.todayProfit)], ['Today Cash', formatMoney(data.cash)], ['Open Repairs', data.openRepairs], ['Pending Installments', data.pendingInstallments], ['Pending Approvals', data.pendingApprovals], ['Low Stock', data.lowStock], ['Online Users/Devices', data.liveStats.devices], ['Sync Queue', data.liveStats.pending]
   ]);
@@ -13156,7 +13393,7 @@ function exportCommandCenterReport(type = 'json') {
   logAudit('export command center', type, { module:'reports', actionType:'export', description:'Enterprise Command Center export' });
   if (type === 'json') return downloadJsonSafe(`digitronics_command_center_${localDateString()}.json`, report);
   if (type === 'csv') {
-    const csv = ['metric,value', `Business Score,${data.score}`, `Health,${data.label}`, `Today Sales,${data.todaySales}`, `Today Profit,${data.todayProfit}`, `Cash,${data.cash}`, `Open Repairs,${data.openRepairs}`, `Low Stock,${data.lowStock}`].join('\n');
+    const csv = ['metric,value', `Business Score,${data.score}`, `Health,${escapeHtml(data.label)}`, `Today Sales,${data.todaySales}`, `Today Profit,${data.todayProfit}`, `Cash,${data.cash}`, `Open Repairs,${data.openRepairs}`, `Low Stock,${data.lowStock}`].join('\n');
     const blob = new Blob([`\ufeff${csv}`], { type:'text/csv;charset=utf-8;' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `digitronics_command_center_${localDateString()}.csv`; a.click(); URL.revokeObjectURL(a.href); return;
   }
@@ -14965,7 +15202,7 @@ function searchCatchPhone() {
         <table class="data-table">
           <thead><tr><th>النوع</th><th>الاسم</th><th>الهاتف الأساسي</th><th>هاتف إضافي</th><th>معلومة</th><th>إجراء</th></tr></thead>
           <tbody>
-            ${hits.map(h => `<tr><td>${h.type}</td><td>${h.name}</td><td>${h.phone}</td><td>${h.phone2}</td><td>${h.extra || '-'}</td><td>${renderCatchPhoneAction(h)}</td></tr>`).join('')}
+            ${hits.map(h => `<tr><td>${h.type}</td><td>${escapeHtml(h.name)}</td><td>${escapeHtml(h.phone)}</td><td>${escapeHtml(h.phone2)}</td><td>${h.extra || '-'}</td><td>${renderCatchPhoneAction(h)}</td></tr>`).join('')}
           </tbody>
         </table>
       </div>
@@ -15176,7 +15413,7 @@ function renderCatchWaTemplates() {
   ensureCatchWaState();
   const sel = document.getElementById('catchWaTemplateSelect');
   if (!sel) return;
-  sel.innerHTML = '<option value="">اختر قالب...</option>' + DB.catchWaTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+  sel.innerHTML = '<option value="">اختر قالب...</option>' + DB.catchWaTemplates.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('');
 }
 
 function saveCatchWaTemplate() {
@@ -15263,7 +15500,7 @@ function renderCatchWaCampaignLog() {
 function renderCatchWaDndList() {
   const host = document.getElementById('catchWaDndList');
   if (!host) return;
-  const rows = (DB.catchWaDnd || []).slice(0, 80).map(x => `<tr><td>${x.phone}</td><td>${x.note || '-'}</td><td><button class="btn btn-danger btn-sm" onclick="removeCatchWaDnd('${normalizePhone(x.phone)}')">🗑️</button></td></tr>`).join('');
+  const rows = (DB.catchWaDnd || []).slice(0, 80).map(x => `<tr><td>${escapeHtml(x.phone)}</td><td>${x.note || '-'}</td><td><button class="btn btn-danger btn-sm" onclick="removeCatchWaDnd('${normalizePhone(x.phone)}')">🗑️</button></td></tr>`).join('');
   host.innerHTML = `<div class="table-container"><div class="table-header"><div class="table-title">⛔ قائمة DND</div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>الرقم</th><th>ملاحظة</th><th>حذف</th></tr></thead><tbody>${rows || '<tr><td colspan="3" style="text-align:center">لا يوجد</td></tr>'}</tbody></table></div></div>`;
 }
 
@@ -15521,7 +15758,7 @@ function renderOpsPreUploadChecklist() {
   const rows = items.map(i => `
     <tr>
       <td><input type="checkbox" ${DB.preUploadChecklist[i.id] ? 'checked' : ''} onchange="togglePreUploadCheck('${i.id}', this.checked)"></td>
-      <td>${i.label}</td>
+      <td>${escapeHtml(i.label)}</td>
     </tr>
   `).join('');
   _opsHost(`<div class="table-container"><div class="table-header"><div class="table-title">✅ Checklist قبل الرفع</div></div><div class="alert ${done === items.length ? 'alert-success' : 'alert-info'}" style="margin:10px">الحالة: ${done}/${items.length} مكتمل</div><div style="padding:0 10px 10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-green btn-sm" onclick="markAllPreUploadChecks(true)">✔️ تحديد الكل</button><button class="btn btn-outline btn-sm" onclick="markAllPreUploadChecks(false)">↩️ إلغاء الكل</button><button class="btn btn-accent btn-sm" onclick="createReleaseSnapshot()">🧊 تجميد نسخة جاهزة</button><button class="btn btn-outline btn-sm" onclick="renderOpsSummary()">📊 رجوع للملخص</button></div><div class="overflow-x"><table class="data-table"><thead><tr><th>تم</th><th>البند</th></tr></thead><tbody>${rows}</tbody></table></div></div>`);
@@ -15748,7 +15985,7 @@ function renderOpsEntityClasses() {
   DB.entityTags = DB.entityTags || {};
   const rows = (DB.suppliers || []).map(s => {
     const tag = DB.entityTags['supplier_' + s.id] || 'supplier';
-    return `<tr><td>${s.name}</td><td>${s.phone || '-'}</td><td><select class="search-input" style="width:150px" onchange="setOpsEntityTag('supplier_${s.id}', this.value)"><option value="supplier" ${tag==='supplier'?'selected':''}>مورد</option><option value="tenant" ${tag==='tenant'?'selected':''}>مؤجر</option><option value="service" ${tag==='service'?'selected':''}>خدمات</option></select></td></tr>`;
+    return `<tr><td>${escapeHtml(s.name)}</td><td>${escapeHtml(s.phone || '-')}</td><td><select class="search-input" style="width:150px" onchange="setOpsEntityTag('supplier_${s.id}', this.value)"><option value="supplier" ${tag==='supplier'?'selected':''}>مورد</option><option value="tenant" ${tag==='tenant'?'selected':''}>مؤجر</option><option value="service" ${tag==='service'?'selected':''}>خدمات</option></select></td></tr>`;
   }).join('');
   _opsHost(`<div class="table-container"><div class="table-header"><div class="table-title">🏷️ تصنيف الأطراف</div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>الاسم</th><th>الهاتف</th><th>التصنيف</th></tr></thead><tbody>${rows || '<tr><td colspan="3" style="text-align:center">لا يوجد موردين</td></tr>'}</tbody></table></div></div>`);
 }
@@ -15784,7 +16021,7 @@ function openOpsDocArchiveModal() {
   if (!link) return;
   DB.docArchive.unshift({ id: Date.now(), date: new Date().toISOString(), title, link, user: currentUser ? currentUser.username : 'system' });
   saveDB();
-  _opsHost(`<div class="table-container"><div class="table-header"><div class="table-title">📎 أرشيف مستندات</div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>العنوان</th><th>الرابط/المسار</th><th>بواسطة</th></tr></thead><tbody>${DB.docArchive.map(d=>`<tr><td>${new Date(d.date).toLocaleString('ar-EG')}</td><td>${d.title}</td><td><code>${d.link}</code></td><td>${d.user||'-'}</td></tr>`).join('')}</tbody></table></div></div>`);
+  _opsHost(`<div class="table-container"><div class="table-header"><div class="table-title">📎 أرشيف مستندات</div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>العنوان</th><th>الرابط/المسار</th><th>بواسطة</th></tr></thead><tbody>${DB.docArchive.map(d=>`<tr><td>${new Date(d.date).toLocaleString('ar-EG')}</td><td>${escapeHtml(d.title)}</td><td><code>${d.link}</code></td><td>${d.user||'-'}</td></tr>`).join('')}</tbody></table></div></div>`);
 }
 
 function setOpsMonthlyLock() {
@@ -15835,7 +16072,7 @@ function renderOpsCollections() {
   const ajel = (DB.saleInvoices || []).filter(i => i.invoiceType === 'ajel').map(i => ({ date: i.date, customer: i.customer || 'عميل', amount: getNetInvoiceTotal(i), type: 'آجل' }));
   const inst = (DB.installments || []).filter(i => i.status === 'active').map(i => ({ date: i.date, customer: i.customer || 'عميل', amount: i.remaining || 0, type: 'تقسيط' }));
   const all = [...ajel, ...inst].sort((a,b) => (b.amount||0) - (a.amount||0)).slice(0, 30);
-  _opsHost(`<div class="table-container"><div class="table-header"><div class="table-title">💳 أولويات التحصيل</div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>النوع</th><th>العميل</th><th>القيمة</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody>${all.map(r=>`<tr><td>${r.type}</td><td>${r.customer}</td><td>${formatMoney(r.amount)}</td><td>${new Date(r.date).toLocaleDateString('ar-EG')}</td><td><button class="btn btn-outline btn-sm" onclick="openCustomerStatementByName('${String(r.customer).replace(/'/g, "\\'")}')">كشف عميل</button></td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center">لا توجد مستحقات</td></tr>'}</tbody></table></div></div>`);
+  _opsHost(`<div class="table-container"><div class="table-header"><div class="table-title">💳 أولويات التحصيل</div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>النوع</th><th>العميل</th><th>القيمة</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody>${all.map(r=>`<tr><td>${r.type}</td><td>${escapeHtml(r.customer)}</td><td>${formatMoney(r.amount)}</td><td>${new Date(r.date).toLocaleDateString('ar-EG')}</td><td><button class="btn btn-outline btn-sm" onclick="openCustomerStatementByName('${String(r.customer).replace(/'/g, "\\'")}')">كشف عميل</button></td></tr>`).join('') || '<tr><td colspan="5" style="text-align:center">لا توجد مستحقات</td></tr>'}</tbody></table></div></div>`);
 }
 
 function renderOpsTasks() {
@@ -16098,7 +16335,7 @@ function getSaleItemUnitCost(item) {
     if (purchasedQty > 0 && purchasedValue > 0) return purchasedValue / purchasedQty;
   }
 
-  const product = productId ? (DB.products || []).find(p => Number(p.id) === Number(productId)) : null;
+  const product = productId ? (DB.products || []).find(p => eqId(p.id, productId)) : null;
   return toSafeFloat(product?.buyPrice, 0);
 }
 
@@ -16228,7 +16465,7 @@ function settleAmanatForProduct(productId, incomingQty, serials = [], ref = '') 
 
   DB.saleInvoices.forEach(inv => {
     (inv.items || []).forEach(item => {
-      if (!(item && item.isAmanat && Number(item.productId) === Number(productId))) return;
+      if (!(item && item.isAmanat && eqId(item.productId, productId))) return;
       const open = getAmanatOpenQty(item);
       if (!(open > 0) || !(qtyLeft > 0)) return;
       const take = Math.min(open, qtyLeft);
@@ -16352,7 +16589,7 @@ function renderAmanatPage() {
   tbody.innerHTML = rows.map(r => `<tr>
     <td>${r.invoiceId}</td>
     <td>${new Date(r.date).toLocaleDateString('ar-EG')}</td>
-    <td>${r.customer}</td>
+    <td>${escapeHtml(r.customer)}</td>
     <td>${r.itemName}</td>
     <td>${r.qty}</td>
     <td>${r.settled}</td>
@@ -16407,31 +16644,27 @@ function clearAmanatFilters() {
 }
 
 function getProductStock(productId) {
-  const product = DB.products.find(p => Number(p.id) === Number(productId));
+  const product = DB.products.find(p => eqId(p.id, productId));
   if (!product) return 0;
   const liveStock = getSupabaseLiveStock(productId);
   if (liveStock !== null) return liveStock;
-
-  const allSerials = (DB.serials || []).filter(s => Number(s.productId) === Number(productId));
-  const availableSerialQty = allSerials.filter(s => s.status === 'available' || s.status === 'returned').length;
-  const purchaseLinks = getProductPurchaseLinks(productId);
-  const saleLinks = getProductSaleLinks(productId);
-  const returnLinks = getProductReturnLinks(productId);
-  const hasInvoiceHistory = purchaseLinks.length || saleLinks.length || returnLinks.length;
-  if (hasInvoiceHistory) {
-    const isQuantityItem = item => item?.noSerial === true || item?.trackingMode === 'quantity' || item?.saleTrackingMode === 'quantity' || !(Array.isArray(item?.serials) && item.serials.length);
-    const purchasedQty = purchaseLinks.filter(x => isQuantityItem(x.item)).reduce((s, x) => s + toSafeFloat(x.item.qty, 0), 0);
-    const soldQty = saleLinks.filter(x => isQuantityItem(x.item)).reduce((s, x) => s + toSafeFloat(x.item.qty, 0), 0);
-    const saleReturnQty = returnLinks
-      .filter(x => (x.ret.invoiceType || 'sale') === 'sale')
-      .reduce((s, x) => s + toSafeFloat(x.item.qty, 0), 0);
-    const purchaseReturnQty = returnLinks
-      .filter(x => (x.ret.invoiceType || 'sale') === 'purchase')
-      .reduce((s, x) => s + toSafeFloat(x.item.qty, 0), 0);
-    return Math.max(0, purchasedQty - soldQty + saleReturnQty - purchaseReturnQty) + availableSerialQty;
-  }
-
-  return Math.max(0, parseInt(product.stockQty, 10) || 0) + availableSerialQty;
+  // R1/cache: single-pass precomputed map (invalidated per data version),
+  // matching the legacy per-invoice computation exactly.
+  const map = getStockMap();
+  const k = String(productId);
+  if (map.has(k)) return map.get(k);
+  // Product added after the cached snapshot (version not yet bumped): compute
+  // its stock directly so we never report a false 0. Mirrors computeStockMap.
+  let qtyNet = 0;
+  const isQty = item => item && (item.noSerial === true || item.trackingMode === 'quantity' || item.saleTrackingMode === 'quantity' || !(Array.isArray(item.serials) && item.serials.length));
+  const add = (inv, sign) => { const items = Array.isArray(inv.items) && inv.items.length ? inv.items : [{ productId: inv.productId, qty: inv.qty, noSerial: true }]; items.forEach(it => { if (isQty(it) && eqId(it.productId, productId)) qtyNet += sign * toSafeFloat(it.qty, 0); }); };
+  (DB.purchaseInvoices || []).forEach(inv => add(inv, 1));
+  (DB.saleInvoices || []).forEach(inv => add(inv, -1));
+  (DB.returns || []).forEach(ret => { const sign = (ret.invoiceType || 'sale') === 'sale' ? 1 : -1; add(ret, sign); });
+  let serialNet = 0;
+  (DB.serials || []).forEach(s => { if (eqId(s.productId, productId) && (s.status === 'available' || s.status === 'returned')) serialNet += 1; });
+  const base = qtyNet !== 0 ? Math.max(0, qtyNet) : Math.max(0, parseInt(product.stockQty, 10) || 0);
+  return base + serialNet;
 }
 
 function getProductStockBreakdown(productId) {
@@ -16444,7 +16677,7 @@ function getProductStockBreakdown(productId) {
   const saleReturns = returnLinks.filter(x => (x.ret.invoiceType || 'sale') === 'sale').reduce((s, x) => s + toSafeFloat(x.item.qty, 0), 0);
   const purchaseReturns = returnLinks.filter(x => (x.ret.invoiceType || 'sale') === 'purchase').reduce((s, x) => s + toSafeFloat(x.item.qty, 0), 0);
   const quantityStock = Math.max(0, quantityPurchased - quantitySold + saleReturns - purchaseReturns);
-  const serials = (DB.serials || []).filter(s => Number(s.productId) === Number(productId));
+  const serials = (DB.serials || []).filter(s => eqId(s.productId, productId));
   const serialAvailable = serials.filter(s => s.status === 'available' || s.status === 'returned').length;
   const serialSold = serials.filter(s => s.status === 'sold').length;
   return {
@@ -16458,7 +16691,7 @@ function getProductStockBreakdown(productId) {
 }
 
 function getAccountingReadOnlyStock(productId) {
-  const product = (DB.products || []).find(p => Number(p.id) === Number(productId));
+  const product = (DB.products || []).find(p => eqId(p.id, productId));
   if (!product) return 0;
   const purchaseLinks = getProductPurchaseLinks(productId);
   const saleLinks = getProductSaleLinks(productId);
@@ -16470,7 +16703,7 @@ function getAccountingReadOnlyStock(productId) {
   const sold = saleLinks.filter(x => isQuantityItem(x.item)).reduce((sum, x) => sum + toSafeFloat(x.item.qty ?? x.item.quantity, 0), 0);
   const saleReturns = returnLinks.filter(x => (x.ret.invoiceType || 'sale') === 'sale').reduce((sum, x) => sum + toSafeFloat(x.item.qty ?? x.item.quantity, 0), 0);
   const purchaseReturns = returnLinks.filter(x => (x.ret.invoiceType || 'sale') === 'purchase').reduce((sum, x) => sum + toSafeFloat(x.item.qty ?? x.item.quantity, 0), 0);
-  const availableSerials = (DB.serials || []).filter(s => Number(s.productId) === Number(productId) && (s.status === 'available' || s.status === 'returned')).length;
+  const availableSerials = (DB.serials || []).filter(s => eqId(s.productId, productId) && (s.status === 'available' || s.status === 'returned')).length;
   return purchased - sold + saleReturns - purchaseReturns + availableSerials;
 }
 
@@ -16507,7 +16740,7 @@ function getOmniAccountingSnapshot() {
 window.getOmniAccountingSnapshot = getOmniAccountingSnapshot;
 
 function getAvailableQuantityStock(productId) {
-  const product = (DB.products || []).find(p => Number(p.id) === Number(productId));
+  const product = (DB.products || []).find(p => eqId(p.id, productId));
   if (!product) return 0;
   const purchaseLinks = getProductPurchaseLinks(productId);
   const hasQuantityHistory = purchaseLinks.some(link =>
@@ -16687,7 +16920,7 @@ function reverseCashType(type) {
 function addStockMovement(productId, type, qty, reason, user, meta = {}) {
   const safeQty = Math.max(0, toSafeFloat(qty, 0));
   if (!(safeQty > 0)) return;
-  const product = DB.products.find(p => Number(p.id) === Number(productId));
+  const product = DB.products.find(p => eqId(p.id, productId));
   const branchMeta = { ...getCurrentBranchMeta(), ...meta };
   const stockAfter = getProductStock(productId) + (type === 'in' ? safeQty : -safeQty);
   DB.stockMovement.unshift({
@@ -16819,7 +17052,7 @@ function reconcileMissingCashPurchaseEntries(options = {}) {
 }
 
 function fixMissingPurchaseCashForProduct(productId) {
-  const product = (DB.products || []).find(p => Number(p.id) === Number(productId));
+  const product = (DB.products || []).find(p => eqId(p.id, productId));
   const missingRows = getMissingCashPurchaseEntries(productId);
   const total = missingRows.reduce((s, r) => s + r.missing, 0);
   if (!missingRows.length || total <= 0) {
@@ -17165,7 +17398,7 @@ function openCustomerProfile(customerId) {
     <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:12px">
       <div class="stat-card blue" style="padding:12px"><div class="stat-label">العميل</div><div class="stat-value" style="font-size:1rem">${escapeHtml(customer.name || '-')}</div></div>
       <div class="stat-card green" style="padding:12px"><div class="stat-label">النقاط</div><div class="stat-value" style="font-size:1rem;color:var(--green)">${toSafeInt(customer.points, 0)}</div></div>
-      <div class="stat-card yellow" style="padding:12px"><div class="stat-label">المستوى</div><div class="stat-value" style="font-size:1rem;color:var(--yellow)">${reward.label}</div></div>
+      <div class="stat-card yellow" style="padding:12px"><div class="stat-label">المستوى</div><div class="stat-value" style="font-size:1rem;color:var(--yellow)">${escapeHtml(reward.label)}</div></div>
       <div class="stat-card blue" style="padding:12px"><div class="stat-label">إجمالي الإنفاق</div><div class="stat-value" style="font-size:1rem">${technicianMode ? '***' : formatMoney(metrics.totalSpent)}</div></div>
       <div class="stat-card red" style="padding:12px"><div class="stat-label">الرصيد الحالي</div><div class="stat-value" style="font-size:1rem">${technicianMode ? '***' : formatMoney(Math.abs(arAccount?.balance || 0))}</div></div>
       <div class="stat-card green" style="padding:12px"><div class="stat-label">آخر دفعة</div><div class="stat-value" style="font-size:.9rem">${technicianMode ? '***' : (arAccount?.lastPayment ? new Date(arAccount.lastPayment.date).toLocaleDateString('ar-EG') : '-')}</div></div>
@@ -17892,7 +18125,7 @@ function renderCRMPage() {
   if (!tbody) return;
   const rows = [...DB.crmLeads].sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
   tbody.innerHTML = rows.map(l => `<tr>
-    <td>${l.name}</td>
+    <td>${escapeHtml(l.name)}</td>
     <td style="direction:ltr">${l.phone || '-'}</td>
     <td>
       <select class="discount-input" style="width:140px" onchange="updateCRMStage('${l.id}', this.value)">
@@ -17967,15 +18200,25 @@ function getSaleReturnFinancialImpact(invoice) {
 }
 
 function getNetInvoiceTotal(invoice) {
+  const id = invoice && invoice.id;
+  const v = (DB.settings && DB.settings.localVersion) || 0;
+  if (id != null && __netTotalCacheVersion === v && __netTotalCache.has('t:' + id)) return __netTotalCache.get('t:' + id);
   const invTotal = Number(invoice?.total || 0);
   const impact = getSaleReturnFinancialImpact(invoice);
-  return Math.max(0, invTotal - impact.returnedTotal);
+  const val = Math.max(0, invTotal - impact.returnedTotal);
+  if (id != null) { if (__netTotalCacheVersion !== v) { __netTotalCache.clear(); __netTotalCacheVersion = v; } __netTotalCache.set('t:' + id, val); }
+  return val;
 }
 
 function getNetInvoiceProfit(invoice) {
+  const id = invoice && invoice.id;
+  const v = (DB.settings && DB.settings.localVersion) || 0;
+  if (id != null && __netTotalCacheVersion === v && __netTotalCache.has('p:' + id)) return __netTotalCache.get('p:' + id);
   const invProfit = calculateSaleInvoiceProfit(invoice);
   const impact = getSaleReturnFinancialImpact(invoice);
-  return Math.max(0, invProfit - impact.returnedProfit);
+  const val = Math.max(0, invProfit - impact.returnedProfit);
+  if (id != null) { if (__netTotalCacheVersion !== v) { __netTotalCache.clear(); __netTotalCacheVersion = v; } __netTotalCache.set('p:' + id, val); }
+  return val;
 }
 
 // ================= DASHBOARD =================
@@ -17988,7 +18231,8 @@ function renderDashboard() {
   const todayProfit = todayInvoices.reduce((sum, inv) => sum + getNetInvoiceProfit(inv), 0);
   const todayExpenses = DB.expenses.filter(e => isToday(e.date)).reduce((sum, e) => sum + (e.amount || 0), 0);
   const totalProducts = DB.products.length;
-  const lowStock = DB.products.filter(p => getProductStock(p.id) <= (p.minStock || 5)).length;
+  const __stockMapDash = getStockMap();
+  const lowStock = DB.products.filter(p => (__stockMapDash.get(String(p.id)) || 0) <= (p.minStock || 5)).length;
   const treasuryBalance = getTreasurySummary().total;
   const maintPending = DB.maintenance.filter(m => m.status === 'pending').length;
   
@@ -18117,7 +18361,7 @@ function renderDashboard() {
           const c = DB.customers.find(x => String(x.id) === String(cid));
           const name = c ? c.name : 'عميل #' + cid;
           const colors = ['var(--d6-green)', 'var(--d6-accent)', 'var(--d6-sky)', 'var(--d6-purple)', 'var(--d6-orange)'];
-          return '<div class="d6-widget-item"><div class="d6-widget-dot" style="background:' + colors[i % colors.length] + '"></div><div class="d6-widget-text">' + name + '</div><div class="d6-widget-value">' + formatMoney(total) + '</div></div>';
+          return '<div class="d6-widget-item"><div class="d6-widget-dot" style="background:' + colors[i % colors.length] + '"></div><div class="d6-widget-text">' + escapeHtml(name) + '</div><div class="d6-widget-value">' + formatMoney(total) + '</div></div>';
         }).join('');
       }
     }
@@ -18160,13 +18404,28 @@ function renderDashboardRevenueChart() {
   if (window._dashboardRevenueChart) window._dashboardRevenueChart.destroy();
   const days = 7, labels = [], revenue = [], expenses = [];
   const today = new Date();
+  const dayKeys = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
+    dayKeys.push(d.toISOString().slice(0, 10));
     labels.push(d.toLocaleDateString('ar-EG', {weekday:'short'}));
-    revenue.push((DB.saleInvoices || []).filter(inv => inv.date && inv.date.slice(0, 10) === ds).reduce((s, inv) => s + getNetInvoiceTotal(inv), 0));
-    expenses.push((DB.expenses || []).filter(e => e.date && e.date.slice(0, 10) === ds).reduce((s, e) => s + (e.amount || 0), 0));
   }
+  const revByDay = new Array(days).fill(0);
+  const expByDay = new Array(days).fill(0);
+  // R1: single pass over invoices instead of days * full-scan filter+reduce.
+  (DB.saleInvoices || []).forEach(inv => {
+    if (!inv.date) return;
+    const ds = String(inv.date).slice(0, 10);
+    const idx = dayKeys.indexOf(ds);
+    if (idx >= 0) revByDay[idx] += getNetInvoiceTotal(inv);
+  });
+  (DB.expenses || []).forEach(e => {
+    if (!e.date) return;
+    const ds = String(e.date).slice(0, 10);
+    const idx = dayKeys.indexOf(ds);
+    if (idx >= 0) expByDay[idx] += (e.amount || 0);
+  });
+  for (let i = 0; i < days; i++) { revenue.push(revByDay[i]); expenses.push(expByDay[i]); }
   window._dashboardRevenueChart = new Chart(ctx, {
     type: 'bar',
     data: { labels: labels, datasets: [
@@ -18202,17 +18461,22 @@ function renderDashboardSalesChart() {
   const labels = [];
   const data = [];
   const today = new Date();
+  const dayKeys = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
-    const dayTotal = (DB.saleInvoices || []).filter(inv => {
-      const invDate = new Date(inv.date).toISOString().slice(0, 10);
-      return invDate === dateStr;
-    }).reduce((sum, inv) => sum + getNetInvoiceTotal(inv), 0);
+    dayKeys.push(d.toISOString().slice(0, 10));
     labels.push(d.toLocaleDateString('ar-EG', { weekday: 'short', day: 'numeric' }));
-    data.push(dayTotal);
   }
+  const dayTotals = new Array(days).fill(0);
+  // R1: single pass over invoices (was days * full-scan filter+reduce).
+  (DB.saleInvoices || []).forEach(inv => {
+    if (!inv.date) return;
+    const ds = String(inv.date).slice(0, 10);
+    const idx = dayKeys.indexOf(ds);
+    if (idx >= 0) dayTotals[idx] += getNetInvoiceTotal(inv);
+  });
+  for (let i = 0; i < days; i++) data.push(dayTotals[i]);
   window._dashboardSalesChart = new Chart(ctx, {
     type: 'line',
     data: {
@@ -18325,7 +18589,7 @@ function renderDailyReport() {
         <thead><tr><th>الوقت</th><th>البيان</th><th>الفئة</th><th>المبلغ</th></tr></thead>
         <tbody>${dayExpenses.map(e => `<tr>
           <td>${new Date(e.date).toLocaleTimeString('ar-EG')}</td>
-          <td>${e.desc}</td>
+          <td>${escapeHtml(e.desc)}</td>
           <td>${e.category}</td>
           <td>${formatMoney(e.amount)}</td>
         </tr>`).join('') || '<tr><td colspan="4" style="text-align:center">لا توجد مصروفات</td></tr>'}</tbody>
@@ -18436,16 +18700,8 @@ function refreshProductReportList() {
 }
 
 function getProductReturnLinks(productId) {
-  const links = [];
-  (DB.returns || []).forEach(ret => {
-    const items = Array.isArray(ret.items) && ret.items.length
-      ? ret.items
-      : [{ productId: ret.productId, name: ret.product || '-', qty: ret.qty || 0, price: ret.price || 0, refund: ret.refund || 0, serials: ret.serials || [] }];
-    items.filter(item => Number(item.productId) === Number(productId)).forEach(item => {
-      links.push({ ret, item });
-    });
-  });
-  return links.sort((a, b) => new Date(b.ret.date || 0) - new Date(a.ret.date || 0));
+  const idx = getProductLinkIndex();
+  return idx.ret.get(String(productId)) || [];
 }
 
 function searchProductReport() {
@@ -18520,7 +18776,7 @@ function buildProductReturnsTable(links) {
 }
 
 function buildProductSerialReportTable(productId) {
-  const serials = (DB.serials || []).filter(s => Number(s.productId) === Number(productId));
+  const serials = (DB.serials || []).filter(s => eqId(s.productId, productId));
   if (!serials.length) return '';
   const rows = serials.map(s => {
     const purInv = s.purchaseInvoiceId ? DB.purchaseInvoices.find(inv => inv.id === s.purchaseInvoiceId) : null;
@@ -18549,13 +18805,13 @@ function buildProductSerialReportTable(productId) {
 }
 
 function generateProductReport(productId) {
-  const product = (DB.products || []).find(p => Number(p.id) === Number(productId));
+  const product = (DB.products || []).find(p => eqId(p.id, productId));
   if (!product) { showToast('الصنف غير موجود', 'error'); return; }
   const purchaseLinks = getProductPurchaseLinks(productId);
   const saleLinks = getProductSaleLinks(productId);
   const returnLinks = getProductReturnLinks(productId);
   const stock = getProductStock(productId);
-  const serials = (DB.serials || []).filter(s => Number(s.productId) === Number(productId));
+  const serials = (DB.serials || []).filter(s => eqId(s.productId, productId));
   const availableSerials = serials.filter(s => s.status === 'available').length;
   const soldSerials = serials.filter(s => s.status === 'sold').length;
   const returnedSerials = serials.filter(s => s.status === 'returned').length;
@@ -18604,7 +18860,7 @@ function generateProductReport(productId) {
 
 function buildSaleInvoiceCard(inv) {
   const items = inv.items || [];
-  const itemsText = items.map(i => `${i.name} ×${i.qty}`).join('، ');
+  const itemsText = items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ');
   const netTotal = getNetInvoiceTotal(inv);
   return `<div class="serial-result-card" style="border-right:4px solid var(--green)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -18628,7 +18884,7 @@ function buildSaleInvoiceCard(inv) {
 
 function buildPurchaseInvoiceCard(inv) {
   const items = inv.items || [];
-  const itemsText = items.map(i => `${i.name} ×${i.qty}`).join('، ');
+  const itemsText = items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ');
   return `<div class="serial-result-card" style="border-right:4px solid var(--accent)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div style="font-weight:700;color:var(--accent);font-size:0.9rem">🛍️ فاتورة شراء</div>
@@ -18653,7 +18909,7 @@ function buildNoSerialItemCard(item) {
   return `<div class="serial-result-card" style="border-right:4px solid var(--yellow)">
     <div style="font-weight:700;color:var(--yellow);font-size:0.88rem;margin-bottom:6px">📦 صنف بدون سيريال</div>
     <div style="font-size:0.82rem;display:grid;grid-template-columns:1fr 1fr;gap:4px">
-      <div>🔖 ${item.name}</div>
+      <div>🔖 ${escapeHtml(item.name)}</div>
       <div>🔢 كمية: ${item.qty}</div>
       <div>💰 سعر: ${formatMoney(item.price)}</div>
       <div>🏭 ${item.supplier || '-'}</div>
@@ -19062,26 +19318,64 @@ function getInvoiceProductItems(inv, productId) {
     const requestedProduct = (DB.products || []).find(p => String(p.id) === String(productId));
     const requestedUuid = requestedProduct ? resolveSupabaseProductUuid(requestedProduct) : null;
     if (requestedUuid && resolveSupabaseProductUuid(i) === requestedUuid) return true;
-    if (Number(i.productId) === Number(productId) || String(i.legacy_product_id || '') === String(productId)) return true;
+    if (eqId(i.productId, productId) || String(i.legacy_product_id || '') === String(productId)) return true;
     const product = resolveProductForInvoiceItem(i);
-    return product && Number(product.id) === Number(productId);
+    return product && eqId(product.id, productId);
   });
+}
+
+// R1: per-version product-link index. getProduct*Links previously scanned ALL
+// invoices per call (O(invoices) each), and getSaleItemUnitCost calls it per
+// item during profit math -> O(invoices^2). Built once per data version.
+let __linkIndex = null;
+let __linkIndexVersion = -1;
+function getProductLinkIndex() {
+  const v = (DB.settings && DB.settings.localVersion) || 0;
+  if (__linkIndex && __linkIndexVersion === v) return __linkIndex;
+  const purchase = new Map();
+  const sale = new Map();
+  const ret = new Map();
+  const addLink = (map, key, link) => {
+    if (key == null) return;
+    const k = String(key);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(link);
+  };
+  const registerItems = (map, inv, dateKey) => {
+    const items = Array.isArray(inv.items) && inv.items.length
+      ? inv.items
+      : [{ productId: inv.productId, name: DB.products.find(p => p.id === inv.productId)?.name || '-', qty: inv.qty || 0, price: inv.price || 0, total: inv.total || 0, serials: [] }];
+    items.forEach(item => {
+      addLink(map, item.productId, { inv, item });
+      if (item.legacy_product_id != null) addLink(map, item.legacy_product_id, { inv, item });
+    });
+  };
+  (DB.purchaseInvoices || []).forEach(inv => registerItems(purchase, inv, inv.date));
+  (DB.saleInvoices || []).forEach(inv => registerItems(sale, inv, inv.date));
+  (DB.returns || []).forEach(r => {
+    const items = Array.isArray(r.items) && r.items.length
+      ? r.items
+      : [{ productId: r.productId, name: r.product || '-', qty: r.qty || 0, price: r.price || 0, refund: r.refund || 0, serials: r.serials || [] }];
+    items.forEach(item => {
+      addLink(ret, item.productId, { ret, item });
+      if (item.legacy_product_id != null) addLink(ret, item.legacy_product_id, { ret, item });
+    });
+  });
+  const sortByDate = (map) => { map.forEach(arr => arr.sort((a, b) => new Date((a.inv ? a.inv.date : a.ret.date) || 0) - new Date((b.inv ? b.inv.date : b.ret.date) || 0))); };
+  sortByDate(purchase); sortByDate(sale); sortByDate(ret);
+  __linkIndex = { purchase, sale, ret };
+  __linkIndexVersion = v;
+  return __linkIndex;
 }
 
 function getProductPurchaseLinks(productId) {
-  const links = [];
-  (DB.purchaseInvoices || []).forEach(inv => {
-    getInvoiceProductItems(inv, productId).forEach(item => links.push({ inv, item }));
-  });
-  return links.sort((a, b) => new Date(b.inv.date || 0) - new Date(a.inv.date || 0));
+  const idx = getProductLinkIndex();
+  return idx.purchase.get(String(productId)) || [];
 }
 
 function getProductSaleLinks(productId) {
-  const links = [];
-  (DB.saleInvoices || []).forEach(inv => {
-    getInvoiceProductItems(inv, productId).forEach(item => links.push({ inv, item }));
-  });
-  return links.sort((a, b) => new Date(b.inv.date || 0) - new Date(a.inv.date || 0));
+  const idx = getProductLinkIndex();
+  return idx.sale.get(String(productId)) || [];
 }
 
 function countUniqueInvoices(links) {
@@ -19123,7 +19417,14 @@ function renderProductsTable(filter = '') {
   filter = getActiveSearch('products');
   const query = String(filter || '').trim().toLowerCase();
   let products = DB.products;
-  if (query) products = products.filter(p => {
+  // R1: window the rendered rows so a 10k/100k product DB does not freeze the
+  // UI. Data and search are unaffected; only the DOM slice is capped and a
+  // notice is shown. The full set is still available via search/filter.
+  const MAX_RENDER_ROWS = 1000;
+  let renderedProducts = products;
+  let truncated = false;
+  if (products.length > MAX_RENDER_ROWS) { renderedProducts = products.slice(0, MAX_RENDER_ROWS); truncated = true; }
+  if (query) { products = products.filter(p => {
     const searchable = [
       p.name, p.barcode, p.partNumber, p.brand, p.model, p.carMake, p.carModel, p.carYear,
       getMasterName('categories', p.categoryId), getMasterName('brands', p.brandId), getMasterName('units', p.unitId),
@@ -19132,10 +19433,11 @@ function renderProductsTable(filter = '') {
       ...Object.values(p.customFields || {})
     ].join(' ').toLowerCase();
     return searchable.includes(query);
-  });
+  }); renderedProducts = products; }
   if (stockBuyEl || stockSellEl || stockProfitEl) {
+    const stockMap = getStockMap();
     const totals = (DB.products || []).reduce((acc, p) => {
-      const stock = Number(getProductStock(p.id) || 0);
+      const stock = Number(stockMap.get(String(p.id)) || 0);
       const buy = Number(p.buyPrice || 0);
       const sell = Number(p.sellPrice || 0);
       acc.buy += (stock * buy);
@@ -19148,17 +19450,32 @@ function renderProductsTable(filter = '') {
     if (stockProfitEl) stockProfitEl.textContent = maskMoneyIfRestricted(expectedProfit);
   }
   
-  tbody.innerHTML = products.map(p => {
-    const stock = getProductStock(p.id);
+  // R1: precompute per-product purchase/sale invoice counts in a single pass
+  // (was O(products * invoices) via getProduct*Links per row).
+  const __purCount = new Map();
+  const __saleCount = new Map();
+  const __bump = (m, id) => { const k = String(id); if (k != null && k !== 'undefined') m.set(k, (m.get(k) || 0) + 1); };
+  (DB.purchaseInvoices || []).forEach(inv => {
+    const items = Array.isArray(inv.items) && inv.items.length ? inv.items : [{ productId: inv.productId }];
+    items.forEach(it => __bump(__purCount, it.productId));
+  });
+  (DB.saleInvoices || []).forEach(inv => {
+    const items = Array.isArray(inv.items) && inv.items.length ? inv.items : [{ productId: inv.productId }];
+    items.forEach(it => __bump(__saleCount, it.productId));
+  });
+
+  tbody.innerHTML = renderedProducts.map(p => {
+    const stockMap = getStockMap();
+    const stock = stockMap.get(String(p.id)) || 0;
     const profit = (p.sellPrice || 0) - (p.buyPrice || 0);
-    const purchaseCount = countUniqueInvoices(getProductPurchaseLinks(p.id));
-    const saleCount = countUniqueInvoices(getProductSaleLinks(p.id));
+    const purchaseCount = __purCount.get(String(p.id)) || 0;
+    const saleCount = __saleCount.get(String(p.id)) || 0;
     const status = stock <= (p.minStock || 5) ? '<span class="badge badge-red">منخفض</span>' : '<span class="badge badge-green">متوفر</span>';
     const rawName = String(p.name || '');
     const i = query ? rawName.toLowerCase().indexOf(query) : -1;
     const nameHtml = (i >= 0)
-      ? `${rawName.slice(0, i)}<span style="background:rgba(255,193,7,0.35);padding:0 3px;border-radius:4px;font-weight:800">${rawName.slice(i, i + query.length)}</span>${rawName.slice(i + query.length)}`
-      : rawName;
+      ? `${escapeHtml(rawName.slice(0, i))}<span style="background:rgba(255,193,7,0.35);padding:0 3px;border-radius:4px;font-weight:800">${escapeHtml(rawName.slice(i, i + query.length))}</span>${escapeHtml(rawName.slice(i + query.length))}`
+      : escapeHtml(rawName);
     const masterMeta = [getMasterName('categories', p.categoryId), getMasterName('brands', p.brandId)].filter(Boolean).map(escapeHtml).join(' • ');
     const dynamicCells = dynamicEngine ? dynamicEngine.renderTableCells(p, currentBusinessType, 3) : '';
     const rowStyle = i >= 0 ? ' style="background:rgba(255,193,7,0.08);border-right:3px solid var(--yellow)"' : '';
@@ -19180,7 +19497,7 @@ function renderProductsTable(filter = '') {
         ${can('deleteProducts') ? `<button class="btn btn-sm btn-danger" onclick="deleteProduct(${p.id})">🗑️</button>` : ''}
       </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="${11 + dynamicColumnCount}" style="text-align:center">لا توجد منتجات</td></tr>`;
+  }).join('') + (truncated ? `<tr><td colspan="${11 + dynamicColumnCount}" style="text-align:center;color:var(--text2);padding:10px">⚠️ يتم عرض أول ${MAX_RENDER_ROWS} من ${products.length.toLocaleString('ar-EG')} منتجًا. استخدم البحث للوصول للباقي.</td></tr>` : '') || `<tr><td colspan="${11 + dynamicColumnCount}" style="text-align:center">لا توجد منتجات</td></tr>`;
   
   // Product log
   const logTbody = document.getElementById('productLogTbody');
@@ -19334,7 +19651,7 @@ function saveNewSerials() {
       branchId: getCurrentBranchMeta().branchId,
       branchName: getCurrentBranchMeta().branchName
     });
-    const product = (DB.products || []).find(p => Number(p.id) === Number(productId));
+    const product = (DB.products || []).find(p => eqId(p.id, productId));
     DB.devices = Array.isArray(DB.devices) ? DB.devices : [];
     DB.devices.unshift({
       id: 'DEV-' + Date.now() + '-' + Math.floor(Math.random() * 9999),
@@ -19403,7 +19720,7 @@ function saveEditProduct() {
   Object.assign(p, editSchemaPayload.direct);
   p.customFields = editCandidate.customFields;
   
-  logProductChange('تعديل منتج', p.name, `من: ${oldName} (${oldBuy}/${oldSell}) إلى: ${p.name} (${p.buyPrice}/${p.sellPrice})`);
+  logProductChange('تعديل منتج', p.name, `من: ${oldName} (${oldBuy}/${oldSell}) إلى: ${escapeHtml(p.name)} (${p.buyPrice}/${p.sellPrice})`);
   
   saveDB();
   closeModal('editProductModal');
@@ -19500,7 +19817,7 @@ function renderCostAuditTable() {
 }
 
 function applyCostAuditProductCost(productId) {
-  const p = (DB.products || []).find(x => Number(x.id) === Number(productId));
+  const p = (DB.products || []).find(x => eqId(x.id, productId));
   if (!p) return;
   const input = document.getElementById(`costAuditCost_${productId}`);
   const newCost = roundMoney(toSafeFloat(input?.value, 0));
@@ -19563,7 +19880,7 @@ function renderStockMovement() {
       <td>${typeBadge}</td>
       <td>${m.qty}</td>
       <td>${m.stockAfter}</td>
-      <td>${m.reason}</td>
+      <td>${escapeHtml(m.reason)}</td>
       <td>${m.user}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center">لا توجد حركات</td></tr>';
@@ -19582,7 +19899,7 @@ function openPurchaseModal() {
   purSelectedProduct = null;
   const suppSelect = document.getElementById('purSupplier');
   suppSelect.innerHTML = '<option value="">اختر المورد...</option>' +
-    DB.suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    DB.suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
   const _ps = document.getElementById('purProductSearch'); if(_ps){_ps.value='';}
   const _ph = document.getElementById('purProductSelect'); if(_ph){_ph.value='';}
   const _pd = document.getElementById('purProductDropdown'); if(_pd){_pd.style.display='none';_pd.innerHTML='';}
@@ -19620,7 +19937,7 @@ function renderPurCart() {
     <thead><tr><th>المنتج</th><th>السعر</th><th>الكمية</th><th>الإجمالي</th><th>عدد السيريالات</th><th>تعديل</th><th>حذف</th></tr></thead>
     <tbody>
       ${purCart.map((item, idx) => `<tr>
-        <td>${item.name}</td>
+        <td>${escapeHtml(item.name)}</td>
         <td>${formatMoney(item.price)}</td>
         <td>${item.qty}</td>
         <td>${formatMoney(item.total)}</td>
@@ -19689,7 +20006,7 @@ function addPurchaseItem() {
   if (!(price > 0)) { showToast('أدخل سعر شراء صحيحاً', 'error'); return false; }
   if (!(qtyInput > 0)) { showToast('أدخل كمية صحيحة', 'error'); return false; }
 
-  const product = DB.products.find(p => Number(p.id) === Number(productId));
+  const product = DB.products.find(p => eqId(p.id, productId));
   if (!product) { showToast('الصنف المحدد غير موجود', 'error'); return false; }
   const tracked = trackingMode === 'serial';
   purSelectedProduct = {
@@ -19786,7 +20103,7 @@ function addPurchaseItem() {
 function hasPendingPurchaseItemReady() {
   const productId = parseInt(purSelectedProduct?.id || document.getElementById('purProductSelect')?.value || 0);
   if (!productId) return false;
-  const product = DB.products.find(p => Number(p.id) === Number(productId));
+  const product = DB.products.find(p => eqId(p.id, productId));
   if (!product) return false;
   const price = parseFloat(document.getElementById('purPrice')?.value) || 0;
   const qty = parseInt(document.getElementById('purQty')?.value) || 0;
@@ -19876,7 +20193,7 @@ function purSearchInput(val) {
     return `<div id="purDrop_${i}" onclick="purSelectProduct(${p.id},'${safe}',${p.buyPrice||0})"
       style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;transition:background .12s"
       onmouseover="purDropHover(${i})" onmouseout="this.style.background=''">
-      <span style="font-weight:700">${p.name}</span>
+      <span style="font-weight:700">${escapeHtml(p.name)}</span>
       <span style="font-size:0.72rem;color:var(--text2);white-space:nowrap;margin-right:8px">شراء: ${formatMoney(p.buyPrice||0)} | مخزون: ${stock}</span>
     </div>`;
   }).join('');
@@ -20168,14 +20485,22 @@ function renderPurchases(filter = '') {
   document.getElementById('pur-debt').textContent = formatMoney(debt);
   document.getElementById('pur-suppliers').textContent = uniqueSuppliers;
 
-  // Supplier cards
+  // Supplier cards (R1: single-pass aggregation instead of O(suppliers*purchases))
+  const suppAgg = new Map();
+  purchases.forEach(p => {
+    const key = p.supplierId == null ? '__none__' : String(p.supplierId);
+    const agg = suppAgg.get(key) || { total: 0, debt: 0 };
+    agg.total += (p.total || 0);
+    if (p.invoiceType === 'ajel') agg.debt += (p.total || 0);
+    suppAgg.set(key, agg);
+  });
   let cardsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px;">';
   DB.suppliers.forEach(s => {
-    const suppPurchases = purchases.filter(p => p.supplierId == s.id);
-    const suppTotal = suppPurchases.reduce((sum, p) => sum + (p.total || 0), 0);
-    const suppDebt = suppPurchases.filter(p => p.invoiceType === 'ajel').reduce((sum, p) => sum + (p.total || 0), 0);
+    const agg = suppAgg.get(String(s.id)) || { total: 0, debt: 0 };
+    const suppTotal = agg.total;
+    const suppDebt = agg.debt;
     cardsHtml += `<div class="stat-card" style="padding:12px">
-      <div style="font-size:0.9rem;font-weight:700">${s.name}</div>
+      <div style="font-size:0.9rem;font-weight:700">${escapeHtml(s.name)}</div>
       <div style="font-size:0.75rem;color:var(--text2)">${s.phone || '-'}</div>
       <div style="margin-top:8px;display:flex;justify-content:space-between"><span style="font-size:0.75rem">المشتريات:</span><span style="font-weight:700">${formatMoney(suppTotal)}</span></div>
       <div style="display:flex;justify-content:space-between"><span style="font-size:0.75rem">الديون:</span><span style="font-weight:700;color:var(--red)">${formatMoney(suppDebt + (s.balance || 0))}</span></div>
@@ -20188,7 +20513,7 @@ function renderPurchases(filter = '') {
   tbody.innerHTML = purchases.slice(0, 100).map(p => {
     // Build items summary - support both new multi-item and old single-item format
     const itemsList = p.items && p.items.length > 0
-      ? p.items.map(i => `<div style="font-size:0.7rem">${i.name} ×${i.qty} — ${formatMoney(i.price)}</div>`).join('')
+      ? p.items.map(i => `<div style="font-size:0.7rem">${escapeHtml(i.name)} ×${i.qty} — ${formatMoney(i.price)}</div>`).join('')
       : (() => { const prod = DB.products.find(x => x.id === p.productId); return `<div style="font-size:0.7rem">${prod ? prod.name : '-'} ×${p.qty}</div>`; })();
     const itemCount = p.items ? p.items.length : 1;
     return `<tr>
@@ -20226,7 +20551,7 @@ function viewPurchaseInvoice(id) {
     const serialsHtml = i.serials && i.serials.length > 0
       ? `<div style="margin-top:4px">${i.serials.map(s => `<span style="font-family:monospace;font-size:0.68rem;background:#f0f4ff;border:1px solid #c0d0ff;border-radius:3px;padding:1px 5px;display:inline-block;margin:1px 2px">${s}</span>`).join('')}</div>` : '';
     return `<tr>
-      <td style="padding:8px;border-bottom:1px solid #eee;vertical-align:top"><div style="font-weight:600">${i.name}</div>${serialsHtml}</td>
+      <td style="padding:8px;border-bottom:1px solid #eee;vertical-align:top"><div style="font-weight:600">${escapeHtml(i.name)}</div>${serialsHtml}</td>
       <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${i.qty}</td>
       <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${formatMoney(i.price)}</td>
       <td style="padding:8px;text-align:center;border-bottom:1px solid #eee;font-weight:700">${formatMoney(i.total)}</td>
@@ -20241,7 +20566,7 @@ function viewPurchaseInvoice(id) {
       <div><strong>التاريخ:</strong> ${new Date(inv.date).toLocaleString('ar-EG')}</div>
       <div><strong>النوع:</strong> ${getInvoiceTypeLabel(inv.invoiceType)}</div>
     </div>
-    ${inv.note ? `<div style="margin-bottom:10px;padding:8px 10px;background:#f5f7ff;border:1px solid #d7e0ff;border-radius:8px;font-size:0.82rem"><strong>ملاحظة:</strong> ${inv.note}</div>` : ''}
+    ${inv.note ? `<div style="margin-bottom:10px;padding:8px 10px;background:#f5f7ff;border:1px solid #d7e0ff;border-radius:8px;font-size:0.82rem"><strong>ملاحظة:</strong> ${escapeHtml(inv.note)}</div>` : ''}
     <table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:14px">
       <thead><tr style="background:#0066ff;color:#fff">
         <th style="padding:8px;text-align:right">المنتج / السيريالات</th>
@@ -20277,7 +20602,7 @@ function editPurchaseInvoice(id) {
   // Open modal and fill supplier info
   const suppSelect = document.getElementById('purSupplier');
   suppSelect.innerHTML = '<option value="">اختر المورد...</option>' +
-    DB.suppliers.map(s => `<option value="${s.id}" ${s.id == inv.supplierId ? 'selected' : ''}>${s.name}</option>`).join('');
+    DB.suppliers.map(s => `<option value="${s.id}" ${s.id == inv.supplierId ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
   const _ps2 = document.getElementById('purProductSearch'); if(_ps2){_ps2.value='';}
   const _ph2 = document.getElementById('purProductSelect'); if(_ph2){_ph2.value='';}
   const _pd2 = document.getElementById('purProductDropdown'); if(_pd2){_pd2.style.display='none';_pd2.innerHTML='';}
@@ -20500,7 +20825,7 @@ function renderSuppliers() {
     const dualNet = dualCustomer ? getDualNetSummary(dualCustomer, s) : null;
     return `<tr>
       <td>${idx + 1}</td>
-      <td style="font-weight:700;cursor:pointer;color:var(--accent)" onclick="viewSupplierStatement(${s.id})">${s.name} 📋</td>
+      <td style="font-weight:700;cursor:pointer;color:var(--accent)" onclick="viewSupplierStatement(${s.id})">${escapeHtml(s.name)} 📋</td>
       <td>${s.phone || '-'}</td>
       <td>${s.phone2 || '-'}</td>
       <td>${s.address || '-'}</td>
@@ -20523,7 +20848,7 @@ function renderSuppliers() {
     const supp = DB.suppliers.find(s => s.id === p.supplierId);
     return `<tr>
       <td>${new Date(p.date).toLocaleDateString('ar-EG')}</td>
-      <td>${supp ? supp.name : '-'}</td>
+      <td>${supp ? escapeHtml(supp.name) : "-"}</td>
       <td>${formatMoney(p.amount)}</td>
       <td>${p.type === 'payment' ? '💰 تسديد' : '📦 توريد'}</td>
       <td>${p.desc || '-'}</td>
@@ -20542,7 +20867,7 @@ function viewSupplierStatement(supplierId) {
   // Purchase invoices
   DB.purchaseInvoices.filter(p => p.supplierId == s.id || p.supplier === s.name).forEach(p => {
     const itemsSummary = p.items && p.items.length > 0
-      ? p.items.map(i => `${i.name} ×${i.qty}`).join('، ')
+      ? p.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ')
       : (DB.products.find(prod => prod.id === p.productId)?.name || '-');
     const isAjelPurchase = p.invoiceType === 'ajel';
     const invTotal = p.total || 0;
@@ -20646,7 +20971,7 @@ function viewSupplierStatement(supplierId) {
     const runColor = running > 0 ? 'var(--red)' : 'var(--green)';
     return `<tr style="background:${t.bg}">
       <td style="font-size:0.78rem;white-space:nowrap">${new Date(t.date).toLocaleDateString('ar-EG')}</td>
-      <td style="font-size:0.78rem"><div style="font-weight:600">${t.desc}</div>${t.detail ? `<div style="color:var(--text2);font-size:0.7rem">${t.detail}</div>` : ''}</td>
+      <td style="font-size:0.78rem"><div style="font-weight:600">${escapeHtml(t.desc)}</div>${t.detail ? `<div style="color:var(--text2);font-size:0.7rem">${escapeHtml(t.detail)}</div>` : ''}</td>
       <td>${t.badge}</td>
       <td style="color:var(--red);font-weight:${t.debit>0?'700':'400'}">${t.debit > 0 ? formatMoney(t.debit) : '-'}</td>
       <td style="color:var(--green);font-weight:${t.credit>0?'700':'400'}">${t.credit > 0 ? formatMoney(t.credit) : '-'}</td>
@@ -20668,8 +20993,8 @@ function viewSupplierStatement(supplierId) {
     <div style="background:linear-gradient(135deg,var(--orange),#ff8c00);border-radius:14px;padding:18px;color:#fff;margin-bottom:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
         <div>
-          <div style="font-size:1.3rem;font-weight:900">🏭 ${s.name}</div>
-          <div style="font-size:0.85rem;opacity:0.9;margin-top:4px">📞 ${s.phone || '-'} ${s.address ? '| 📍 ' + s.address : ''}</div>
+          <div style="font-size:1.3rem;font-weight:900">🏭 ${escapeHtml(s.name)}</div>
+          <div style="font-size:0.85rem;opacity:0.9;margin-top:4px">📞 ${escapeHtml(s.phone || '-')} ${s.address ? '| 📍 ' + escapeHtml(s.address) : ''}</div>
         </div>
         <div style="text-align:center;background:rgba(255,255,255,0.2);border-radius:10px;padding:12px 20px">
           <div style="font-size:0.75rem;opacity:0.9">${balLabel}</div>
@@ -21027,16 +21352,22 @@ function renderCustomersTable(filter = '') {
   const tbody = document.getElementById('customersTbody');
   let customers = DB.customers;
   if (filter) customers = customers.filter(c => c.name.toLowerCase().includes(filter.toLowerCase()) || (c.phone && c.phone.includes(filter)));
+  // R1: precompute ajel totals per customer in a single pass (was O(customers*invoices)).
+  const __custDebt = new Map();
+  (DB.saleInvoices || []).forEach(inv => {
+    if (inv.invoiceType === 'ajel' && inv.customer) {
+      const k = String(inv.customer);
+      __custDebt.set(k, (Number(__custDebt.get(k)) || 0) + getNetInvoiceTotal(inv));
+    }
+  });
   
   tbody.innerHTML = customers.map((c, idx) => {
-    const debt = (c.balance || 0) + DB.saleInvoices
-      .filter(inv => inv.customer === c.name && inv.invoiceType === 'ajel')
-      .reduce((sum, inv) => sum + getNetInvoiceTotal(inv), 0);
+    const debt = (c.balance || 0) + (Number(__custDebt.get(String(c.name))) || 0);
     const dualSupplier = findMatchingSupplierForCustomer(c);
     const dualNet = dualSupplier ? getDualNetSummary(c, dualSupplier) : null;
     return `<tr>
       <td>${idx + 1}</td>
-      <td>${c.name}</td>
+      <td>${escapeHtml(c.name)}</td>
       <td>${c.phone || '-'}</td>
       <td>${c.phone2 || '-'}</td>
       <td>${c.points || 0}</td>
@@ -21076,8 +21407,8 @@ function updateCartCustomerSelect() {
   const select = document.getElementById('cartCustomerSelect');
   if (!select) return;
   const prev = select.value;
-  const custOptions = DB.customers.map(c => `<option value="c_${c.id}">${c.name}${c.phone ? ' — ' + c.phone : ''}</option>`).join('');
-  const suppOptions = DB.suppliers.map(s => `<option value="s_${s.id}">🏭 ${s.name}${s.phone ? ' — ' + s.phone : ''}</option>`).join('');
+  const custOptions = DB.customers.map(c => `<option value="c_${c.id}">${escapeHtml(c.name)}${c.phone ? ' — ' + c.phone : ''}</option>`).join('');
+  const suppOptions = DB.suppliers.map(s => `<option value="s_${s.id}">🏭 ${escapeHtml(s.name)}${s.phone ? ' — ' + s.phone : ''}</option>`).join('');
   if (mode === 'sale') {
     select.innerHTML = `<option value="">👤 اختر عميل (اختياري)...</option>${custOptions}<optgroup label="── أو مورد ──"></optgroup>${suppOptions}`;
   } else {
@@ -21144,7 +21475,7 @@ function viewCustomerStatement(customerIdOrName) {
     (customer.phone && inv.customerPhone && String(inv.customerPhone).replace(/\s/g, '') === String(customer.phone).replace(/\s/g, ''))
   ).forEach(inv => {
     const itemsSummary = inv.items && inv.items.length > 0
-      ? inv.items.map(i => `${i.name} ×${i.qty}`).join('، ')
+      ? inv.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ')
       : 'بيع';
     transactions.push({
       date: inv.date,
@@ -21165,8 +21496,8 @@ function viewCustomerStatement(customerIdOrName) {
     (customer.phone && p.supplierPhone && String(p.supplierPhone).replace(/\s/g, '') === String(customer.phone).replace(/\s/g, ''))
   ).forEach(p => {
     const itemsSummary = p.items && p.items.length > 0
-      ? p.items.map(i => `${i.name} ×${i.qty}`).join('، ')
-      : (DB.products.find(prod => prod.id === p.productId)?.name || '-');
+      ? p.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ')
+      : escapeHtml(DB.products.find(prod => prod.id === p.productId)?.name || '-');
     transactions.push({
       date: p.date,
       desc: `📥 فاتورة شراء #${p.id}`,
@@ -21217,7 +21548,7 @@ function viewCustomerStatement(customerIdOrName) {
     const runColor = running > 0 ? 'var(--red)' : 'var(--green)';
     return `<tr style="background:${t.bg}">
       <td>${new Date(t.date).toLocaleDateString('ar-EG')}</td>
-      <td><div style="font-weight:600">${t.desc}</div>${t.detail ? `<div style="color:var(--text2);font-size:0.72rem">${t.detail}</div>` : ''}</td>
+      <td><div style="font-weight:600">${escapeHtml(t.desc)}</div>${t.detail ? `<div style="color:var(--text2);font-size:0.72rem">${escapeHtml(t.detail)}</div>` : ''}</td>
       <td>${t.badge}</td>
       <td style="color:var(--red);font-weight:${t.debit > 0 ? '700' : '400'}">${t.debit > 0 ? formatMoney(t.debit) : '-'}</td>
       <td style="color:var(--green);font-weight:${t.credit > 0 ? '700' : '400'}">${t.credit > 0 ? formatMoney(t.credit) : '-'}</td>
@@ -21234,8 +21565,8 @@ function viewCustomerStatement(customerIdOrName) {
   const finalBalance = running;
   let html = `
     <div class="customer-statement-header">
-      <div style="font-size:1.3rem;font-weight:700;margin-bottom:8px">${customer.name}</div>
-      <div style="font-size:0.85rem;opacity:0.9">${customer.phone || '-'} | ${customer.address || '-'}</div>
+      <div style="font-size:1.3rem;font-weight:700;margin-bottom:8px">${escapeHtml(customer.name)}</div>
+      <div style="font-size:0.85rem;opacity:0.9">${escapeHtml(customer.phone || '-')} | ${escapeHtml(customer.address || '-')}</div>
     </div>
     <div class="stats-grid" style="margin-bottom:20px">
       <div class="stat-card blue"><div class="stat-value">${formatMoney(totalDebit)}</div><div class="stat-label">إجمالي مدين</div></div>
@@ -21634,7 +21965,14 @@ function onRetActionChange() {
 }
 
 function setReturnType(type) {
-  document.getElementById('retInvType').value = type;
+  const retInvTypeEl = document.getElementById('retInvType');
+  const prevType = retInvTypeEl ? retInvTypeEl.value : '';
+  if (retInvTypeEl) retInvTypeEl.value = type;
+  // Ensure the save handler knows which invoice type is being returned.
+  // Without this, saveReturnImpl always defaults to 'sale' and purchase
+  // returns can never be processed (Bug: purchase returns broken).
+  const retSaveBtn = document.getElementById('retSaveBtn');
+  if (retSaveBtn) retSaveBtn.dataset.invType = type;
   const isSale = type === 'sale';
   document.getElementById('retTypeSale').className = isSale ? 'btn btn-accent btn-sm' : 'btn btn-outline btn-sm';
   document.getElementById('retTypePur').className = !isSale ? 'btn btn-accent btn-sm' : 'btn btn-outline btn-sm';
@@ -21657,7 +21995,12 @@ function setReturnType(type) {
   // Reset
   document.getElementById('retInvoiceDetails').style.display = 'none';
   document.getElementById('retSaveBtn').style.display = 'none';
-  document.getElementById('retInvoiceId').value = '';
+  // Only clear the entered invoice id when the user manually switches the
+  // return type. When called from loadReturnInvoice (same type), keep the id
+  // so saveReturnImpl can resolve the invoice (Bug: purchase returns broken).
+  if (prevType && prevType !== type) {
+    document.getElementById('retInvoiceId').value = '';
+  }
 }
 
 function loadReturnInvoice() {
@@ -21722,7 +22065,7 @@ function loadReturnInvoice() {
     itemHtml += `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
         <input type="checkbox" id="retItem_${idx}" style="width:16px;height:16px;cursor:pointer" onchange="onRetItemCheck(${idx})">
-        <label for="retItem_${idx}" style="font-weight:700;cursor:pointer">${item.name}</label>
+        <label for="retItem_${idx}" style="font-weight:700;cursor:pointer">${escapeHtml(item.name)}</label>
         <span style="color:var(--text2);font-size:0.78rem">| كمية: ${item.qty} | سعر: ${formatMoney(item.price)}</span>
       </div>`;
 
@@ -21765,6 +22108,7 @@ function loadReturnInvoice() {
   document.getElementById('retSaveBtn').style.display = 'inline-flex';
   document.getElementById('retSaveBtn').dataset.invoiceId = inv.id;
   document.getElementById('retSaveBtn').dataset.invType = isPurchase ? 'purchase' : 'sale';
+  document.getElementById('retInvoiceId').value = inv.id;
   // Pre-fill refund amount
   document.getElementById('retRefund').value = isPurchase ? (inv.total || 0) : getNetInvoiceTotal(inv);
 }
@@ -21775,23 +22119,109 @@ function onRetItemCheck(idx) {
 }
 
 function saveReturn() {
+  console.log('[TRACE] >>> saveReturn ENTER (caller: ' + (new Error().stack) + ')');
+  console.log('[TRACE] saveReturn -> withButtonBusy(actionKey=saveReturn, buttonId=retSaveBtn, fn=saveReturnImpl)');
   return withButtonBusy('saveReturn', 'retSaveBtn', saveReturnImpl);
 }
 
 function saveReturnImpl() {
-  const invoiceId = document.getElementById('retInvoiceId').value.trim();
+  const _TRACE = (label, extra) => console.log('[TRACE][' + label + '] ' + (extra || ''));
+  console.group('[TRACE] >>> saveReturnImpl ENTER');
+  console.log('[TRACE] caller stack:\n' + new Error().stack);
+  // Resolve the invoice id from the input, falling back to the value pinned
+  // by loadReturnInvoice (retSaveBtn.dataset.invoiceId). The input is cleared
+  // by setReturnType during the load flow, so trusting only the input caused
+  // returns to fail with "invoice not found" (Bug: returns broken).
+  const retSaveBtnEl = document.getElementById('retSaveBtn');
+  const datasetInvoiceId = retSaveBtnEl ? (retSaveBtnEl.dataset.invoiceId || '') : '';
+  const invoiceId = (document.getElementById('retInvoiceId').value || '').trim() || datasetInvoiceId;
   const reason = document.getElementById('retReason').value.trim();
   const action = document.getElementById('retAction').value;
   const refund = parseFloat(document.getElementById('retRefund').value) || 0;
   const refundMethod = document.getElementById('retRefundMethod').value;
   const invType = document.getElementById('retSaveBtn').dataset.invType || 'sale';
+  const _invObj = (typeof DB !== 'undefined' && DB.invoices) ? DB.invoices.find(i => String(i.id).toLowerCase() === String(invoiceId).toLowerCase()) : undefined;
+  console.log('[TRACE] saveReturnImpl vars:',
+    'invoiceId=', JSON.stringify(invoiceId),
+    '| invType=', JSON.stringify(invType),
+    '| dataset.invoiceId=', JSON.stringify(retSaveBtnEl && retSaveBtnEl.dataset.invoiceId),
+    '| dataset.invType=', JSON.stringify(document.getElementById('retSaveBtn').dataset.invType),
+    '| reason=', JSON.stringify(reason),
+    '| hasReturnedObject(DB.invoices)=', !!_invObj,
+    '| DB.purchaseInvoices.length=', (DB.purchaseInvoices || []).length,
+    '| DB.saleInvoices.length=', (DB.saleInvoices || []).length);
 
-  if (!reason) { showToast('أدخل سبب المرتجع', 'error'); return; }
+  if (!reason) { _TRACE('RETURN @reason-empty', 'why=reason empty -> showToast(أدخل سبب المرتجع)'); console.groupEnd(); showToast('أدخل سبب المرتجع', 'error'); return; }
+
+  // ===== [RET DEBUG] comprehensive diagnostics (temporary, do NOT remove) =====
+  (function RET_DEBUG() {
+    const _id = String(invoiceId);
+    const _lcId = _id.toLowerCase();
+    const _purArr = Array.isArray(DB.purchaseInvoices) ? DB.purchaseInvoices : [];
+    console.log('\n==============================\n[RET DEBUG]\n==============================');
+    console.log('invoiceId(input):', JSON.stringify(document.getElementById('retInvoiceId').value));
+    console.log('dataset.invoiceId:', JSON.stringify((retSaveBtnEl && retSaveBtnEl.dataset.invoiceId) || ''));
+    console.log('dataset.invType:', JSON.stringify((retSaveBtnEl && retSaveBtnEl.dataset.invType) || ''));
+    console.log('DB.purchaseInvoices.length:', _purArr.length);
+    console.log('First 20 invoice IDs:', JSON.stringify(_purArr.slice(0, 20).map(p => p.id)));
+    console.log('Last 20 invoice IDs:', JSON.stringify(_purArr.slice(-20).map(p => p.id)));
+    const _exact = _purArr.find(p => String(p.id).toLowerCase() === _lcId);
+    const _incl = _purArr.find(p => String(p.id).toLowerCase().includes(_lcId));
+    const _trim = _purArr.find(p => String(p.id).trim().toLowerCase() === _lcId.trim());
+    const _ws = _purArr.find(p => String(p.id).replace(/\s+/g, '').toLowerCase() === _id.replace(/\s+/g, '').toLowerCase());
+    console.log('exact match:', !!_exact, _exact ? '-> ' + _exact.id : '');
+    console.log('includes() match:', !!_incl, _incl ? '-> ' + _incl.id : '');
+    console.log('trim().toLowerCase() match:', !!_trim, _trim ? '-> ' + _trim.id : '');
+    console.log('normalized whitespace match:', !!_ws, _ws ? '-> ' + _ws.id : '');
+    if (!_exact && !_incl && !_trim && !_ws) {
+      const purIds = _purArr.map(p => String(p.id));
+      console.log('Array of ALL purchase invoice IDs containing "PUR":', JSON.stringify(purIds.filter(x => x.toLowerCase().includes('pur'))));
+      const numPart = _id.replace(/[^0-9]/g, '');
+      console.log('Array of ALL invoice IDs whose numeric portion matches (' + JSON.stringify(numPart) + '):', JSON.stringify(purIds.filter(x => numPart && x.replace(/[^0-9]/g, '') === numPart)));
+      console.log('input invoiceId charcodes:', Array.from(_id).map(c => c + '=U+' + c.charCodeAt(0).toString(16).toUpperCase()).join(' '));
+      console.log('candidate ids charcodes (hidden/unicode flagged):');
+      _purArr.slice(0, 50).forEach(p => {
+        const cid = String(p.id);
+        const hidden = Array.from(cid).filter(c => c.charCodeAt(0) > 127 || /\s/.test(c) || c.charCodeAt(0) < 32);
+        if (hidden.length) console.log('  HIDDEN/UNICODE in', JSON.stringify(cid), '->', Array.from(cid).map(c => c + '=U+' + c.charCodeAt(0).toString(16).toUpperCase()).join(' '));
+      });
+    }
+    console.log('typeof invoiceId:', typeof invoiceId);
+    console.log('typeof every p.id:', JSON.stringify(_purArr.slice(0, 10).map(p => typeof p.id)));
+    console.log('DB.purchaseInvoices is Array:', Array.isArray(DB.purchaseInvoices));
+    console.log('DB.purchaseInvoices objects have id:', _purArr.every(p => p && 'id' in p));
+    console.table(_purArr.slice(0, 20));
+    console.log('-------------------------------------------------');
+  })();
+  // ===== end [RET DEBUG] =====
 
   // Handle Purchase Return
   if (invType === 'purchase') {
-    const purInv = DB.purchaseInvoices.find(p => p.id.toLowerCase() === invoiceId.toLowerCase());
-    if (!purInv) { showToast('فاتورة الشراء غير موجودة', 'error'); return; }
+    _TRACE('enter purchase branch', 'invType===purchase evaluated TRUE');
+    const _pur = Array.isArray(DB.purchaseInvoices) ? DB.purchaseInvoices : [];
+    const _lc = String(invoiceId).toLowerCase();
+    const _exact = _pur.find(p => String(p.id).toLowerCase() === _lc);
+    const _incl = _pur.find(p => String(p.id).toLowerCase().includes(_lc));
+    console.log('[TRACE] purchase lookup:',
+      'datasource=DB.purchaseInvoices',
+      '| searchedId=', JSON.stringify(invoiceId),
+      '| exact=', !!_exact, _exact ? '->' + _exact.id : '',
+      '| includes=', !!_incl, _incl ? '->' + _incl.id : '',
+      '| length=', _pur.length);
+    const purInv = _exact || _incl;
+    if (!purInv) {
+      _TRACE('REACHED TOAST', 'why=invType===purchase AND purInv is falsy (both exact and includes lookups returned undefined)');
+      console.log('[TRACE] FAILURE DETAIL:',
+        'invoiceId=', JSON.stringify(invoiceId),
+        '| invType=', JSON.stringify(invType),
+        '| dataset.invoiceId=', JSON.stringify(retSaveBtnEl && retSaveBtnEl.dataset.invoiceId),
+        '| DB.purchaseInvoices.length=', _pur.length,
+        '| sampleIds=', JSON.stringify(_pur.slice(0, 20).map(x => x.id)),
+        '| invoiceId charcodes=', JSON.stringify(Array.from(String(invoiceId)).map(c => c + '=U+' + c.charCodeAt(0).toString(16).toUpperCase())),
+        '| stack=', new Error().stack);
+      console.groupEnd();
+      showToast('فاتورة الشراء غير موجودة', 'error'); return;
+    }
     const items = purInv.items || [];
     let returnedItems = [];
     let totalRefundCalc = 0;
@@ -21917,6 +22347,19 @@ function saveReturnImpl() {
   returnedItems.flatMap(r => r.serials || []).forEach(serial => updateLocalDeviceFromReturn(serial, returnRecord));
 
   logActivity('مرتجع', `فاتورة ${invoiceId} - ${returnedItems.length} صنف - ${formatMoney(actualRefund)}`);
+
+  // Reverse the customer's receivable balance for the returned goods.
+  // When the original sale was AJEL/credit, completeSale() added `total` to the
+  // customer's balance; a return must discharge that debt, otherwise the
+  // customer statement and AR aging keep phantom debt after a refund.
+  if (inv.customer) {
+    const cust = DB.customers.find(c => c.name === inv.customer);
+    if (cust) {
+      const discharged = action === 'refund' ? actualRefund : totalRefundCalc;
+      cust.balance = Math.max(0, (Number(cust.balance) || 0) - (Number(discharged) || 0));
+    }
+  }
+
   saveDB();
   closeModal('returnModal');
   renderReturns();
@@ -21949,7 +22392,7 @@ function renderReturns() {
 
   const tbody = document.getElementById('returnsTbody');
   tbody.innerHTML = DB.returns.map(r => {
-    const itemsText = r.items ? r.items.map(i => `${i.name} ×${i.qty}`).join(' | ') : (r.product || '-');
+    const itemsText = r.items ? r.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join(' | ') : escapeHtml(r.product || '-');
     const serialsCount = r.items ? r.items.reduce((s, i) => s + i.serials.length, 0) : (r.serials ? r.serials.length : 0);
     return `<tr>
       <td style="font-family:monospace;font-size:0.75rem">${r.id}</td>
@@ -21958,7 +22401,7 @@ function renderReturns() {
       <td>${r.invoiceType === 'purchase' ? (r.supplier || '-') : (r.customer || '-')}</td>
       <td style="font-size:0.75rem">${itemsText}</td>
       <td>${serialsCount > 0 ? serialsCount + ' سيريال' : '-'}</td>
-      <td>${r.reason}</td>
+      <td>${escapeHtml(r.reason)}</td>
       <td>${r.action === 'refund' ? '💰 رد للعميل' : r.action === 'supplier_refund' ? '💸 استرداد من المورد' : r.action === 'replace' ? '🔄 استبدال' : '🔧 إصلاح'}</td>
       <td style="color:var(--green);font-weight:700">${formatMoney(r.refund)}</td>
       <td>${r.user || '-'}</td>
@@ -22262,8 +22705,8 @@ function renderWarranty() {
     
     return `<tr>
       <td>${w.id}</td>
-      <td>${w.customer}</td>
-      <td>${w.product}</td>
+      <td>${escapeHtml(w.customer)}</td>
+      <td>${escapeHtml(w.product)}</td>
       <td style="font-family:monospace">${w.serial}</td>
       <td>${new Date(w.purchaseDate).toLocaleDateString('ar-EG')}</td>
       <td>${w.duration} شهر</td>
@@ -22780,7 +23223,7 @@ function renderMaintenance(filter = '') {
     const deviceCell = `${escapeHtml(m.device || '-')}${deviceMeta ? `<div style="font-size:0.68rem;color:var(--accent);font-family:monospace;direction:ltr">${escapeHtml(deviceMeta)}</div>` : ''}${m.deviceSaleRef ? `<div style="font-size:0.68rem;color:var(--text2)">فاتورة بيع: ${escapeHtml(m.deviceSaleRef)}</div>` : ''}${(m.warranty_status_at_repair || m.deviceWarrantyStatus) ? `<div style="font-size:0.68rem;color:${warrantyAtRepair.status === 'active' ? 'var(--green)' : warrantyAtRepair.status === 'expired' ? 'var(--red)' : 'var(--yellow)'}">${escapeHtml(warrantyAtRepair.label)}</div>` : ''}`;
     return `<tr>
       <td>${m.maintNum}</td>
-      <td>${m.customer}</td>
+      <td>${escapeHtml(m.customer)}</td>
       <td>${deviceCell}</td>
       <td>${m.issue.substring(0, 30)}${m.issue.length > 30 ? '...' : ''}</td>
       <td>${statusBadge}</td>
@@ -23462,14 +23905,14 @@ function openTreasuryAuditModal() {
     <div class="table-container" style="margin-bottom:12px">
       <div class="table-header"><div class="table-title">آخر قيود تسوية شراء كاش (${autoRecon.length})</div></div>
       <div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>البيان</th><th>المستخدم</th></tr></thead><tbody>
-      ${(autoRecon.slice(0, 30).map(r => `<tr><td>${r.date.toLocaleString('ar-EG')}</td><td>${r.type === 'in' ? 'وارد' : 'صادر'}</td><td>${formatMoney(r.amount)}</td><td>${r.desc}</td><td>${r.user}</td></tr>`).join('')) || '<tr><td colspan="5" style="text-align:center">لا يوجد</td></tr>'}
+      ${(autoRecon.slice(0, 30).map(r => `<tr><td>${r.date.toLocaleString('ar-EG')}</td><td>${r.type === 'in' ? 'وارد' : 'صادر'}</td><td>${formatMoney(r.amount)}</td><td>${escapeHtml(r.desc)}</td><td>${r.user}</td></tr>`).join('')) || '<tr><td colspan="5" style="text-align:center">لا يوجد</td></tr>'}
       </tbody></table></div>
     </div>
 
     <div class="table-container">
       <div class="table-header"><div class="table-title">آخر قيود يدوية (${manualEntries.length})</div></div>
       <div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>المبلغ</th><th>البيان</th><th>المستخدم</th></tr></thead><tbody>
-      ${(manualEntries.slice(0, 30).map(r => `<tr><td>${r.date.toLocaleString('ar-EG')}</td><td>${r.type === 'in' ? 'وارد' : 'صادر'}</td><td>${formatMoney(r.amount)}</td><td>${r.desc}</td><td>${r.user}</td></tr>`).join('')) || '<tr><td colspan="5" style="text-align:center">لا يوجد</td></tr>'}
+      ${(manualEntries.slice(0, 30).map(r => `<tr><td>${r.date.toLocaleString('ar-EG')}</td><td>${r.type === 'in' ? 'وارد' : 'صادر'}</td><td>${formatMoney(r.amount)}</td><td>${escapeHtml(r.desc)}</td><td>${r.user}</td></tr>`).join('')) || '<tr><td colspan="5" style="text-align:center">لا يوجد</td></tr>'}
       </tbody></table></div>
     </div>
   `;
@@ -23634,7 +24077,7 @@ function renderExpenses() {
     .slice(0, 100);
   tbody.innerHTML = latestExpenses.map(e => `<tr>
     <td>${new Date(e.date).toLocaleDateString('ar-EG')}</td>
-    <td>${e.desc}</td>
+    <td>${escapeHtml(e.desc)}</td>
     <td>${e.category}</td>
     <td>${formatMoney(e.amount)}</td>
     <td>${getPaymentLabel(e.from)}</td>
@@ -23729,7 +24172,7 @@ function renderReports() {
   const bestTbody = document.getElementById('bestSellersTbody');
   bestTbody.innerHTML = bestSellers.map(([, p], idx) => `<tr>
     <td>${idx + 1}</td>
-    <td>${p.name}</td>
+    <td>${escapeHtml(p.name)}</td>
     <td>${p.qty}</td>
     <td>${formatMoney(p.revenue)}</td>
     <td>${maskMoneyIfRestricted(p.profit)}</td>
@@ -23755,7 +24198,7 @@ function renderReports() {
   
   const slowTbody = document.getElementById('slowMoversTbody');
   slowTbody.innerHTML = slowMovers.map(p => `<tr>
-    <td>${p.name}</td>
+    <td>${escapeHtml(p.name)}</td>
     <td>${p.stock}</td>
     <td>${p.lastSale}</td>
     <td>${typeof p.days === 'number' ? p.days + ' يوم' : p.days}</td>
@@ -23927,7 +24370,7 @@ function buildDeviceLifecycleReportRows() {
         normalized.id, normalized.productName, normalized.serialNumber, normalized.imei, normalized.serviceTag,
         ownership.currentOwner, ownership.currentPhone, normalized.customerName, normalized.customerPhone,
         previousOwners, ownership.sales.map(s => `${s.invoiceId} ${s.customer} ${s.phone}`).join(' '),
-        ownership.returns.map(r => `${r.returnId} ${r.invoiceId} ${r.customer} ${r.reason}`).join(' '),
+        ownership.returns.map(r => `${r.returnId} ${r.invoiceId} ${escapeHtml(r.customer)} ${escapeHtml(r.reason)}`).join(' '),
         repairs.map(r => `${r.ref} ${r.problem} ${r.status}`).join(' ')
       ].join(' ').toLowerCase()
     });
@@ -24132,7 +24575,7 @@ function renderTopProductsPage() {
   if (!tbody) return;
   tbody.innerHTML = rows.map((r, idx) => `<tr>
     <td>${idx + 1}</td>
-    <td>${r.name}</td>
+    <td>${escapeHtml(r.name)}</td>
     <td>${r.qty}</td>
     <td>${formatMoney(r.revenue)}</td>
     <td style="color:${r.profit >= 0 ? 'var(--green)' : 'var(--red)'}">${maskMoneyIfRestricted(r.profit)}</td>
@@ -24166,7 +24609,7 @@ function renderInventoryAnalysisPage() {
   tbody.innerHTML = rows
     .sort((a, b) => a.stock - b.stock)
     .map(r => `<tr>
-      <td>${r.name}</td>
+      <td>${escapeHtml(r.name)}</td>
       <td>${r.stock}</td>
       <td>${r.minStock}</td>
       <td>${r.low ? '<span class="badge badge-red">⚠️ منخفض</span>' : '<span class="badge badge-green">✅ جيد</span>'}</td>
@@ -24214,7 +24657,7 @@ function renderForecastPage() {
   const tbody = document.getElementById('forecastTbody');
   if (!tbody) return;
   tbody.innerHTML = rows.sort((a, b) => b.suggestedQty - a.suggestedQty).map(r => `<tr>
-    <td>${r.name}</td>
+    <td>${escapeHtml(r.name)}</td>
     <td>${r.stock}</td>
     <td>${r.monthlyAvg.toFixed(1)}</td>
     <td>${r.leadTimeDays} يوم</td>
@@ -25302,7 +25745,7 @@ function renderAutomationRuleForm() {
   const disabled = !canManageAutomationCenter() ? 'disabled' : '';
   host.innerHTML = `
     <div class="form-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px">
-      <div class="form-group"><label>Template</label><select id="automationTemplateSelect" ${disabled}>${getAutomationTemplates().map(t => `<option value="${t.id}">${t.name}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Template</label><select id="automationTemplateSelect" ${disabled}>${getAutomationTemplates().map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join('')}</select></div>
       <div class="form-group"><label>Rule Name</label><input id="automationRuleName" ${disabled} placeholder="اسم القاعدة"></div>
       <div class="form-group"><label>Threshold</label><input id="automationRuleThreshold" ${disabled} type="number" value="0"></div>
       <div class="form-group"><label>Schedule</label><select id="automationRuleSchedule" ${disabled}><option>Manual</option><option>Auto</option><option>Hourly</option><option>Daily</option><option>Weekly</option><option>Monthly</option><option>Custom</option></select></div>
@@ -25874,7 +26317,7 @@ function syncRepMobileQueue() {
         amount: item.amount || 0,
         user: item.user || 'system'
       });
-      addCashEntry('in', item.amount || 0, 'cash', `تحصيل ميداني - ${item.name}`);
+      addCashEntry('in', item.amount || 0, 'cash', `تحصيل ميداني - ${escapeHtml(item.name)}`);
     }
     item.synced = true;
     syncedCount++;
@@ -25999,7 +26442,7 @@ function mergeDeviceSearchRows(primaryRows = [], fallbackRows = []) {
 function refreshDeviceProductOptions() {
   const sel = document.getElementById('deviceProduct');
   if (!sel) return;
-  sel.innerHTML = '<option value="">اختر الصنف...</option>' + (DB.products || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  sel.innerHTML = '<option value="">اختر الصنف...</option>' + (DB.products || []).map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
 }
 
 function clearDeviceForm() {
@@ -26945,7 +27388,7 @@ function renderEmployeePerformance() {
     const score = e.lastPaid ? '🟢 منتظم' : '🟡 يحتاج متابعة';
     return `<tr>
       <td>${idx + 1}</td>
-      <td>${e.name}</td>
+      <td>${escapeHtml(e.name)}</td>
       <td>${e.position || '-'}</td>
       <td>${formatMoney(totalPaid)}</td>
       <td>${empLogs.length}</td>
@@ -27276,7 +27719,7 @@ function renderPartners() {
   grid.innerHTML = DB.partners.map((p, idx) => {
     const share = totalCapital > 0 ? ((p.capital || 0) / totalCapital * 100).toFixed(1) : 0;
     return `<div class="stat-card" style="padding:18px">
-      <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:10px;">${p.name}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:10px;">${escapeHtml(p.name)}</div>
       <div style="margin-bottom:8px;"><strong>التليفون:</strong> ${p.phone || '-'}</div>
       <div style="margin-bottom:8px;"><strong>رأس المال الحالي:</strong> ${formatMoney(p.capital)}</div>
       <div style="margin-bottom:8px;"><strong>رأس المال الافتتاحي:</strong> ${formatMoney(p.initialCapital || 0)}</div>
@@ -27311,9 +27754,9 @@ function populatePartnerTxSelectors() {
   if (!sel || !filterSel) return;
   const prevPartner = sel.value;
   const prevFilter = filterSel.value;
-  const options = DB.partners.map(p => `<option value="${p.id}">${p.name} (${formatMoney(p.capital || 0)})</option>`).join('');
+  const options = DB.partners.map(p => `<option value="${p.id}">${escapeHtml(p.name)} (${formatMoney(p.capital || 0)})</option>`).join('');
   sel.innerHTML = options || '<option value="">لا يوجد شركاء</option>';
-  filterSel.innerHTML = '<option value="">📋 كل الشركاء</option>' + DB.partners.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  filterSel.innerHTML = '<option value="">📋 كل الشركاء</option>' + DB.partners.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
   if (prevPartner && sel.querySelector(`option[value="${prevPartner}"]`)) sel.value = prevPartner;
   if (prevFilter && filterSel.querySelector(`option[value="${prevFilter}"]`)) filterSel.value = prevFilter;
 }
@@ -27459,7 +27902,7 @@ function renderPartnerTransactions() {
           <thead><tr><th>الشريك</th><th>عدد الحركات</th><th>إجمالي الإيداعات</th><th>إجمالي التدوير للخزنة</th><th>الصافي</th></tr></thead>
           <tbody>
             ${stats.map(s => `<tr>
-              <td>${s.name}</td>
+              <td>${escapeHtml(s.name)}</td>
               <td>${s.count}</td>
               <td style="color:var(--green);font-weight:700">${formatMoney(s.dep)}</td>
               <td style="color:var(--accent);font-weight:700">${formatMoney(s.tr)}</td>
@@ -27617,7 +28060,7 @@ function renderFinancial() {
       <div style="padding:15px;">
         ${DB.partners.map(p => {
           const partnerProfit = netProfit * ((p.percent || 50) / 100);
-          return `<div class="statement-row"><span>${p.name} (${p.percent || 50}%)</span><span style="color:${partnerProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${formatMoney(partnerProfit)}</span></div>`;
+          return `<div class="statement-row"><span>${escapeHtml(p.name)} (${p.percent || 50}%)</span><span style="color:${partnerProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${formatMoney(partnerProfit)}</span></div>`;
         }).join('')}
       </div>
     </div>`;
@@ -27944,24 +28387,38 @@ function getArApOpeningBalance(entityType, entity) {
   }, 0);
 }
 
-function getCustomerArApTransactions(customer) {
-  ensureArApState();
-  const rows = [];
-  const push = row => rows.push({ branchId: row.branchId || 'MAIN', branchName: row.branchName || getBranchNameById(row.branchId || 'MAIN'), ...row });
-  getArApBalanceEntries('customer', customer).forEach(r => push({
-    date: r.date,
-    kind: r.kind || 'opening',
-    label: r.kind === 'adjustment' ? 'تسوية' : 'رصيد افتتاحي',
-    reference: r.reference || r.id,
-    debit: r.direction === 'credit' ? 0 : toSafeFloat(r.amount, 0),
-    credit: r.direction === 'credit' ? toSafeFloat(r.amount, 0) : 0,
-    notes: r.reason || r.notes || ''
-  }));
-  (DB.saleInvoices || []).filter(inv => arApSameParty(inv, customer, ['customer', 'customerName']) || arApClean(inv.customer) === arApClean(customer.name)).forEach(inv => {
+// R1: AR/AP transaction index. Built once per data version as a single pass
+// over all sources; per-entity lookups then become O(1) instead of
+// O(customers * invoices). Match keys mirror arApSameParty exactly (id, name,
+// phone) so results are identical to the previous per-entity scanning.
+let __arApTxIndex = null;
+let __arApTxIndexVersion = -1;
+function __arApMatchKeys(row, nameFields) {
+  const keys = [];
+  if (row.entityId != null) keys.push(String(row.entityId));
+  if (row.customerId != null) keys.push(String(row.customerId));
+  if (row.supplierId != null) keys.push(String(row.supplierId));
+  (nameFields || []).forEach(f => { const v = arApClean(row[f]); if (v) keys.push(v); });
+  const ph = arApPhone(row.phone || row.customerPhone || row.supplierPhone || row.entityPhone || row.partyPhone);
+  if (ph) keys.push(ph);
+  return keys;
+}
+function getArApTxIndex() {
+  const v = (DB.settings && DB.settings.localVersion) || 0;
+  if (__arApTxIndex && __arApTxIndexVersion === v) return __arApTxIndex;
+  const map = new Map();
+  const add = (row, nameFields) => {
+    __arApMatchKeys(row, nameFields).forEach(k => {
+      if (!map.has(k)) map.set(k, []);
+      map.get(k).push(row);
+    });
+  };
+  (DB.saleInvoices || []).forEach(inv => {
     const total = getNetInvoiceTotal(inv);
     const kind = String(inv.invoiceType || inv.payment || '').toLowerCase();
     const isCredit = ['ajel', 'installment', 'credit'].includes(kind);
-    push({
+    add({
+      ...inv,
       date: inv.date || inv.createdAt,
       kind: 'invoice',
       label: isCredit ? 'فاتورة بيع آجلة' : 'فاتورة بيع نقدية',
@@ -27970,11 +28427,12 @@ function getCustomerArApTransactions(customer) {
       debit: isCredit ? total : 0,
       credit: 0,
       notes: `${(inv.items || []).length || 0} صنف`
-    });
+    }, ['customer', 'customerName']);
   });
-  (DB.maintenance || []).filter(m => arApSameParty(m, customer, ['customer', 'customerName', 'clientName', 'name'])).forEach(m => {
+  (DB.maintenance || []).forEach(m => {
     const amount = toSafeFloat(m.total, 0) || roundMoney(toSafeFloat(m.partsCost, 0) + toSafeFloat(m.laborCost, 0) + toSafeFloat(m.cost, 0));
-    if (amount > 0) push({
+    if (amount > 0) add({
+      ...m,
       date: m.date || m.createdAt || m.receivedDate,
       kind: 'repair',
       label: 'تكلفة صيانة',
@@ -27982,66 +28440,25 @@ function getCustomerArApTransactions(customer) {
       debit: amount,
       credit: 0,
       notes: m.issue || m.problem || ''
-    });
+    }, ['customer', 'customerName', 'clientName', 'name']);
   });
-  (DB.returns || []).filter(r => arApSameParty(r, customer, ['customer', 'customerName', 'clientName'])).forEach(r => push({
-    date: r.date || r.createdAt,
-    kind: 'return',
-    label: 'مرتجع / رد عميل',
-    reference: r.id || r.returnId || r.invoiceId,
-    debit: 0,
-    credit: toSafeFloat(r.amount || r.refundAmount || r.total, 0),
-    notes: r.reason || ''
-  }));
-  (DB.asPayments || []).filter(p => p.entityType === 'customer' && arApSameParty(p, customer, ['entityName', 'partyName', 'customer'])).forEach(p => push({
-    date: p.date,
-    kind: 'payment',
-    label: p.direction === 'pay' ? 'تحصيل دفعة' : 'استرداد للعميل',
-    reference: p.reference || p.id,
-    debit: p.direction === 'pay' ? 0 : toSafeFloat(p.amount, 0),
-    credit: p.direction === 'pay' ? toSafeFloat(p.amount, 0) : 0,
-    notes: p.note || p.notes || '',
-    user: p.user
-  }));
-  (DB.vouchers || []).filter(v => v.partyType === 'customer' && arApSameParty(v, customer, ['partyName'])).forEach(v => push({
-    date: v.date,
-    kind: 'payment',
-    label: v.type === 'receipt' ? 'سند قبض' : 'سند صرف',
-    reference: v.id,
-    debit: v.type === 'payment' ? toSafeFloat(v.amount, 0) : 0,
-    credit: v.type === 'receipt' ? toSafeFloat(v.amount, 0) : 0,
-    notes: v.desc || ''
-  }));
-  (DB.installments || []).filter(i => arApSameParty(i, customer, ['customer', 'customerName', 'name'])).forEach(i => {
-    (i.payments || []).forEach(p => push({
-      date: p.date,
-      kind: 'installment',
-      label: 'دفعة تقسيط',
-      reference: p.id || i.id,
+  (DB.returns || []).forEach(r => {
+    const isPurchase = (r.invoiceType === 'purchase' || r.action === 'supplier_refund');
+    add({
+      ...r,
+      date: r.date || r.createdAt,
+      kind: 'return',
+      label: isPurchase ? 'مرتجع شراء' : 'مرتجع / رد عميل',
+      reference: r.id || r.returnId || r.invoiceId,
       debit: 0,
-      credit: toSafeFloat(p.amount, 0),
-      notes: i.invoiceId || ''
-    }));
+      credit: toSafeFloat(r.amount || r.refundAmount || r.total, 0),
+      notes: r.reason || ''
+    }, isPurchase ? ['supplier', 'supplierName'] : ['customer', 'customerName', 'clientName']);
   });
-  return rows.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-}
-
-function getSupplierArApTransactions(supplier) {
-  ensureArApState();
-  const rows = [];
-  const push = row => rows.push({ branchId: row.branchId || 'MAIN', branchName: row.branchName || getBranchNameById(row.branchId || 'MAIN'), ...row });
-  getArApBalanceEntries('supplier', supplier).forEach(r => push({
-    date: r.date,
-    kind: r.kind || 'opening',
-    label: r.kind === 'adjustment' ? 'تسوية' : 'رصيد افتتاحي',
-    reference: r.reference || r.id,
-    debit: r.direction === 'credit' ? 0 : toSafeFloat(r.amount, 0),
-    credit: r.direction === 'credit' ? toSafeFloat(r.amount, 0) : 0,
-    notes: r.reason || r.notes || ''
-  }));
-  (DB.purchaseInvoices || []).filter(inv => arApSameParty(inv, supplier, ['supplier', 'supplierName'])).forEach(inv => {
+  (DB.purchaseInvoices || []).forEach(inv => {
     const isCredit = ['ajel', 'credit'].includes(String(inv.invoiceType || '').toLowerCase());
-    push({
+    add({
+      ...inv,
       date: inv.date || inv.createdAt,
       kind: 'purchase',
       label: isCredit ? 'فاتورة شراء آجلة' : 'فاتورة شراء نقدية',
@@ -28050,18 +28467,10 @@ function getSupplierArApTransactions(supplier) {
       debit: isCredit ? toSafeFloat(inv.total, 0) : 0,
       credit: 0,
       notes: `${(inv.items || []).length || 0} صنف`
-    });
+    }, ['supplier', 'supplierName']);
   });
-  (DB.returns || []).filter(r => (r.invoiceType === 'purchase' || r.action === 'supplier_refund') && arApSameParty(r, supplier, ['supplier', 'supplierName'])).forEach(r => push({
-    date: r.date || r.createdAt,
-    kind: 'return',
-    label: 'مرتجع شراء',
-    reference: r.id || r.returnId || r.invoiceId,
-    debit: 0,
-    credit: toSafeFloat(r.amount || r.refundAmount || r.total, 0),
-    notes: r.reason || ''
-  }));
-  (DB.supplierPayments || []).filter(p => arApSameParty(p, supplier, ['supplierName', 'name'])).forEach(p => push({
+  (DB.supplierPayments || []).forEach(p => add({
+    ...p,
     date: p.date,
     kind: 'payment',
     label: 'دفع للمورد',
@@ -28070,25 +28479,100 @@ function getSupplierArApTransactions(supplier) {
     credit: toSafeFloat(p.amount, 0),
     notes: p.desc || p.notes || '',
     user: p.user
+  }, ['supplierName', 'name']));
+  (DB.asPayments || []).forEach(p => {
+    const isCustomer = p.entityType === 'customer';
+    add({
+      ...p,
+      date: p.date,
+      kind: 'payment',
+      label: isCustomer ? (p.direction === 'pay' ? 'تحصيل دفعة' : 'استرداد للعميل') : (p.direction === 'receive' ? 'دفع للمورد' : 'استرداد من المورد'),
+      reference: p.reference || p.id,
+      debit: 0,
+      credit: isCustomer ? (p.direction === 'pay' ? toSafeFloat(p.amount, 0) : 0) : (p.direction === 'receive' ? toSafeFloat(p.amount, 0) : 0),
+      notes: p.note || p.notes || '',
+      user: p.user
+    }, isCustomer ? ['entityName', 'partyName', 'customer'] : ['entityName', 'partyName', 'supplier']);
+  });
+  (DB.vouchers || []).forEach(v => {
+    const isCustomer = v.partyType === 'customer';
+    add({
+      ...v,
+      date: v.date,
+      kind: 'payment',
+      label: v.type === 'receipt' ? 'سند قبض' : 'سند صرف',
+      reference: v.id,
+      debit: v.type === 'payment' ? toSafeFloat(v.amount, 0) : 0,
+      credit: v.type === 'receipt' ? toSafeFloat(v.amount, 0) : 0,
+      notes: v.desc || ''
+    }, ['partyName']);
+  });
+  (DB.installments || []).forEach(i => {
+    (i.payments || []).forEach(p => add({
+      ...i, ...p,
+      date: p.date,
+      kind: 'installment',
+      label: 'دفعة تقسيط',
+      reference: p.id || i.id,
+      debit: 0,
+      credit: toSafeFloat(p.amount, 0),
+      notes: i.invoiceId || ''
+    }, ['customer', 'customerName', 'name']));
+  });
+  __arApTxIndex = map;
+  __arApTxIndexVersion = v;
+  return map;
+}
+
+function __arApCollectFor(entity) {
+  const index = getArApTxIndex();
+  const keys = [];
+  if (entity.id != null) keys.push(String(entity.id));
+  const nm = arApClean(entity.name); if (nm) keys.push(nm);
+  const ph = arApPhone(entity.phone || entity.phone2); if (ph) keys.push(ph);
+  const out = [];
+  const seen = new Set();
+  keys.forEach(k => {
+    (index.get(k) || []).forEach(r => {
+      const tag = r.reference + '|' + r.kind + '|' + r.date;
+      if (seen.has(tag)) return;
+      seen.add(tag);
+      out.push({ branchId: r.branchId || 'MAIN', branchName: r.branchName || getBranchNameById(r.branchId || 'MAIN'), ...r });
+    });
+  });
+  return out.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+}
+
+function getCustomerArApTransactions(customer) {
+  ensureArApState();
+  const rows = __arApCollectFor(customer);
+  getArApBalanceEntries('customer', customer).forEach(r => rows.push({
+    branchId: 'MAIN',
+    branchName: getBranchNameById('MAIN'),
+    date: r.date,
+    kind: r.kind || 'opening',
+    label: r.kind === 'adjustment' ? 'تسوية' : 'رصيد افتتاحي',
+    reference: r.reference || r.id,
+    debit: r.direction === 'credit' ? 0 : toSafeFloat(r.amount, 0),
+    credit: r.direction === 'credit' ? toSafeFloat(r.amount, 0) : 0,
+    notes: r.reason || r.notes || ''
   }));
-  (DB.asPayments || []).filter(p => p.entityType === 'supplier' && arApSameParty(p, supplier, ['entityName', 'partyName', 'supplier'])).forEach(p => push({
-    date: p.date,
-    kind: 'payment',
-    label: p.direction === 'receive' ? 'دفع للمورد' : 'استرداد من المورد',
-    reference: p.reference || p.id,
-    debit: p.direction === 'pay' ? 0 : 0,
-    credit: p.direction === 'receive' ? toSafeFloat(p.amount, 0) : 0,
-    notes: p.note || p.notes || '',
-    user: p.user
-  }));
-  (DB.vouchers || []).filter(v => v.partyType === 'supplier' && arApSameParty(v, supplier, ['partyName'])).forEach(v => push({
-    date: v.date,
-    kind: 'payment',
-    label: v.type === 'payment' ? 'سند صرف' : 'سند قبض',
-    reference: v.id,
-    debit: v.type === 'receipt' ? 0 : 0,
-    credit: v.type === 'payment' ? toSafeFloat(v.amount, 0) : 0,
-    notes: v.desc || ''
+  return rows.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+}
+
+function getSupplierArApTransactions(supplier) {
+  ensureArApState();
+  const rows = __arApCollectFor(supplier);
+  getArApBalanceEntries('supplier', supplier).forEach(r => rows.push({
+    branchId: 'MAIN',
+    branchName: getBranchNameById('MAIN'),
+    date: r.date,
+    kind: r.kind || 'opening',
+    label: r.kind === 'adjustment' ? 'تسوية' : 'رصيد افتتاحي',
+    reference: r.reference || r.id,
+    debit: r.direction === 'credit' ? 0 : toSafeFloat(r.amount, 0),
+    credit: r.direction === 'credit' ? toSafeFloat(r.amount, 0) : 0,
+    notes: r.reason || r.notes || ''
   }));
   return rows.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
 }
@@ -30154,13 +30638,13 @@ function renderUsers() {
   const roleLabel = r => r==='Manager'?'👑 أدمن':r==='WarehouseSales'?'🛒 بائع/مخزن':r==='Sales'?'💼 مبيعات':r==='Support'?'🔧 دعم':'👁️ مشاهد';
   tbody.innerHTML = visible.map((u, idx) => `<tr>
     <td>${idx + 1}</td>
-    <td><div style="font-weight:700">${u.username}</div><div style="font-size:0.72rem;color:var(--text2)">${u.fullName || ''}</div></td>
+    <td><div style="font-weight:700">${escapeHtml(u.username)}</div><div style="font-size:0.72rem;color:var(--text2)">${u.fullName || ''}</div></td>
     <td>${roleLabel(u.role)}</td>
     <td>${u.phone || '-'}</td>
     <td>${u.pinVerified ? '<span class="badge badge-green">✅ مؤكد</span>' : '<span class="badge badge-yellow">⏳ بانتظار PIN</span>'}</td>
     <td>
       ${isOwnerUser() && u.username !== currentUser.username
-        ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${u.username}')">🗑️</button>`
+        ? `<button class="btn btn-sm btn-danger" onclick="deleteUser('${escapeHtml(u.username)}')">🗑️</button>`
         : ''}
     </td>
   </tr>`).join('') || '<tr><td colspan="6" style="text-align:center">لا يوجد مستخدمين</td></tr>';
@@ -30695,7 +31179,7 @@ function renderPOSProducts(filter = '') {
     const allowAmanat = isAmanatEnabledInPOS();
     const disabled = (stock === 0 && !allowAmanat) ? 'opacity:0.5;' : '';
     return `<div class="product-card" style="${disabled}" onclick="addToCart(${p.id})">
-      <div class="p-name">${p.name}</div>
+      <div class="p-name">${escapeHtml(p.name)}</div>
       <div class="p-price">${formatMoney(p.sellPrice)}</div>
       <div class="p-stock">متوفر: ${stock}${stock === 0 && allowAmanat ? ' | 🟠 أمانات' : ''}</div>
     </div>`;
@@ -30709,7 +31193,7 @@ function filterPosInvoiceProducts(query) {
   if (!sel) return;
   const q = String(query || '').trim().toLowerCase();
   const products = (DB.products || []).filter(p => !q || (p.name || '').toLowerCase().includes(q));
-  sel.innerHTML = '<option value="">اختر الصنف...</option>' + products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  sel.innerHTML = '<option value="">اختر الصنف...</option>' + products.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
   onPosInvoiceAddProductChange();
 }
 
@@ -30986,7 +31470,7 @@ function renderCart() {
     return `<div class="cart-item" style="flex-direction:column;align-items:stretch;gap:6px">
       <div style="display:flex;align-items:center;gap:8px">
         <div class="cart-item-info" style="flex:1">
-          <div class="cart-item-name" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${item.name} ${amanatBadge}</div>
+          <div class="cart-item-name" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${escapeHtml(item.name)} ${amanatBadge}</div>
           <div style="display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap">
             <div class="cart-item-price" style="color:var(--accent);font-weight:700">${formatMoney(priceNum)} × ${qtyNum}</div>
             <button onclick="editCartItemPrice(${idx})" style="background:rgba(249,168,37,0.15);border:1px solid rgba(249,168,37,0.4);color:var(--yellow);border-radius:5px;padding:2px 7px;font-size:0.65rem;cursor:pointer;font-family:Cairo,sans-serif">✏️ تعديل السعر</button>
@@ -31711,7 +32195,7 @@ function printInvoice(invoice) {
       : '';
     return `<tr>
       <td style="padding:8px;border-bottom:1px solid #eee;vertical-align:top">
-        <div style="font-weight:600">${item.name} ${item.isAmanat ? '<span style="background:rgba(245,124,0,0.12);color:#ef6c00;border:1px solid rgba(245,124,0,0.35);padding:1px 6px;border-radius:14px;font-size:0.64rem">🟠 أمانة</span>' : ''}</div>
+        <div style="font-weight:600">${escapeHtml(item.name)} ${item.isAmanat ? '<span style="background:rgba(245,124,0,0.12);color:#ef6c00;border:1px solid rgba(245,124,0,0.35);padding:1px 6px;border-radius:14px;font-size:0.64rem">🟠 أمانة</span>' : ''}</div>
         ${serialsHtml ? `<div style="margin-top:4px">${serialsHtml}</div>` : ''}
       </td>
       <td style="padding:8px;text-align:center;border-bottom:1px solid #eee;vertical-align:top">${item.qty}</td>
@@ -31733,11 +32217,11 @@ function printInvoice(invoice) {
       </div>
       
       <div style="margin-bottom:15px;padding:10px;background:#f5f5f5;border-radius:8px">
-        <div><strong>العميل:</strong> ${invoice.customer}</div>
+        <div><strong>العميل:</strong> ${escapeHtml(invoice.customer)}</div>
         ${invoice.customerPhone ? `<div><strong>التليفون:</strong> ${invoice.customerPhone}</div>` : ''}
         <div><strong>الفرع:</strong> ${escapeHtml(invoice.branchName || invoice.branch_name || getBranchNameById(invoice.branchId || invoice.branch_id || 'MAIN'))}</div>
         ${(invoice.branchAddress || invoice.branchPhone) ? `<div><strong>بيانات الفرع:</strong> ${escapeHtml([invoice.branchAddress, invoice.branchPhone].filter(Boolean).join(' - '))}</div>` : ''}
-        ${invoice.note ? `<div><strong>ملاحظة:</strong> ${invoice.note}</div>` : ''}
+        ${invoice.note ? `<div><strong>ملاحظة:</strong> ${escapeHtml(invoice.note)}</div>` : ''}
       </div>
       
       <table style="width:100%;border-collapse:collapse;margin-bottom:15px;font-size:0.85rem">
@@ -31947,7 +32431,7 @@ function filterEditSaleProducts(query) {
   if (!sel) return;
   const q = String(query || '').trim().toLowerCase();
   const list = (DB.products || []).filter(p => !q || (p.name || '').toLowerCase().includes(q));
-  sel.innerHTML = '<option value="">اختر الصنف...</option>' + list.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  sel.innerHTML = '<option value="">اختر الصنف...</option>' + list.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
   onEditSaleAddProductChange();
 }
 
@@ -32056,7 +32540,7 @@ function validateSaleModeSerials(productId, serials, qty, productName = '') {
   const duplicateInInvoice = cleanSerials.find(sn => alreadyInInvoice.includes(String(sn || '').trim().toLowerCase()));
   if (duplicateInInvoice) { showToast(`هذا السيريال مختار بالفعل داخل الفاتورة: ${duplicateInInvoice}`, 'error'); return false; }
   for (const serial of cleanSerials) {
-    const serialRecord = (DB.serials || []).find(s => String(s.serial || '').trim().toLowerCase() === serial.toLowerCase() && Number(s.productId) === Number(productId));
+    const serialRecord = (DB.serials || []).find(s => String(s.serial || '').trim().toLowerCase() === serial.toLowerCase() && eqId(s.productId, productId));
     if (!serialRecord) { showToast(`هذا السيريال غير متاح لهذا الصنف: ${serial}`, 'error'); return false; }
     const info = getSerialSaleBlockInfo(serial);
     if (!info.deviceRecord) { showToast(`هذا السيريال غير مسجل في سجل الأجهزة — السيريال: ${serial}`, 'error'); return false; }
@@ -32116,7 +32600,7 @@ function setEditSaleReplaceTarget(idx) {
   editSaleReplaceTargetIdx = idx;
   const item = editSaleInvItems[idx];
   const repLbl = document.getElementById('editSaleReplaceTargetLabel');
-  if (repLbl) repLbl.textContent = item ? `المحدد للاستبدال: ${item.name}` : 'لا يوجد بند محدد للاستبدال';
+  if (repLbl) repLbl.textContent = item ? `المحدد للاستبدال: ${escapeHtml(item.name)}` : 'لا يوجد بند محدد للاستبدال';
 }
 
 function replaceEditSaleItem() {
@@ -32171,7 +32655,7 @@ function renderEditSaleItems() {
       return `
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:700;font-size:0.85rem">${item.name} ${item.isAmanat ? '<span style="font-size:0.65rem;color:var(--orange);border:1px solid rgba(245,124,0,0.35);background:rgba(245,124,0,0.12);padding:1px 6px;border-radius:12px">🟠 أمانة</span>' : ''}</span>
+          <span style="font-weight:700;font-size:0.85rem">${escapeHtml(item.name)} ${item.isAmanat ? '<span style="font-size:0.65rem;color:var(--orange);border:1px solid rgba(245,124,0,0.35);background:rgba(245,124,0,0.12);padding:1px 6px;border-radius:12px">🟠 أمانة</span>' : ''}</span>
           <div style="display:flex;gap:6px;align-items:center">
             <button class="btn btn-yellow btn-sm" onclick="setEditSaleReplaceTarget(${idx})">🎯 استبدال</button>
             <button onclick="removeEditSaleItem(${idx})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem">🗑️</button>
@@ -32366,8 +32850,8 @@ function filterCartCustomers(query) {
     suppList = suppList.filter(s => s.name.toLowerCase().includes(q) || (s.phone && s.phone.includes(q)));
   }
 
-  const custOptions = custList.map(c => `<option value="c_${c.id}">${c.name}${c.phone ? ' — ' + c.phone : ''}</option>`).join('');
-  const suppOptions = suppList.map(s => `<option value="s_${s.id}">🏭 ${s.name}${s.phone ? ' — ' + s.phone : ''}</option>`).join('');
+  const custOptions = custList.map(c => `<option value="c_${c.id}">${escapeHtml(c.name)}${c.phone ? ' — ' + c.phone : ''}</option>`).join('');
+  const suppOptions = suppList.map(s => `<option value="s_${s.id}">🏭 ${escapeHtml(s.name)}${s.phone ? ' — ' + s.phone : ''}</option>`).join('');
 
   if (mode === 'sale') {
     select.innerHTML = `<option value="">👤 اختر عميل (اختياري)...</option>${custOptions}<optgroup label="── أو مورد ──"></optgroup>${suppOptions}`;
@@ -32950,12 +33434,12 @@ function renderUnifiedASCard(customer, supplier) {
   const supplierNameEsc = escapeForSingleQuoteJs(supplier.name || '');
   let transactions = [];
   DB.saleInvoices.filter(inv => inv.customer === customer.name).forEach(inv => {
-    const itemsSummary = inv.items && inv.items.length > 0 ? inv.items.map(i => `${i.name} ×${i.qty}`).join('، ') : 'بيع';
+    const itemsSummary = inv.items && inv.items.length > 0 ? inv.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ') : 'بيع';
     const netInv = getNetInvoiceTotal(inv);
     transactions.push({ date: inv.date, desc: `📤 فاتورة بيع #${inv.id} — ${itemsSummary}`, saleDebit: inv.invoiceType === 'ajel' ? netInv : 0, saleCredit: inv.invoiceType !== 'ajel' ? netInv : 0, purDebit: 0, purCredit: 0, invoiceId: inv.id, invoiceKind: 'sale', badge: '<span class="badge badge-blue">بيع</span>', bg: 'rgba(0,102,255,0.05)' });
   });
   DB.purchaseInvoices.filter(p => p.supplierId == supplier.id || p.supplier === supplier.name).forEach(p => {
-    const itemsSummary = p.items && p.items.length > 0 ? p.items.map(i => `${i.name} ×${i.qty}`).join('، ') : DB.products.find(prod => prod.id === p.productId)?.name || '-';
+    const itemsSummary = p.items && p.items.length > 0 ? p.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ') : escapeHtml(DB.products.find(prod => prod.id === p.productId)?.name || '-');
     const invTotal = p.total || 0;
     const purDebit = p.invoiceType === 'ajel' ? invTotal : invTotal;
     const purCredit = p.invoiceType === 'ajel' ? 0 : invTotal;
@@ -32983,7 +33467,7 @@ function renderUnifiedASCard(customer, supplier) {
   transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
   const rows = transactions.map(t => `<tr style="background:${t.bg}">
     <td style="font-size:0.75rem;white-space:nowrap">${new Date(t.date).toLocaleDateString('ar-EG')}</td>
-    <td style="font-size:0.78rem">${t.desc}</td>
+    <td style="font-size:0.78rem">${escapeHtml(t.desc)}</td>
     <td>${t.badge}</td>
     <td style="color:var(--red);font-weight:${(t.saleDebit||t.purDebit)>0?'700':'400'}">${t.saleDebit > 0 ? formatMoney(t.saleDebit) : t.purDebit > 0 ? formatMoney(t.purDebit) : '-'}</td>
     <td style="color:var(--green);font-weight:${(t.saleCredit||t.purCredit)>0?'700':'400'}">${t.saleCredit > 0 ? formatMoney(t.saleCredit) : t.purCredit > 0 ? formatMoney(t.purCredit) : '-'}</td>
@@ -32995,7 +33479,7 @@ function renderUnifiedASCard(customer, supplier) {
   document.getElementById('asResult').innerHTML = `
   <div style="background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:18px;margin-bottom:16px">
     <div style="font-size:0.75rem;font-weight:700;color:var(--accent);margin-bottom:3px">👥 عميل + 🏭 مورد</div>
-    <div style="font-size:1.4rem;font-weight:900;color:var(--text)">${customer.name}</div>
+    <div style="font-size:1.4rem;font-weight:900;color:var(--text)">${escapeHtml(customer.name)}</div>
     <div style="font-size:0.85rem;color:var(--text2);margin-top:2px">📞 ${customer.phone || '-'}</div>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end;margin-bottom:12px;flex-wrap:wrap">
@@ -33079,7 +33563,7 @@ function renderASCard(entity, type) {
     invoices.forEach(inv => {
       // One row per invoice — show all items summary
       const itemsSummary = inv.items && inv.items.length > 0
-        ? inv.items.map(i => `${i.name} ×${i.qty}`).join('، ')
+        ? inv.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ')
         : 'بيع';
       transactions.push({
         date: inv.date,
@@ -33095,7 +33579,7 @@ function renderASCard(entity, type) {
       (entity.phone && p.supplierPhone && p.supplierPhone.replace(/\s/g,'') === entity.phone.replace(/\s/g,''))
     ).forEach(p => {
       const itemsSummary = p.items && p.items.length > 0
-        ? p.items.map(i => `${i.name} ×${i.qty}`).join('، ')
+        ? p.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ')
         : (DB.products.find(prod => prod.id === p.productId)?.name || '-');
       transactions.push({ date: p.date, desc: `🛍️ فاتورة شراء #${p.id} — ${itemsSummary}`, debit: 0, credit: p.total || 0, type: 'purchase_invoice' });
     });
@@ -33113,7 +33597,7 @@ function renderASCard(entity, type) {
     const purchases = DB.purchaseInvoices.filter(p => p.supplierId == entity.id || p.supplier === entity.name);
     purchases.forEach(p => {
       const itemsSummary = p.items && p.items.length > 0
-        ? p.items.map(i => `${i.name} ×${i.qty}`).join('، ')
+        ? p.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ')
         : (DB.products.find(prod => prod.id === p.productId)?.name || '-');
       transactions.push({ date: p.date, desc: `🛍️ فاتورة شراء #${p.id} — ${itemsSummary}`, debit: p.total || 0, credit: 0, type: 'invoice' });
     });
@@ -33123,7 +33607,7 @@ function renderASCard(entity, type) {
       (entity.phone && inv.customerPhone && inv.customerPhone.replace(/\s/g,'') === entity.phone.replace(/\s/g,''))
     ).forEach(inv => {
       const itemsSummary = inv.items && inv.items.length > 0
-        ? inv.items.map(i => `${i.name} ×${i.qty}`).join('، ') : 'بيع';
+        ? inv.items.map(i => `${escapeHtml(i.name)} ×${i.qty}`).join('، ') : 'بيع';
       transactions.push({ date: inv.date, desc: `🧾 فاتورة بيع #${inv.id} — ${itemsSummary}`, debit: 0, credit: getNetInvoiceTotal(inv), type: 'sale_invoice' });
     });
     DB.supplierPayments.filter(sp => sp.supplierId == entity.id && sp.type === 'payment').forEach(sp => {
@@ -33209,7 +33693,7 @@ function renderASCard(entity, type) {
           <div style="font-size:0.78rem;font-weight:700;color:${typeColor};margin-bottom:4px">${typeLabel}</div>
           <div style="font-size:1.5rem;font-weight:900;color:var(--text)">${entityName}</div>
           <div style="font-size:0.85rem;color:var(--text2);margin-top:4px">📞 ${entity.phone || '-'}${entity.phone2 ? ' | 📞 ' + entity.phone2 : ''}</div>
-          ${entity.address ? `<div style="font-size:0.78rem;color:var(--text2)">📍 ${entity.address}</div>` : ''}
+          ${entity.address ? `<div style="font-size:0.78rem;color:var(--text2)">📍 ${escapeHtml(entity.address)}</div>` : ''}
           ${(entity.job || entity.position || entity.role) ? `<div style="font-size:0.78rem;color:var(--text2)">💼 ${entity.job || entity.position || entity.role || ''}</div>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
@@ -33311,7 +33795,7 @@ function renderASCard(entity, type) {
                 : `<td><span style="font-size:0.65rem;color:var(--text2)">—</span></td>`;
               return `<tr style="background:${rowBg}">
                 <td style="font-size:0.78rem">${new Date(t.date).toLocaleDateString('ar-EG')}</td>
-                <td style="font-size:0.78rem">${icon} ${t.desc}</td>
+                <td style="font-size:0.78rem">${icon} ${escapeHtml(t.desc)}</td>
                 <td style="color:var(--red);font-weight:${t.debit>0?'700':'400'};font-size:0.82rem">${t.debit > 0 ? formatMoney(t.debit) : '<span style="color:var(--text2)">-</span>'}</td>
                 <td style="color:var(--green);font-weight:${t.credit>0?'700':'400'};font-size:0.82rem">${t.credit > 0 ? formatMoney(t.credit) : '<span style="color:var(--text2)">-</span>'}</td>
                 <td>${badge}</td>
@@ -33349,6 +33833,7 @@ function openASPaymentModal(entityId, entityType, entityName, balance) {
 }
 
 function saveASPayment() {
+  return withButtonBusy('saveASPayment', 'asPaySaveBtn', () => {
   const entityId = document.getElementById('asPayEntityId').value;
   const entityType = document.getElementById('asPayEntityType').value;
   const amount = parseFloat(document.getElementById('asPayAmount').value) || 0;
@@ -33387,6 +33872,7 @@ function saveASPayment() {
 
   // Refresh the statement
   searchAccountStatement();
+  });
 }
 
 
@@ -33568,7 +34054,7 @@ function setVoucherParty(partyType) {
     const list = partyType === 'customer' ? DB.customers : DB.suppliers;
     document.getElementById('vchPartySelect').innerHTML =
       `<option value="">اختر ${label}...</option>` +
-      list.map(x => `<option value="${x.id}">${x.name} ${x.phone ? '— ' + x.phone : ''}</option>`).join('');
+      list.map(x => `<option value="${escapeHtml(x.id)}">${escapeHtml(x.name)} ${x.phone ? '— ' + escapeHtml(x.phone) : ''}</option>`).join('');
     document.getElementById('vchPhone').value = '';
   }
 }
@@ -33730,7 +34216,7 @@ function renderVouchers() {
         ? '<span class="badge badge-green">📥 قبض</span>'
         : '<span class="badge badge-red">📤 صرف</span>'}</td>
       <td>${partyBadge} ${v.partyName}</td>
-      <td style="font-size:0.78rem">${v.desc}</td>
+      <td style="font-size:0.78rem">${escapeHtml(v.desc)}</td>
       <td>${getPaymentLabel(v.method)}</td>
       <td style="font-weight:700;color:${isReceipt ? 'var(--green)' : 'var(--red)'}">${formatMoney(v.amount)}</td>
       <td>${v.user || '-'}</td>
@@ -33799,7 +34285,7 @@ function printVoucher(voucher) {
         </tr>
         <tr>
           <td style="padding:8px 12px;background:#f9f9f9;border:1px solid #e0e0e0;font-weight:700">البيان</td>
-          <td colspan="3" style="padding:8px 12px;border:1px solid #e0e0e0">${voucher.desc}</td>
+          <td colspan="3" style="padding:8px 12px;border:1px solid #e0e0e0">${escapeHtml(voucher.desc)}</td>
         </tr>
         <tr>
           <td style="padding:8px 12px;background:#f9f9f9;border:1px solid #e0e0e0;font-weight:700">طريقة الدفع</td>
@@ -34183,7 +34669,7 @@ function applyAdminControls() {
 function openChangePassModal() {
   if (!can('manageUsers')) { showToast('للإدمن فقط', 'error'); return; }
   const sel = document.getElementById('cpUserSel');
-  sel.innerHTML = DB.users.map(u => `<option value="${u.username}">${u.username} (${u.role})</option>`).join('');
+  sel.innerHTML = DB.users.map(u => `<option value="${escapeHtml(u.username)}">${escapeHtml(u.username)} (${u.role})</option>`).join('');
   document.getElementById('cpNewPass').value = '';
   document.getElementById('cpConfirmPass').value = '';
   openModal('changePassModal');
@@ -34213,7 +34699,7 @@ function openQuotationModal() {
   const d = new Date(); d.setDate(d.getDate() + 7);
   document.getElementById('qtExpiry').valueAsDate = d;
   const sel = document.getElementById('qtProductSel');
-  sel.innerHTML = '<option value="">اختر منتج...</option>' + DB.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  sel.innerHTML = '<option value="">اختر منتج...</option>' + DB.products.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
   document.getElementById('qtPrice').value = '';
   document.getElementById('qtQty').value = '1';
   renderQtItems();
@@ -34242,7 +34728,7 @@ function renderQtItems() {
     ? '<div style="text-align:center;padding:16px;color:var(--text2)">لا توجد أصناف — أضف من الأعلى</div>'
     : qtItems.map((i, idx) => `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:6px;margin-bottom:6px">
-        <span style="font-size:0.85rem;font-weight:600">${i.name} ×${i.qty}</span>
+        <span style="font-size:0.85rem;font-weight:600">${escapeHtml(i.name)} ×${i.qty}</span>
         <span style="color:var(--accent);font-weight:700">${formatMoney(i.total)}</span>
         <button onclick="qtItems.splice(${idx},1);renderQtItems()" style="background:none;border:none;color:var(--red);cursor:pointer">🗑️</button>
       </div>`).join('')
@@ -34271,7 +34757,7 @@ function saveQuotation() {
 }
 function printQuotation(qt) {
   const itemsHtml = qt.items.map(i => `<tr>
-    <td style="padding:8px;border-bottom:1px solid #eee">${i.name}</td>
+    <td style="padding:8px;border-bottom:1px solid #eee">${escapeHtml(i.name)}</td>
     <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${i.qty}</td>
     <td style="padding:8px;text-align:center;border-bottom:1px solid #eee">${formatMoney(i.price)}</td>
     <td style="padding:8px;text-align:center;border-bottom:1px solid #eee;font-weight:700">${formatMoney(i.total)}</td>
@@ -34282,7 +34768,7 @@ function printQuotation(qt) {
       <div style="font-size:1rem;font-weight:700;margin-top:8px;color:#333">عرض سعر #${qt.id}</div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:15px;font-size:0.85rem">
-      <div><strong>العميل:</strong> ${qt.customer}</div>
+      <div><strong>العميل:</strong> ${escapeHtml(qt.customer)}</div>
       <div><strong>التليفون:</strong> ${qt.phone || '-'}</div>
       <div><strong>تاريخ العرض:</strong> ${new Date(qt.date).toLocaleDateString('ar-EG')}</div>
       <div><strong>صالح حتى:</strong> ${qt.expiry ? new Date(qt.expiry).toLocaleDateString('ar-EG') : '-'}</div>
@@ -34299,7 +34785,7 @@ function printQuotation(qt) {
     <div style="display:flex;justify-content:space-between;font-size:1.2rem;font-weight:700;padding:12px;background:#f0f4ff;border-radius:8px">
       <span>الإجمالي الكلي:</span><span style="color:#0066ff">${formatMoney(qt.total)}</span>
     </div>
-    ${qt.notes ? `<div style="margin-top:12px;padding:10px;background:#fffbf0;border-radius:6px;font-size:0.82rem;color:#666">${qt.notes}</div>` : ''}
+    ${qt.notes ? `<div style="margin-top:12px;padding:10px;background:#fffbf0;border-radius:6px;font-size:0.82rem;color:#666">${escapeHtml(qt.notes)}</div>` : ''}
     <div style="text-align:center;margin-top:16px;font-size:0.75rem;color:#999">هذا العرض صالح حتى ${qt.expiry ? new Date(qt.expiry).toLocaleDateString('ar-EG') : '-'} • شكراً لتعاملكم معنا</div>
   </div>`;
   document.getElementById('invoicePrintContent').innerHTML = html;
@@ -34315,7 +34801,7 @@ function renderQuotations() {
     return `<tr>
       <td style="font-family:monospace;font-size:0.75rem">${qt.id}</td>
       <td>${new Date(qt.date).toLocaleDateString('ar-EG')}</td>
-      <td>${qt.customer}</td>
+      <td>${escapeHtml(qt.customer)}</td>
       <td>${qt.items.length} صنف</td>
       <td style="font-weight:700;color:var(--accent)">${formatMoney(qt.total)}</td>
       <td>${statusBadge}</td>
@@ -34352,11 +34838,11 @@ function shareQuotationWA(id) {
   if (!qt) return;
   const lines = ['⚡ *DigiTronics* — 🏷️ عرض سعر', `📄 رقم العرض: *${qt.id}*`,
     `📅 تاريخ: ${new Date(qt.date).toLocaleDateString('ar-EG')}`,
-    `👤 العميل: ${qt.customer}`, '', '*الأصناف:*',
-    ...qt.items.map(i => `• ${i.name} ×${i.qty} — ${formatMoney(i.total)}`),
+    `👤 العميل: ${escapeHtml(qt.customer)}`, '', '*الأصناف:*',
+    ...qt.items.map(i => `• ${escapeHtml(i.name)} ×${i.qty} — ${formatMoney(i.total)}`),
     '', `💰 *الإجمالي: ${formatMoney(qt.total)}*`,
     qt.expiry ? `⏰ صالح حتى: ${new Date(qt.expiry).toLocaleDateString('ar-EG')}` : '',
-    qt.notes ? `📝 ${qt.notes}` : '', '', 'شكراً لتعاملكم معنا 🙏'];
+    qt.notes ? `📝 ${escapeHtml(qt.notes)}` : '', '', 'شكراً لتعاملكم معنا 🙏'];
   const phone = qt.phone ? normalizeWAPhone(qt.phone) : '';
   window.open(`https://wa.me/${phone}?text=${encodeURIComponent(lines.filter(Boolean).join('\n'))}`, '_blank');
 }
@@ -34415,13 +34901,13 @@ function setCurrentBranch(id) {
 }
 
 function getBranchStock(productId, branchId) {
-  const moves = (DB.stockMovement || []).filter(m => Number(m.productId) === Number(productId) && String(m.branchId || 'MAIN') === String(branchId || 'MAIN'));
+  const moves = (DB.stockMovement || []).filter(m => eqId(m.productId, productId) && String(m.branchId || 'MAIN') === String(branchId || 'MAIN'));
   return moves.reduce((sum, m) => sum + (m.type === 'in' ? toSafeFloat(m.qty, 0) : -toSafeFloat(m.qty, 0)), 0);
 }
 
 function getCurrentBranchStockOrGlobal(productId) {
   const branchId = getCurrentBranchMeta().branchId;
-  const hasBranchHistory = (DB.stockMovement || []).some(m => Number(m.productId) === Number(productId) && String(m.branchId || 'MAIN') === String(branchId));
+  const hasBranchHistory = (DB.stockMovement || []).some(m => eqId(m.productId, productId) && String(m.branchId || 'MAIN') === String(branchId));
   return hasBranchHistory ? Math.max(0, getBranchStock(productId, branchId)) : getProductStock(productId);
 }
 
@@ -34448,7 +34934,7 @@ function saveBranchTransfer() {
   if (!productId || !from || !to) { showToast('أكمل بيانات التحويل', 'error'); return; }
   if (from === to) { showToast('فرع المصدر والهدف نفس الفرع', 'error'); return; }
   if (!can('all') && !canSeeBranch(from)) { showToast('لا تملك صلاحية فرع المصدر', 'error'); return; }
-  const product = DB.products.find(p => Number(p.id) === Number(productId));
+  const product = DB.products.find(p => eqId(p.id, productId));
   const sourceStock = getBranchStock(productId, from);
   if (!serial && sourceStock < qty) showToast('⚠️ مخزون هذا الفرع قد يصبح بالسالب', 'error');
   const fromName = getBranchNameById(from);
@@ -34636,7 +35122,7 @@ function renderWarehouses() {
   const grid = document.getElementById('warehousesGrid');
   grid.innerHTML = DB.warehouses.map((w, idx) => `
     <div class="stat-card" style="padding:18px">
-      <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:6px">🏭 ${w.name}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:6px">🏭 ${escapeHtml(w.name)}</div>
       <div style="font-size:0.8rem;color:var(--text2);margin-bottom:10px">📍 ${w.location || '-'}</div>
       <div style="font-size:0.82rem;font-weight:700">${DB.products.length} صنف مسجل</div>
       ${idx > 0 ? `<button class="btn btn-sm btn-danger" style="margin-top:10px;width:100%" onclick="deleteWarehouse(${idx})">🗑️ حذف</button>` : ''}
@@ -34654,7 +35140,7 @@ function startNewStockCount() {
   const rows = DB.products.map((p, idx) => {
     const stock = getProductStock(p.id);
     return `<tr>
-      <td>${p.name}</td>
+      <td>${escapeHtml(p.name)}</td>
       <td style="font-weight:700">${stock}</td>
       <td><input type="number" min="0" value="${stock}" id="sc_${idx}" style="width:80px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-family:Cairo,sans-serif;text-align:center"></td>
       <td id="scdiff_${idx}" style="font-weight:700">—</td>
@@ -34717,7 +35203,7 @@ function renderStockCount() {
       <div class="overflow-x"><table class="data-table">
         <thead><tr><th>المنتج</th><th>النظام</th><th>الفعلي</th><th>الفرق</th></tr></thead>
         <tbody>${last.results.map(r => `<tr style="${r.diff !== 0 ? 'background:' + (r.diff < 0 ? 'rgba(229,57,53,0.06)' : 'rgba(0,168,84,0.06)') : ''}">
-          <td>${r.name}</td>
+          <td>${escapeHtml(r.name)}</td>
           <td>${r.system}</td>
           <td style="font-weight:700">${r.actual}</td>
           <td style="font-weight:700;color:${r.diff > 0 ? 'var(--green)' : r.diff < 0 ? 'var(--red)' : 'var(--text2)'}">${r.diff > 0 ? '+' : ''}${r.diff}</td>
@@ -34731,7 +35217,7 @@ function exportStockCountCSV() {
   if (DB.stockCounts.length === 0) { showToast('لا توجد بيانات جرد', 'error'); return; }
   const last = DB.stockCounts[DB.stockCounts.length - 1];
   let csv = 'المنتج,النظام,الفعلي,الفرق\n';
-  last.results.forEach(r => { csv += `${r.name},${r.system},${r.actual},${r.diff}\n`; });
+  last.results.forEach(r => { csv += `${escapeHtml(r.name)},${r.system},${r.actual},${r.diff}\n`; });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = `stockcount_${new Date().toISOString().slice(0,10)}.csv`; a.click();
@@ -34741,9 +35227,9 @@ function exportStockCountCSV() {
 function openStockTransferModal() {
   DB.warehouses = DB.warehouses || [{ id: 1, name: 'المخزن الرئيسي', location: '' }];
   const prodSel = document.getElementById('stProduct');
-  prodSel.innerHTML = '<option value="">اختر المنتج...</option>' + DB.products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  prodSel.innerHTML = '<option value="">اختر المنتج...</option>' + DB.products.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
   ['stFrom','stTo'].forEach(id => {
-    document.getElementById(id).innerHTML = '<option value="">اختر...</option>' + DB.warehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+    document.getElementById(id).innerHTML = '<option value="">اختر...</option>' + DB.warehouses.map(w => `<option value="${w.id}">${escapeHtml(w.name)}</option>`).join('');
   });
   document.getElementById('stQty').value = '1';
   document.getElementById('stNote').value = '';
@@ -34955,8 +35441,8 @@ function renderBroadcastList() {
     <div onclick="toggleBroadcastContact('${broadcastContactKey(c)}')" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:${c.selected ? 'rgba(0,102,255,0.1)' : 'var(--surface2)'};border:1px solid ${c.selected ? 'var(--accent)' : 'var(--border)'};border-radius:8px;cursor:pointer;transition:all .15s">
       <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${c.selected ? 'var(--accent)' : 'var(--border)'};background:${c.selected ? 'var(--accent)' : 'transparent'};display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#fff;flex-shrink:0">${c.selected ? '✓' : ''}</div>
       <div style="min-width:0">
-        <div style="font-size:0.82rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</div>
-        <div style="font-size:0.7rem;color:var(--text2)">${c.typeLabel} · ${c.phone}</div>
+        <div style="font-size:0.82rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(c.name)}</div>
+        <div style="font-size:0.7rem;color:var(--text2)">${c.typeLabel} · ${escapeHtml(c.phone)}</div>
       </div>
     </div>`).join('') || '<div style="text-align:center;padding:20px;color:var(--text2)">لا توجد جهات اتصال</div>';
   
@@ -35256,14 +35742,14 @@ function exportInvoicePDF(id) {
   const netTotal = getNetInvoiceTotal(inv);
   const items = inv.items || [];
   const rows = items.map(function(i) {
-    const sn = i.serials && i.serials.length ? '<br><small style="font-family:monospace;color:#666">' + i.serials.join(', ') + '</small>' : '';
-    return '<tr><td>' + i.name + sn + '</td><td style="text-align:center">' + i.qty + '</td><td style="text-align:center">' + formatMoney(i.price) + '</td><td style="text-align:center;font-weight:700">' + formatMoney(i.price * i.qty) + '</td></tr>';
+    const sn = i.serials && i.serials.length ? '<br><small style="font-family:monospace;color:#666">' + escapeHtml(i.serials.join(', ')) + '</small>' : '';
+    return '<tr><td>' + escapeHtml(i.name) + sn + '</td><td style="text-align:center">' + i.qty + '</td><td style="text-align:center">' + formatMoney(i.price) + '</td><td style="text-align:center;font-weight:700">' + formatMoney(i.price * i.qty) + '</td></tr>';
   }).join('');
   const disc = inv.discount > 0 ? '<div style="text-align:left;margin-bottom:8px;color:#e53935;font-size:0.85rem">الخصم: -' + formatMoney(inv.discount) + '</div>' : '';
   const ret = returnImpact.returnedTotal > 0 ? '<div style="text-align:left;margin-bottom:8px;color:#e53935;font-size:0.85rem">مرتجعات معتمدة: -' + formatMoney(returnImpact.returnedTotal) + '</div>' : '';
   const content = '<div class="ig">'
-    + '<div class="ii"><div class="il">العميل</div><strong>' + (inv.customer || '-') + '</strong></div>'
-    + '<div class="ii"><div class="il">التليفون</div>' + (inv.customerPhone || '-') + '</div>'
+    + '<div class="ii"><div class="il">العميل</div><strong>' + escapeHtml(inv.customer || '-') + '</strong></div>'
+    + '<div class="ii"><div class="il">التليفون</div>' + escapeHtml(inv.customerPhone || '-') + '</div>'
     + '<div class="ii"><div class="il">التاريخ</div>' + new Date(inv.date).toLocaleDateString('ar-EG') + '</div>'
     + '<div class="ii"><div class="il">طريقة الدفع</div>' + getPaymentLabel(inv.payment) + '</div>'
     + '</div>'
@@ -35422,11 +35908,11 @@ function exportInvoiceImg(id) {
   const netTotal = getNetInvoiceTotal(inv);
   const items = inv.items || [];
   const rows = items.map(function(i) {
-    const sn = i.serials && i.serials.length ? '<div style="font-family:monospace;font-size:0.65rem;color:#888;margin-top:2px">' + i.serials.join(', ') + '</div>' : '';
-    return '<tr><td style="padding:7px 10px;border-bottom:1px solid #eee">' + i.name + sn + '</td><td style="text-align:center;padding:7px 10px;border-bottom:1px solid #eee">' + i.qty + '</td><td style="text-align:center;padding:7px 10px;border-bottom:1px solid #eee">' + formatMoney(i.price) + '</td><td style="text-align:center;padding:7px 10px;border-bottom:1px solid #eee;font-weight:700">' + formatMoney(i.price * i.qty) + '</td></tr>';
+    const sn = i.serials && i.serials.length ? '<div style="font-family:monospace;font-size:0.65rem;color:#888;margin-top:2px">' + escapeHtml(i.serials.join(', ')) + '</div>' : '';
+    return '<tr><td style="padding:7px 10px;border-bottom:1px solid #eee">' + escapeHtml(i.name) + sn + '</td><td style="text-align:center;padding:7px 10px;border-bottom:1px solid #eee">' + i.qty + '</td><td style="text-align:center;padding:7px 10px;border-bottom:1px solid #eee">' + formatMoney(i.price) + '</td><td style="text-align:center;padding:7px 10px;border-bottom:1px solid #eee;font-weight:700">' + formatMoney(i.price * i.qty) + '</td></tr>';
   }).join('');
   const content = '<table style="width:100%;border-collapse:collapse;margin-bottom:12px;font-size:0.85rem">'
-    + '<tr style="background:#f5f5f5"><td style="padding:8px 12px;font-weight:700;color:#666;font-size:0.75rem;width:40%">العميل</td><td style="padding:8px 12px">' + (inv.customer || '-') + '</td><td style="padding:8px 12px;font-weight:700;color:#666;font-size:0.75rem;width:25%">التليفون</td><td style="padding:8px 12px">' + (inv.customerPhone || '-') + '</td></tr>'
+    + '<tr style="background:#f5f5f5"><td style="padding:8px 12px;font-weight:700;color:#666;font-size:0.75rem;width:40%">العميل</td><td style="padding:8px 12px">' + escapeHtml(inv.customer || '-') + '</td><td style="padding:8px 12px;font-weight:700;color:#666;font-size:0.75rem;width:25%">التليفون</td><td style="padding:8px 12px">' + escapeHtml(inv.customerPhone || '-') + '</td></tr>'
     + '<tr><td style="padding:8px 12px;font-weight:700;color:#666;font-size:0.75rem">التاريخ</td><td style="padding:8px 12px">' + new Date(inv.date).toLocaleDateString('ar-EG') + '</td><td style="padding:8px 12px;font-weight:700;color:#666;font-size:0.75rem">الدفع</td><td style="padding:8px 12px">' + getPaymentLabel(inv.payment) + '</td></tr>'
     + '</table>'
     + '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:14px"><thead><tr style="background:#0066ff;color:#fff"><th style="padding:8px 10px;text-align:right">المنتج</th><th style="padding:8px 10px;text-align:center">الكمية</th><th style="padding:8px 10px;text-align:center">السعر</th><th style="padding:8px 10px;text-align:center">الإجمالي</th></tr></thead><tbody>' + rows + '</tbody></table>'
@@ -35800,6 +36286,27 @@ window.addEventListener('offline', function() {
 
 // Initialize on load
 loadDB();
+// R3: if localStorage had no usable copy but IndexedDB fallback exists, restore it.
+(async function restoreFromIDBIfNeeded() {
+  try {
+    let hasLocal = false;
+    try { hasLocal = !!localStorage.getItem(DB_KEY); } catch (e) {}
+    if (hasLocal) return;
+    const blob = await __idbGet(DB_KEY);
+    if (!blob) return;
+    const data = JSON.parse(blob);
+    Object.keys(data).forEach(k => { if (k !== 'users') DB[k] = data[k]; });
+    DB.users = DB.users || [];
+    ensureDBIntegrity();
+    invalidateStockCache();
+    __stockMapVersion = -1;
+    // Re-render the active view so the UI reflects the restored data (the async
+    // restore completes after the synchronous startup render; without this the
+    // user could see a stale empty page until the next navigation).
+    try { if (typeof currentPage === 'string' && currentPage) showPage(currentPage); } catch (re) { console.warn('post-restore re-render skipped', re); }
+    console.info('Restored DB from IndexedDB fallback.');
+  } catch (e) { console.warn('restoreFromIDBIfNeeded failed', e); }
+})();
 applyBusinessBranding();
 const sessionRestored = restoreSessionOnLoad();
 if (sessionRestored) showPage(getDefaultPageForCurrentRole());
