@@ -874,6 +874,8 @@ body.accent-orange{--accent:#ea580c;--accent2:#c2410c;--accent-color:#ea580c;}
 
 /* WARRANTY */
 .warranty-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;}
+.autoDistStep{flex:1;padding:8px 12px;text-align:center;border-radius:8px;font-size:0.82rem;font-weight:700;background:var(--surface2);color:var(--text2);cursor:default;transition:all 0.2s;}
+.autoDistStep.active{background:var(--accent);color:#fff;}
 
 /* FOOTER */
 .app-footer{margin-top:30px;padding:20px;border-top:1px solid var(--border);text-align:center;}
@@ -6128,6 +6130,31 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     <button class="btn btn-outline" onclick="closeModal('voucherPrintModal')">إغلاق</button>
     <button class="btn btn-accent" onclick="window.print()">🖨️ طباعة</button>
   </div>
+</div></div>
+
+<!-- Auto Distribution Wizard Modal -->
+<div class="modal-overlay" id="autoDistModal"><div class="modal modal-xl" style="max-height:94vh;overflow-y:auto">
+  <div class="modal-title" id="autoDistTitle">📊 التوزيع التلقائي للأرباح<button class="modal-close" onclick="closeModal('autoDistModal')">&times;</button></div>
+  <div id="autoDistSteps" style="display:flex;gap:4px;margin-bottom:16px">
+    <div class="autoDistStep active" data-step="1">1. الفترة والمبلغ</div>
+    <div class="autoDistStep" data-step="2">2. المعاينة والتعديل</div>
+    <div class="autoDistStep" data-step="3">3. التأكيد</div>
+  </div>
+  <div id="autoDistStep1" class="autoDistStepContent"></div>
+  <div id="autoDistStep2" class="autoDistStepContent" style="display:none"></div>
+  <div id="autoDistStep3" class="autoDistStepContent" style="display:none"></div>
+</div></div>
+
+<!-- Auto Distribution History Modal -->
+<div class="modal-overlay" id="autoDistHistoryModal"><div class="modal modal-xl" style="max-height:94vh;overflow-y:auto">
+  <div class="modal-title">📊 سجل دفعات التوزيع التلقائي<button class="modal-close" onclick="closeModal('autoDistHistoryModal')">&times;</button></div>
+  <div id="autoDistHistoryContent"></div>
+</div></div>
+
+<!-- Auto Distribution Detail Modal -->
+<div class="modal-overlay" id="autoDistDetailModal"><div class="modal modal-xl" style="max-height:94vh;overflow-y:auto">
+  <div class="modal-title">📋 تفاصيل دفعة التوزيع<button class="modal-close" onclick="closeModal('autoDistDetailModal')">&times;</button></div>
+  <div id="autoDistDetailContent"></div>
 </div></div>
 
 <!-- Quick Sale Modal -->
@@ -29439,6 +29466,8 @@ function ensureCapitalPartnerState() {
   DB.capitalPartners = Array.isArray(DB.capitalPartners) ? DB.capitalPartners : [];
   DB.capitalPartnerSettlements = Array.isArray(DB.capitalPartnerSettlements) ? DB.capitalPartnerSettlements : [];
   DB.capitalPartnerMovements = Array.isArray(DB.capitalPartnerMovements) ? DB.capitalPartnerMovements : [];
+  DB.capitalPartnerDistBatches = Array.isArray(DB.capitalPartnerDistBatches) ? DB.capitalPartnerDistBatches : [];
+  DB.capitalPartnerRetainedEarnings = Array.isArray(DB.capitalPartnerRetainedEarnings) ? DB.capitalPartnerRetainedEarnings : [];
   DB.capitalPartners.forEach(p => {
     const storedCapital = getCapitalPartnerStoredCapital(p);
     if (p.openingCapital == null || toSafeFloat(p.openingCapital, 0) === 0) p.openingCapital = storedCapital;
@@ -29790,6 +29819,8 @@ function renderCapitalPartnersFinancialSection(filters = getFinancialFilters()) 
       <div class="table-header">
         <div class="table-title">🤝 شركاء رأس المال</div>
         <div class="table-actions">
+          <button class="btn btn-accent btn-sm" onclick="openAutoProfitDistWizard()">📊 التوزيع التلقائي للأرباح</button>
+          <button class="btn btn-outline btn-sm" onclick="openDistBatchHistory()">📋 سجل الدفعات</button>
           <button class="btn btn-outline btn-sm" onclick="exportCapitalPartnerReport('csv')">⬇️ CSV</button>
           <button class="btn btn-outline btn-sm" onclick="exportCapitalPartnerReport('json')">⬇️ JSON</button>
           <button class="btn btn-outline btn-sm" onclick="renderFinancialCenter()">🔄 تحديث</button>
@@ -30375,6 +30406,402 @@ function exportCapitalPartnerReport(type = 'csv') {
   a.click();
   URL.revokeObjectURL(a.href);
   logAudit('export capital partner report CSV', 'تصدير تقرير أرباح الشركاء CSV', { module: 'financial', actionType: 'export', description: 'Capital partner CSV export' });
+}
+
+// ==================== Automatic Profit Distribution System ====================
+
+function getNextDistBatchNum() {
+  DB.capitalPartnerDistBatches = DB.capitalPartnerDistBatches || [];
+  const year = new Date().getFullYear();
+  let maxNum = 0;
+  DB.capitalPartnerDistBatches.forEach(b => {
+    const m = String(b.id).match(new RegExp('^DIST-' + year + '-(\\d+)$'));
+    if (m) maxNum = Math.max(maxNum, parseInt(m[1]));
+  });
+  return maxNum + 1;
+}
+
+function getRetainedEarningsBalance() {
+  DB.capitalPartnerRetainedEarnings = DB.capitalPartnerRetainedEarnings || [];
+  return DB.capitalPartnerRetainedEarnings.reduce((sum, re) => sum + toSafeFloat(re.amount, 0), 0);
+}
+
+function getDistPeriodLabel(from, to) {
+  const months = ['', 'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  const d1 = new Date(from + 'T00:00:00');
+  const d2 = new Date(to + 'T00:00:00');
+  if (d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear()) return months[d1.getMonth() + 1] + ' ' + d1.getFullYear();
+  return months[d1.getMonth() + 1] + ' ' + d1.getFullYear() + ' - ' + months[d2.getMonth() + 1] + ' ' + d2.getFullYear();
+}
+
+function openAutoProfitDistWizard() {
+  if (!canManageCapitalPartners()) { permissionDenied(); return; }
+  ensureCapitalPartnerState();
+  const cps = DB.capitalPartners || [];
+  const activeCPs = cps.filter(p => (p.status || 'active') === 'active');
+  if (activeCPs.length === 0) { showToast('لا يوجد شركاء رأس مال نشطين', 'error'); return; }
+  const defaultFrom = localDateString().slice(0, 7) + '-01';
+  const defaultTo = localDateString();
+  _autoDistState = {
+    step: 1, periodFrom: defaultFrom, periodTo: defaultTo,
+    periodLabel: getDistPeriodLabel(defaultFrom, defaultTo),
+    distributionDate: localDateString(), netProfit: 0, distributedAmount: 0,
+    retainedAmount: 0, includeRetained: false, notes: '',
+    partners: activeCPs.map(p => ({
+      partnerId: p.id, name: p.name, percentage: toSafeFloat(p.percentage, 6),
+      calculatedShare: 0, finalAmount: 0, adjustment: 0,
+      excluded: false, tempPercentage: null, manualAmount: null
+    }))
+  };
+  renderAutoDistStep1();
+  openModal('autoDistModal');
+}
+
+function showAutoDistStep(step) {
+  _autoDistState.step = step;
+  [1, 2, 3].forEach(i => {
+    const el = document.getElementById('autoDistStep' + i);
+    if (el) el.style.display = i === step ? 'block' : 'none';
+  });
+  document.querySelectorAll('#autoDistSteps .autoDistStep').forEach(el => {
+    el.classList.toggle('active', parseInt(el.dataset.step) === step);
+  });
+}
+
+function renderAutoDistStep1() {
+  const retainedBalance = getRetainedEarningsBalance();
+  document.getElementById('autoDistStep1').innerHTML = '<div style="margin-bottom:20px">'
+    + '<div class="form-group"><label>الفترة المحاسبية - من</label><input type="date" id="adPeriodFrom" class="search-input" value="' + _autoDistState.periodFrom + '" onchange="onAutoDistPeriodChange()"></div>'
+    + '<div class="form-group"><label>الفترة المحاسبية - إلى</label><input type="date" id="adPeriodTo" class="search-input" value="' + _autoDistState.periodTo + '" onchange="onAutoDistPeriodChange()"></div>'
+    + '<div class="form-group"><label>تاريخ التوزيع</label><input type="date" id="adDistDate" class="search-input" value="' + _autoDistState.distributionDate + '"></div>'
+    + '<div class="form-group"><label>صافي الربح للفترة</label><input type="number" id="adNetProfit" class="search-input" min="0" step="0.01" value="' + _autoDistState.netProfit + '" placeholder="أدخل صافي الربح"></div>'
+    + (retainedBalance > 0 ? '<div class="form-group" style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:10px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="adIncludeRetained" ' + (_autoDistState.includeRetained ? 'checked' : '') + ' onchange="onAutoDistIncludeRetained()"> ➕ إضافة الأرباح المحتجزة السابقة (' + formatMoney(retainedBalance) + ')</label><div style="font-size:0.78rem;color:var(--text2);margin-top:4px">سيتم إضافة ' + formatMoney(retainedBalance) + ' إلى صافي الربح للتوزيع</div></div>' : '')
+    + '<div class="form-group"><label>الأرباح المحتجزة (المبلغ الذي لن يتم توزيعه)</label><input type="number" id="adRetainedAmount" class="search-input" min="0" step="0.01" value="' + _autoDistState.retainedAmount + '" placeholder="0 = توزيع الكل" onchange="onAutoDistRetainedChange()"><div style="font-size:0.78rem;color:var(--text2);margin-top:4px">المبلغ الذي تريد الاحتفاظ به للتوزيعات المستقبلية</div></div>'
+    + '<div class="form-group"><label>ملاحظات</label><input type="text" id="adNotes" class="search-input" value="' + _autoDistState.notes + '" placeholder="اختياري"></div>'
+    + '<div style="background:var(--surface2);border-radius:8px;padding:12px;margin-top:10px">'
+    + '<div style="display:flex;justify-content:space-between;font-size:0.9rem"><span>صافي الربح:</span><strong id="adPreviewNetProfit">' + formatMoney(_autoDistState.netProfit) + '</strong></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:0.9rem"><span>الأرباح المحتجزة:</span><strong id="adPreviewRetained">' + formatMoney(_autoDistState.retainedAmount) + '</strong></div>'
+    + '<div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:900;color:var(--green);border-top:1px solid var(--border);padding-top:8px;margin-top:8px"><span>المبلغ المطلوب توزيعه:</span><strong id="adPreviewDistAmount">' + formatMoney(Math.max(0, _autoDistState.netProfit - _autoDistState.retainedAmount)) + '</strong></div>'
+    + '</div></div>'
+    + '<div class="modal-footer" style="justify-content:space-between"><button class="btn btn-outline" onclick="closeModal(\'autoDistModal\')">إلغاء</button><button class="btn btn-accent" onclick="goToAutoDistStep2()">التالي: المعاينة ➡</button></div>';
+  showAutoDistStep(1);
+}
+
+function onAutoDistPeriodChange() {
+  const from = document.getElementById('adPeriodFrom')?.value || '';
+  const to = document.getElementById('adPeriodTo')?.value || '';
+  if (from && to) { _autoDistState.periodFrom = from; _autoDistState.periodTo = to; _autoDistState.periodLabel = getDistPeriodLabel(from, to); }
+}
+
+function onAutoDistIncludeRetained() { _autoDistState.includeRetained = document.getElementById('adIncludeRetained')?.checked || false; }
+
+function onAutoDistRetainedChange() {
+  _autoDistState.retainedAmount = toSafeFloat(document.getElementById('adRetainedAmount')?.value, 0);
+  const np = toSafeFloat(document.getElementById('adNetProfit')?.value, 0);
+  const el = document.getElementById('adPreviewDistAmount');
+  if (el) el.textContent = formatMoney(Math.max(0, np - _autoDistState.retainedAmount));
+  _autoDistState.netProfit = np;
+}
+
+function goToAutoDistStep2() {
+  _autoDistState.periodFrom = document.getElementById('adPeriodFrom')?.value || _autoDistState.periodFrom;
+  _autoDistState.periodTo = document.getElementById('adPeriodTo')?.value || _autoDistState.periodTo;
+  _autoDistState.periodLabel = getDistPeriodLabel(_autoDistState.periodFrom, _autoDistState.periodTo);
+  _autoDistState.distributionDate = document.getElementById('adDistDate')?.value || _autoDistState.distributionDate;
+  _autoDistState.netProfit = toSafeFloat(document.getElementById('adNetProfit')?.value, 0);
+  _autoDistState.retainedAmount = toSafeFloat(document.getElementById('adRetainedAmount')?.value, 0);
+  _autoDistState.includeRetained = document.getElementById('adIncludeRetained')?.checked || false;
+  _autoDistState.notes = document.getElementById('adNotes')?.value || '';
+  if (!_autoDistState.periodFrom || !_autoDistState.periodTo) { showToast('اختر الفترة المحاسبية', 'error'); return; }
+  if (_autoDistState.netProfit <= 0 && !confirm('صافي الربح يساوي صفر أو أقل. هل تريد المتابعة؟')) return;
+  DB.capitalPartnerDistBatches = DB.capitalPartnerDistBatches || [];
+  const dup = DB.capitalPartnerDistBatches.find(b => b.status === 'completed' && String(b.accountingPeriod?.from) === String(_autoDistState.periodFrom) && String(b.accountingPeriod?.to) === String(_autoDistState.periodTo));
+  if (dup && !confirm('⚠️ توجد دفعة توزيع موجودة بالفعل للفترة ' + _autoDistState.periodLabel + ' (' + dup.id + ').\nهل تريد إنشاء دفعة أخرى؟')) return;
+  const totalPct = _autoDistState.partners.reduce((s, p) => s + (p.tempPercentage != null ? p.tempPercentage : p.percentage), 0);
+  if (Math.abs(totalPct - 100) > 0.01 && !confirm('⚠️ مجموع نسب الشركاء = ' + totalPct.toFixed(2) + '% (يجب أن يكون 100%).\nهل تريد المتابعة مع هذه النسب؟')) return;
+  calculateAutoDistribution();
+  renderAutoDistStep2();
+}
+
+function calculateAutoDistribution() {
+  const netProfit = _autoDistState.includeRetained ? _autoDistState.netProfit + getRetainedEarningsBalance() : _autoDistState.netProfit;
+  _autoDistState.distributedAmount = Math.max(0, netProfit - _autoDistState.retainedAmount);
+  const activePartners = _autoDistState.partners.filter(p => !p.excluded);
+  const totalPct = activePartners.reduce((s, p) => s + (p.tempPercentage != null ? p.tempPercentage : p.percentage), 0);
+  if (totalPct <= 0) { activePartners.forEach(p => { p.calculatedShare = 0; p.finalAmount = 0; p.adjustment = 0; }); return; }
+  let sumFinal = 0;
+  activePartners.forEach((p, i) => {
+    const pct = p.tempPercentage != null ? p.tempPercentage : p.percentage;
+    p.calculatedShare = _autoDistState.distributedAmount * (pct / 100);
+    if (p.manualAmount != null) { p.finalAmount = p.manualAmount; p.adjustment = p.finalAmount - p.calculatedShare; }
+    else if (i === activePartners.length - 1) { p.finalAmount = roundMoney(_autoDistState.distributedAmount - sumFinal); p.adjustment = roundMoney(p.finalAmount - p.calculatedShare); }
+    else { p.finalAmount = roundMoney(p.calculatedShare); p.adjustment = 0; }
+    if (p.manualAmount == null) sumFinal += p.finalAmount;
+  });
+  const li = activePartners.length - 1;
+  if (li >= 0 && activePartners[li].manualAmount == null) {
+    const snl = activePartners.slice(0, li).reduce((s, p) => s + p.finalAmount, 0);
+    activePartners[li].finalAmount = roundMoney(_autoDistState.distributedAmount - snl);
+    activePartners[li].adjustment = roundMoney(activePartners[li].finalAmount - activePartners[li].calculatedShare);
+  }
+}
+
+function renderAutoDistStep2() {
+  const totalPct = _autoDistState.partners.reduce((s, p) => s + (p.tempPercentage != null ? p.tempPercentage : p.percentage), 0);
+  const pctWarn = Math.abs(totalPct - 100) > 0.01;
+  const netProfit = _autoDistState.includeRetained ? _autoDistState.netProfit + getRetainedEarningsBalance() : _autoDistState.netProfit;
+  document.getElementById('autoDistStep2').innerHTML = '<div style="margin-bottom:16px;background:var(--surface2);border-radius:8px;padding:12px">'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85rem">'
+    + '<div><span style="color:var(--text2)">الفترة:</span> <strong>' + _autoDistState.periodLabel + '</strong></div>'
+    + '<div><span style="color:var(--text2)">تاريخ التوزيع:</span> <strong>' + _autoDistState.distributionDate + '</strong></div>'
+    + '<div><span style="color:var(--text2)">صافي الربح:</span> <strong>' + formatMoney(netProfit) + '</strong></div>'
+    + '<div><span style="color:var(--text2)">المبلغ الموزع:</span> <strong style="color:var(--green)">' + formatMoney(_autoDistState.distributedAmount) + '</strong></div>'
+    + (_autoDistState.retainedAmount > 0 ? '<div><span style="color:var(--text2)">الأرباح المحتجزة:</span> <strong style="color:var(--orange)">' + formatMoney(_autoDistState.retainedAmount) + '</strong></div>' : '')
+    + '</div>'
+    + (pctWarn ? '<div style="margin-top:8px;padding:8px;background:rgba(255,152,0,.15);border-radius:6px;color:var(--orange);font-size:0.82rem">⚠️ مجموع النسب = ' + totalPct.toFixed(2) + '% — يجب أن يكون 100%</div>' : '')
+    + '</div>'
+    + '<div class="overflow-x" style="margin-bottom:12px"><table class="data-table" style="font-size:0.82rem"><thead><tr><th style="width:30px">استبعاد</th><th>الشريك</th><th style="width:80px">النسبة %</th><th style="width:120px">النصيب المحسوب</th><th style="width:90px">تعديل يدوي</th><th style="width:120px">المبلغ النهائي</th><th style="width:60px">الفرق</th></tr></thead><tbody>'
+    + _autoDistState.partners.map(function(p, i) {
+      const pct = p.tempPercentage != null ? p.tempPercentage : p.percentage;
+      return '<tr style="' + (p.excluded ? 'opacity:0.5;text-decoration:line-through' : '') + '">'
+        + '<td style="text-align:center"><input type="checkbox" ' + (p.excluded ? 'checked' : '') + ' onchange="onAutoDistToggleExclude(' + i + ', this.checked)" style="width:18px;height:18px;cursor:pointer"></td>'
+        + '<td><strong>' + escapeHtml(p.name) + '</strong></td>'
+        + '<td><input type="number" class="search-input" style="width:70px;padding:4px 6px" min="0" max="100" step="0.01" value="' + pct + '" ' + (p.excluded ? 'disabled' : '') + ' onchange="onAutoDistChangePercent(' + i + ', this.value)"></td>'
+        + '<td style="text-align:right;font-weight:700">' + formatMoney(p.calculatedShare) + '</td>'
+        + '<td><input type="number" class="search-input" style="width:80px;padding:4px 6px" min="0" step="0.01" value="' + (p.manualAmount != null ? p.manualAmount : '') + '" placeholder="تلقائي" ' + (p.excluded ? 'disabled' : '') + ' onchange="onAutoDistManualAmount(' + i + ', this.value)"></td>'
+        + '<td style="text-align:right;font-weight:900;color:' + (p.finalAmount >= 0 ? 'var(--green)' : 'var(--red)') + '">' + formatMoney(p.finalAmount) + '</td>'
+        + '<td style="text-align:right;font-size:0.75rem;color:var(--text2)">' + (p.adjustment !== 0 ? (p.adjustment > 0 ? '+' : '') + formatMoney(p.adjustment) : '-') + '</td>'
+        + '</tr>';
+    }).join('')
+    + '</tbody><tfoot><tr style="font-weight:900;font-size:0.9rem"><td colspan="3" style="text-align:left">المجموع:</td>'
+    + '<td style="text-align:right">' + formatMoney(_autoDistState.partners.filter(function(p) { return !p.excluded; }).reduce(function(s, p) { return s + p.calculatedShare; }, 0)) + '</td>'
+    + '<td></td>'
+    + '<td style="text-align:right;color:var(--green)">' + formatMoney(_autoDistState.partners.filter(function(p) { return !p.excluded; }).reduce(function(s, p) { return s + p.finalAmount; }, 0)) + '</td>'
+    + '<td></td></tr></tfoot></table></div>'
+    + '<div style="font-size:0.78rem;color:var(--text2);margin-bottom:10px">💡 التعديلات مؤقتة لهذا التوزيع فقط — لا تؤثر على نسب الشركاء الأصلية.</div>'
+    + '<div class="modal-footer" style="justify-content:space-between">'
+    + '<div><button class="btn btn-outline" onclick="showAutoDistStep(1)">➡ السابق</button></div>'
+    + '<div style="display:flex;gap:8px"><button class="btn btn-outline" onclick="closeModal(\'autoDistModal\')">إلغاء</button><button class="btn btn-accent" onclick="goToAutoDistStep3()">التالي: التأكيد ➡</button></div></div>';
+  showAutoDistStep(2);
+}
+
+function onAutoDistToggleExclude(idx, excluded) {
+  if (idx < _autoDistState.partners.length) { _autoDistState.partners[idx].excluded = excluded; if (excluded) { _autoDistState.partners[idx].tempPercentage = null; _autoDistState.partners[idx].manualAmount = null; } }
+  calculateAutoDistribution();
+  renderAutoDistStep2();
+}
+
+function onAutoDistChangePercent(idx, val) {
+  if (idx < _autoDistState.partners.length) { var pct = parseFloat(val); _autoDistState.partners[idx].tempPercentage = (!isNaN(pct) && pct >= 0 && pct <= 100) ? pct : null; }
+  calculateAutoDistribution();
+  renderAutoDistStep2();
+}
+
+function onAutoDistManualAmount(idx, val) {
+  if (idx < _autoDistState.partners.length) { var amt = parseFloat(val); _autoDistState.partners[idx].manualAmount = (!isNaN(amt) && amt >= 0) ? amt : null; }
+  calculateAutoDistribution();
+  renderAutoDistStep2();
+}
+
+function goToAutoDistStep3() { calculateAutoDistribution(); showAutoDistStep(3); renderAutoDistStep3(); }
+
+function renderAutoDistStep3() {
+  const netProfit = _autoDistState.includeRetained ? _autoDistState.netProfit + getRetainedEarningsBalance() : _autoDistState.netProfit;
+  const bNum = getNextDistBatchNum();
+  const bId = 'DIST-' + new Date().getFullYear() + '-' + String(bNum).padStart(4, '0');
+  const act = _autoDistState.partners.filter(function(p) { return !p.excluded; });
+  const tDist = act.reduce(function(s, p) { return s + p.finalAmount; }, 0);
+  document.getElementById('autoDistStep3').innerHTML = '<div style="margin-bottom:20px">'
+    + '<div style="background:rgba(0,200,83,.1);border-radius:10px;padding:16px;margin-bottom:16px">'
+    + '<div style="font-size:1.1rem;font-weight:900;color:var(--green);margin-bottom:8px">📋 ملخص التوزيع التلقائي</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85rem">'
+    + '<div><span style="color:var(--text2)">رقم الدفعة:</span> <strong style="font-family:monospace">' + bId + '</strong></div>'
+    + '<div><span style="color:var(--text2)">الفترة:</span> <strong>' + _autoDistState.periodLabel + '</strong></div>'
+    + '<div><span style="color:var(--text2)">تاريخ التوزيع:</span> <strong>' + _autoDistState.distributionDate + '</strong></div>'
+    + '<div><span style="color:var(--text2)">صافي الربح:</span> <strong>' + formatMoney(netProfit) + '</strong></div>'
+    + '<div><span style="color:var(--text2)">المبلغ الموزع:</span> <strong style="color:var(--green)">' + formatMoney(_autoDistState.distributedAmount) + '</strong></div>'
+    + (_autoDistState.retainedAmount > 0 ? '<div><span style="color:var(--text2)">الأرباح المحتجزة:</span> <strong style="color:var(--orange)">' + formatMoney(_autoDistState.retainedAmount) + '</strong></div>' : '')
+    + (_autoDistState.includeRetained ? '<div><span style="color:var(--text2)">تم تضمين الأرباح المحتجزة السابقة:</span> <strong>' + formatMoney(getRetainedEarningsBalance()) + '</strong></div>' : '')
+    + '<div><span style="color:var(--text2)">عدد الشركاء:</span> <strong>' + act.length + '</strong></div>'
+    + '<div><span style="color:var(--text2)">ملاحظات:</span> <strong>' + (_autoDistState.notes || '-') + '</strong></div>'
+    + '</div></div>'
+    + '<div class="overflow-x" style="margin-bottom:12px"><table class="data-table" style="font-size:0.85rem"><thead><tr><th>الشريك</th><th>النسبة</th><th>النصيب</th><th>التسوية</th><th>المبلغ النهائي</th></tr></thead><tbody>'
+    + act.map(function(p) { var pct = p.tempPercentage != null ? p.tempPercentage : p.percentage; return '<tr><td><strong>' + escapeHtml(p.name) + '</strong></td><td>' + pct.toFixed(2) + '%</td><td style="text-align:right">' + formatMoney(p.calculatedShare) + '</td><td style="text-align:right;color:var(--text2)">' + (p.adjustment !== 0 ? (p.adjustment > 0 ? '+' : '') + formatMoney(p.adjustment) : '-') + '</td><td style="text-align:right;font-weight:900;color:var(--green)">' + formatMoney(p.finalAmount) + '</td></tr>'; }).join('')
+    + '</tbody><tfoot><tr style="font-weight:900"><td colspan="4" style="text-align:left">الإجمالي:</td><td style="text-align:right;color:var(--green)">' + formatMoney(tDist) + '</td></tr></tfoot></table></div>'
+    + (_autoDistState.retainedAmount > 0 ? '<div style="background:rgba(255,152,0,.1);border-radius:8px;padding:12px;font-size:0.85rem"><strong>📌 الأرباح المحتجزة:</strong> ' + formatMoney(_autoDistState.retainedAmount) + ' سيتم تخزينها للتوزيعات المستقبلية.</div>' : '')
+    + '</div>'
+    + '<div class="modal-footer" style="justify-content:space-between">'
+    + '<div><button class="btn btn-outline" onclick="showAutoDistStep(2)">➡ السابق</button><button class="btn btn-outline" onclick="closeModal(\'autoDistModal\')">إلغاء</button></div>'
+    + '<button class="btn btn-green" onclick="confirmAutoDistribution(\'' + bId + '\')" style="font-size:1rem;padding:12px 24px">✅ تأكيد التوزيع وإنشاء السندات</button></div>';
+}
+
+function confirmAutoDistribution(batchId) {
+  if (!canManageCapitalPartners()) { permissionDenied(); return; }
+  ensureCapitalPartnerState();
+  const netProfit = _autoDistState.includeRetained ? _autoDistState.netProfit + getRetainedEarningsBalance() : _autoDistState.netProfit;
+  const act = _autoDistState.partners.filter(function(p) { return !p.excluded; });
+  const tDist = act.reduce(function(s, p) { return s + p.finalAmount; }, 0);
+  if (act.length === 0) { showToast('لا يوجد شركاء للتوزيع', 'error'); return; }
+  if (tDist <= 0) { showToast('المبلغ الموزع يجب أن يكون أكبر من صفر', 'error'); return; }
+  var audit = {
+    excludedPartners: _autoDistState.partners.filter(function(p) { return p.excluded; }).map(function(p) { return { partnerId: p.partnerId, name: p.name }; }),
+    percentageOverrides: _autoDistState.partners.filter(function(p) { return p.tempPercentage != null; }).map(function(p) { return { partnerId: p.partnerId, name: p.name, originalPercentage: p.percentage, tempPercentage: p.tempPercentage }; }),
+    manualOverrides: _autoDistState.partners.filter(function(p) { return p.manualAmount != null; }).map(function(p) { return { partnerId: p.partnerId, name: p.name, calculatedShare: p.calculatedShare, manualAmount: p.manualAmount }; })
+  };
+  var voucherIds = [];
+  var now = localDateTimeString();
+  var user = currentUser ? currentUser.username : 'system';
+  act.forEach(function(p) {
+    if (p.finalAmount <= 0) return;
+    DB.vouchers = DB.vouchers || [];
+    var n = getVchNextNum();
+    var vid = 'PRF-' + String(n).padStart(5, '0');
+    var desc = 'توزيع أرباح تلقائي - ' + _autoDistState.periodLabel + ' - ' + p.name + ' - دفعة ' + batchId;
+    var branchId = document.getElementById('financeBranchFilter')?.value || 'MAIN';
+    DB.vouchers.push({ id: vid, type: 'payment', voucherType: 'profit_distribution', transactionCategory: 'partner_profit', partyType: 'partner', partyId: p.partnerId, partyName: p.name, phone: '', amount: p.finalAmount, method: 'cash', desc: desc, date: localDateWithCurrentTime(_autoDistState.distributionDate), user: user, referenceType: 'partner_profit', referenceId: batchId, branchId: branchId, branchName: getBranchNameById(branchId), distBatchId: batchId });
+    voucherIds.push(vid);
+    addCashEntry('out', p.finalAmount, 'cash', desc, localDateWithCurrentTime(_autoDistState.distributionDate), { referenceType: 'partner_profit', referenceId: vid, entryKind: 'partner_profit_share', sourceModule: 'capital-partners', branchId: branchId, branchName: getBranchNameById(branchId), distBatchId: batchId });
+  });
+  if (_autoDistState.retainedAmount > 0) {
+    DB.capitalPartnerRetainedEarnings = DB.capitalPartnerRetainedEarnings || [];
+    DB.capitalPartnerRetainedEarnings.unshift({ id: 'RE-' + Date.now(), amount: _autoDistState.retainedAmount, sourceBatchId: batchId, accountingPeriod: { from: _autoDistState.periodFrom, to: _autoDistState.periodTo, label: _autoDistState.periodLabel }, createdAt: now, createdBy: user, notes: _autoDistState.notes || 'Retained from ' + batchId });
+  }
+  if (_autoDistState.includeRetained && getRetainedEarningsBalance() > 0) {
+    DB.capitalPartnerRetainedEarnings = DB.capitalPartnerRetainedEarnings || [];
+    var remaining = Math.min(getRetainedEarningsBalance(), _autoDistState.netProfit);
+    while (remaining > 0.01 && DB.capitalPartnerRetainedEarnings.length > 0) {
+      var re = DB.capitalPartnerRetainedEarnings[DB.capitalPartnerRetainedEarnings.length - 1];
+      var deduct = Math.min(remaining, toSafeFloat(re.amount, 0));
+      re.amount = roundMoney(toSafeFloat(re.amount, 0) - deduct);
+      re.usedInBatch = re.usedInBatch || [];
+      re.usedInBatch.push({ batchId: batchId, amount: deduct, usedAt: now });
+      remaining = roundMoney(remaining - deduct);
+      if (re.amount <= 0) DB.capitalPartnerRetainedEarnings.pop();
+    }
+  }
+  DB.capitalPartnerDistBatches = DB.capitalPartnerDistBatches || [];
+  DB.capitalPartnerDistBatches.unshift({ id: batchId, accountingPeriod: { from: _autoDistState.periodFrom, to: _autoDistState.periodTo, label: _autoDistState.periodLabel }, distributionDate: _autoDistState.distributionDate, netProfit: netProfit, distributedAmount: _autoDistState.distributedAmount, retainedAmount: _autoDistState.retainedAmount, notes: _autoDistState.notes || '', partners: JSON.parse(JSON.stringify(_autoDistState.partners)), status: 'completed', createdAt: now, createdBy: user, voucherIds: voucherIds, audit: audit });
+  logActivity('توزيع أرباح تلقائي', 'دفعة ' + batchId + ' - ' + formatMoney(tDist) + ' - ' + act.length + ' شركاء');
+  logAudit('auto profit distribution', 'توزيع أرباح تلقائي ' + batchId, { module: 'financial', actionType: 'auto_profit_distribution', recordId: batchId, description: 'Auto profit distribution batch ' + batchId + ': ' + formatMoney(tDist) + ' to ' + act.length + ' partners', audit: audit }, { save: false });
+  saveDB();
+  closeModal('autoDistModal');
+  renderFinancialCenter();
+  showToast('✅ تم إنشاء دفعة ' + batchId + ' - ' + voucherIds.length + ' سندات');
+}
+
+// ==================== Distribution Batch History ====================
+
+function openDistBatchHistory() {
+  if (!canViewCapitalPartners()) { permissionDenied(); return; }
+  DB.capitalPartnerDistBatches = DB.capitalPartnerDistBatches || [];
+  DB.capitalPartnerRetainedEarnings = DB.capitalPartnerRetainedEarnings || [];
+  var retainedBalance = getRetainedEarningsBalance();
+  var months = ['', 'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  document.getElementById('autoDistHistoryContent').innerHTML = '<div style="margin-bottom:12px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+    + '<div style="font-size:1rem;font-weight:700">📊 سجل دفعات التوزيع التلقائي</div>'
+    + '<div style="font-size:0.85rem">💰 الأرباح المحتجزة: <strong style="color:var(--orange)">' + formatMoney(retainedBalance) + '</strong></div></div>'
+    + (retainedBalance > 0 ? '<div style="margin-top:8px"><details style="font-size:0.82rem;background:var(--surface2);border-radius:6px;padding:8px"><summary style="cursor:pointer;font-weight:700">📜 تفاصيل الأرباح المحتجزة</summary><div style="margin-top:6px">' + (DB.capitalPartnerRetainedEarnings.length === 0 ? '<div style="color:var(--text2)">لا توجد أرباح محتجزة</div>' : DB.capitalPartnerRetainedEarnings.map(function(re) { var dt = new Date(re.createdAt || Date.now()); return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><span>' + months[dt.getMonth() + 1] + ' ' + dt.getFullYear() + ' - ' + (re.sourceBatchId || '-') + '</span><strong style="color:var(--orange)">' + formatMoney(toSafeFloat(re.amount, 0)) + '</strong></div>'; }).join('')) + '</div></details></div>' : '')
+    + '</div>'
+    + (DB.capitalPartnerDistBatches.length === 0 ? '<div class="empty-state">لا توجد دفعات توزيع تلقائي بعد</div>' : DB.capitalPartnerDistBatches.map(function(b) {
+      var tDist = (b.partners || []).filter(function(p) { return !p.excluded; }).reduce(function(s, p) { return s + toSafeFloat(p.finalAmount, 0); }, 0);
+      var dt = new Date(b.createdAt || Date.now());
+      return '<div style="background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:10px">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">'
+        + '<div><strong style="font-family:monospace;font-size:1rem">' + b.id + '</strong> <span class="badge badge-green" style="font-size:0.7rem">مكتمل</span></div>'
+        + '<div style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick="viewDistBatchDetail(\'' + b.id + '\')">📋 عرض</button><button class="btn btn-outline btn-sm" onclick="exportDistBatchReport(\'' + b.id + '\')">📤 تصدير</button><button class="btn btn-outline btn-sm" onclick="exportDistBatchReportExcel(\'' + b.id + '\')">📊 Excel</button></div></div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:8px;font-size:0.8rem">'
+        + '<div><span style="color:var(--text2)">الفترة:</span> <strong>' + (b.accountingPeriod?.label || (b.accountingPeriod?.from + ' - ' + b.accountingPeriod?.to)) + '</strong></div>'
+        + '<div><span style="color:var(--text2)">تاريخ التوزيع:</span> <strong>' + (b.distributionDate || '-') + '</strong></div>'
+        + '<div><span style="color:var(--text2)">صافي الربح:</span> <strong>' + formatMoney(toSafeFloat(b.netProfit, 0)) + '</strong></div>'
+        + '<div><span style="color:var(--text2)">المبلغ الموزع:</span> <strong style="color:var(--green)">' + formatMoney(tDist) + '</strong></div>'
+        + (toSafeFloat(b.retainedAmount, 0) > 0 ? '<div><span style="color:var(--text2)">المحتجز:</span> <strong style="color:var(--orange)">' + formatMoney(toSafeFloat(b.retainedAmount, 0)) + '</strong></div>' : '')
+        + '<div><span style="color:var(--text2)">بواسطة:</span> <strong>' + (b.createdBy || '-') + '</strong></div>'
+        + '<div><span style="color:var(--text2)">التاريخ:</span> <strong>' + dt.toLocaleString('ar-EG') + '</strong></div></div>'
+        + (b.notes ? '<div style="margin-top:6px;font-size:0.78rem;color:var(--text2)">📝 ' + escapeHtml(b.notes) + '</div>' : '')
+        + '<div style="margin-top:6px;font-size:0.75rem;color:var(--text2)">🧾 السندات: ' + ((b.voucherIds || []).map(function(id) { return '<a href="#" onclick="viewVoucherDetail(\'' + id + '\');return false" style="color:var(--accent);text-decoration:underline;margin-left:4px">' + id + '</a>'; }).join('') || 'لا يوجد') + '</div></div>';
+    }).join(''))
+    + '<div class="modal-footer"><button class="btn btn-outline" onclick="closeModal(\'autoDistHistoryModal\')">إغلاق</button></div>';
+  openModal('autoDistHistoryModal');
+}
+
+function viewDistBatchDetail(batchId) {
+  DB.capitalPartnerDistBatches = DB.capitalPartnerDistBatches || [];
+  var b = DB.capitalPartnerDistBatches.find(function(x) { return x.id === batchId; });
+  if (!b) { showToast('الدفعة غير موجودة', 'error'); return; }
+  var act = (b.partners || []).filter(function(p) { return !p.excluded; });
+  var tDist = act.reduce(function(s, p) { return s + toSafeFloat(p.finalAmount, 0); }, 0);
+  var months = ['', 'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  document.getElementById('autoDistDetailContent').innerHTML = '<div style="margin-bottom:16px">'
+    + '<div style="background:rgba(0,200,83,.1);border-radius:10px;padding:16px;margin-bottom:12px">'
+    + '<div style="font-size:1.1rem;font-weight:900;color:var(--green);margin-bottom:8px">📋 دفعة ' + b.id + '</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85rem">'
+    + '<div><span style="color:var(--text2)">الفترة:</span> <strong>' + (b.accountingPeriod?.label || (b.accountingPeriod?.from + ' - ' + b.accountingPeriod?.to)) + '</strong></div>'
+    + '<div><span style="color:var(--text2)">تاريخ التوزيع:</span> <strong>' + (b.distributionDate || '-') + '</strong></div>'
+    + '<div><span style="color:var(--text2)">صافي الربح:</span> <strong>' + formatMoney(toSafeFloat(b.netProfit, 0)) + '</strong></div>'
+    + '<div><span style="color:var(--text2)">المبلغ الموزع:</span> <strong style="color:var(--green)">' + formatMoney(tDist) + '</strong></div>'
+    + (toSafeFloat(b.retainedAmount, 0) > 0 ? '<div><span style="color:var(--text2)">المحتجز:</span> <strong style="color:var(--orange)">' + formatMoney(toSafeFloat(b.retainedAmount, 0)) + '</strong></div>' : '')
+    + '<div><span style="color:var(--text2)">بواسطة:</span> <strong>' + (b.createdBy || '-') + '</strong></div></div></div>'
+    + '<div class="overflow-x" style="margin-bottom:12px"><table class="data-table" style="font-size:0.85rem"><thead><tr><th>الشريك</th><th>النسبة</th><th>النصيب المحسوب</th><th>التسوية</th><th>المبلغ النهائي</th></tr></thead><tbody>'
+    + act.map(function(p) { var pct = p.tempPercentage != null ? p.tempPercentage : p.percentage; var adj = toSafeFloat(p.adjustment, 0); return '<tr><td><strong>' + escapeHtml(p.name) + '</strong></td><td>' + toSafeFloat(pct, 0).toFixed(2) + '%</td><td style="text-align:right">' + formatMoney(toSafeFloat(p.calculatedShare, 0)) + '</td><td style="text-align:right;color:var(--text2)">' + (adj !== 0 ? (adj > 0 ? '+' : '') + formatMoney(adj) : '-') + '</td><td style="text-align:right;font-weight:900;color:var(--green)">' + formatMoney(toSafeFloat(p.finalAmount, 0)) + '</td></tr>'; }).join('')
+    + '</tbody><tfoot><tr style="font-weight:900"><td colspan="4" style="text-align:left">الإجمالي:</td><td style="text-align:right;color:var(--green)">' + formatMoney(tDist) + '</td></tr></tfoot></table></div>'
+    + (b.notes ? '<div style="margin-bottom:10px;font-size:0.85rem"><span style="color:var(--text2)">📝 ملاحظات:</span> ' + escapeHtml(b.notes) + '</div>' : '')
+    + ((b.audit?.excludedPartners?.length || b.audit?.percentageOverrides?.length || b.audit?.manualOverrides?.length) ? '<details style="font-size:0.82rem;background:var(--surface2);border-radius:6px;padding:8px;margin-bottom:10px"><summary style="cursor:pointer;font-weight:700">📋 سجل التدقيق</summary><div style="margin-top:6px">' + (b.audit?.excludedPartners?.length ? '<div style="margin-bottom:4px"><strong>الشركاء المستبعدون:</strong> ' + b.audit.excludedPartners.map(function(e) { return escapeHtml(e.name); }).join('، ') + '</div>' : '') + (b.audit?.percentageOverrides?.length ? '<div style="margin-bottom:4px"><strong>تعديلات النسب:</strong><br>' + b.audit.percentageOverrides.map(function(o) { return escapeHtml(o.name) + ': ' + o.originalPercentage + '% → ' + o.tempPercentage + '%'; }).join('<br>') + '</div>' : '') + (b.audit?.manualOverrides?.length ? '<div><strong>تعديلات يدوية:</strong><br>' + b.audit.manualOverrides.map(function(o) { return escapeHtml(o.name) + ': ' + formatMoney(o.calculatedShare) + ' → ' + formatMoney(o.manualAmount); }).join('<br>') + '</div>' : '') + '</div></details>' : '')
+    + '<div style="font-size:0.82rem"><strong>🧾 السندات:</strong> ' + ((b.voucherIds || []).map(function(id) { return '<a href="#" onclick="viewVoucherDetail(\'' + id + '\');return false" style="color:var(--accent);text-decoration:underline;margin-left:6px">' + id + '</a>'; }).join('') || 'لا يوجد') + '</div></div>'
+    + '<div class="modal-footer" style="justify-content:space-between"><button class="btn btn-outline" onclick="closeModal(\'autoDistDetailModal\');openDistBatchHistory()">➡ الرجوع للقائمة</button><button class="btn btn-outline" onclick="exportDistBatchReport(\'' + b.id + '\')">📤 تصدير</button></div>';
+  openModal('autoDistDetailModal');
+}
+
+function viewVoucherDetail(vchId) {
+  closeModal('autoDistDetailModal'); closeModal('autoDistHistoryModal'); closeModal('autoDistModal');
+  showPage('vouchers');
+  setTimeout(function() {
+    var rows = document.querySelectorAll('#vouchersTbody tr');
+    rows.forEach(function(row) {
+      if (row.textContent.indexOf(vchId) >= 0) { row.style.background = 'rgba(0,200,83,.2)'; row.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(function() { row.style.background = ''; }, 3000); }
+    });
+  }, 500);
+}
+
+function exportDistBatchReport(batchId) {
+  DB.capitalPartnerDistBatches = DB.capitalPartnerDistBatches || [];
+  var b = DB.capitalPartnerDistBatches.find(function(x) { return x.id === batchId; });
+  if (!b) { showToast('الدفعة غير موجودة', 'error'); return; }
+  var act = (b.partners || []).filter(function(p) { return !p.excluded; });
+  var tDist = act.reduce(function(s, p) { return s + toSafeFloat(p.finalAmount, 0); }, 0);
+  var rowsHtml = act.map(function(p) { var pct = p.tempPercentage != null ? p.tempPercentage : p.percentage; var adj = toSafeFloat(p.adjustment, 0); return '<tr><td style="padding:7px 10px;border-bottom:1px solid #eee">' + escapeHtml(p.name) + '</td><td style="text-align:center;padding:7px 10px;border-bottom:1px solid #eee">' + toSafeFloat(pct, 0).toFixed(2) + '%</td><td style="text-align:right;padding:7px 10px;border-bottom:1px solid #eee">' + formatMoney(toSafeFloat(p.calculatedShare, 0)) + '</td><td style="text-align:right;padding:7px 10px;border-bottom:1px solid #eee">' + (adj !== 0 ? (adj > 0 ? '+' : '') + formatMoney(adj) : '-') + '</td><td style="text-align:right;padding:7px 10px;border-bottom:1px solid #eee;font-weight:900">' + formatMoney(toSafeFloat(p.finalAmount, 0)) + '</td></tr>'; }).join('');
+  var htmlContent = '<div style="margin-bottom:14px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;font-size:0.85rem">'
+    + '<div style="background:#f8f8f8;border-radius:6px;padding:8px 12px"><div style="font-size:0.72rem;color:#888">رقم الدفعة</div><strong>' + escapeHtml(b.id) + '</strong></div>'
+    + '<div style="background:#f8f8f8;border-radius:6px;padding:8px 12px"><div style="font-size:0.72rem;color:#888">تاريخ التوزيع</div><strong>' + escapeHtml(b.distributionDate || '-') + '</strong></div>'
+    + '<div style="background:#f8f8f8;border-radius:6px;padding:8px 12px"><div style="font-size:0.72rem;color:#888">الفترة المحاسبية</div><strong>' + (b.accountingPeriod?.label || (b.accountingPeriod?.from + ' - ' + b.accountingPeriod?.to)) + '</strong></div>'
+    + '<div style="background:#f8f8f8;border-radius:6px;padding:8px 12px"><div style="font-size:0.72rem;color:#888">بواسطة</div><strong>' + escapeHtml(b.createdBy || '-') + '</strong></div></div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;font-size:0.85rem">'
+    + '<div style="background:#f0f4ff;border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:0.72rem;color:#666">صافي الربح</div><div style="font-size:1.1rem;font-weight:900;color:#0066ff">' + formatMoney(toSafeFloat(b.netProfit, 0)) + '</div></div>'
+    + '<div style="background:#e8f5e9;border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:0.72rem;color:#666">المبلغ الموزع</div><div style="font-size:1.1rem;font-weight:900;color:#00a854">' + formatMoney(tDist) + '</div></div>'
+    + '<div style="background:#fff3e0;border-radius:6px;padding:10px 12px;text-align:center"><div style="font-size:0.72rem;color:#666">الأرباح المحتجزة</div><div style="font-size:1.1rem;font-weight:900;color:#e65100">' + formatMoney(toSafeFloat(b.retainedAmount, 0)) + '</div></div></div>'
+    + '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr style="background:#0066ff;color:#fff"><th style="padding:8px 10px;text-align:right">الشريك</th><th style="padding:8px 10px;text-align:center">النسبة</th><th style="padding:8px 10px;text-align:right">النصيب المحسوب</th><th style="padding:8px 10px;text-align:right">التسوية</th><th style="padding:8px 10px;text-align:right">المبلغ النهائي</th></tr></thead><tbody>' + rowsHtml + '</tbody></table>'
+    + '<div style="background:#f0f4ff;border-radius:8px;padding:12px 16px;font-size:1rem;font-weight:700;display:flex;justify-content:space-between;margin-top:10px"><span>الإجمالي الموزع</span><span style="color:#00a854">' + formatMoney(tDist) + '</span></div>'
+    + (b.notes ? '<div style="margin-top:10px;font-size:0.82rem;color:#666">📝 ' + escapeHtml(b.notes) + '</div>' : '') + '</div>';
+  showExportMenu('تقرير التوزيع التلقائي - ' + b.id, htmlContent, 'auto_dist_' + b.id);
+}
+
+function exportDistBatchReportExcel(batchId) {
+  DB.capitalPartnerDistBatches = DB.capitalPartnerDistBatches || [];
+  var b = DB.capitalPartnerDistBatches.find(function(x) { return x.id === batchId; });
+  if (!b) return;
+  var act = (b.partners || []).filter(function(p) { return !p.excluded; });
+  var tDist = act.reduce(function(s, p) { return s + toSafeFloat(p.finalAmount, 0); }, 0);
+  var csv = '\uFEFFرقم الدفعة,الفترة,تاريخ التوزيع,صافي الربح,المبلغ الموزع,الأرباح المحتجزة\n';
+  csv += b.id + ',' + (b.accountingPeriod?.label || '') + ',' + (b.distributionDate || '') + ',' + toSafeFloat(b.netProfit, 0) + ',' + tDist + ',' + toSafeFloat(b.retainedAmount, 0) + '\n\n';
+  csv += 'الشريك,النسبة %,النصيب المحسوب,التسوية,المبلغ النهائي\n';
+  act.forEach(function(p) { var pct = p.tempPercentage != null ? p.tempPercentage : p.percentage; csv += p.name + ',' + toSafeFloat(pct, 0).toFixed(2) + ',' + toSafeFloat(p.calculatedShare, 0) + ',' + toSafeFloat(p.adjustment, 0) + ',' + toSafeFloat(p.finalAmount, 0) + '\n'; });
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Auto_Dist_' + b.id + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('✅ تم تصدير التقرير');
 }
 
 function renderFinancialCenter() {
