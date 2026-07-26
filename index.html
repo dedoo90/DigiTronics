@@ -27689,6 +27689,7 @@ function savePartner() {
         : capital,
       createdAt: DB.partners[editingPartnerIndex].createdAt || new Date().toISOString()
     };
+    syncPartnerWithCapitalPartner(DB.partners[editingPartnerIndex]);
     showToast('تم تعديل الشريك');
   } else {
     DB.partners.push({
@@ -27705,9 +27706,32 @@ function savePartner() {
   }
 
   saveDB();
+  ensureCapitalPartnerState();
   editingPartnerIndex = null;
   closeModal('partnerModal');
   renderPartners();
+}
+
+function syncPartnerWithCapitalPartner(partner) {
+  if (!partner || !partner.id) return;
+  ensureCapitalPartnerState();
+  const cp = DB.capitalPartners.find(x => String(x.partnerId) === String(partner.id));
+  if (!cp) {
+    DB.capitalPartners.unshift({
+      id: `CP-${Date.now()}`,
+      partnerId: partner.id,
+      name: partner.name,
+      phone: partner.phone || '',
+      capitalAmount: roundMoney(toSafeFloat(partner.capital, 0)),
+      openingCapital: roundMoney(toSafeFloat(partner.initialCapital || partner.capital, 0)),
+      percentage: toSafeFloat(partner.percent, 50),
+      startDate: (partner.createdAt || localDateString()).slice(0, 10),
+      status: 'active',
+      notes: '',
+      createdAt: localDateTimeString(),
+      createdBy: currentUser ? currentUser.username : 'system'
+    });
+  }
 }
 
 function renderPartners() {
@@ -27742,6 +27766,8 @@ function deletePartner(idx) {
   if (!partner) return;
   DB.partners.splice(idx, 1);
   DB.partnerTransactions = (DB.partnerTransactions || []).filter(t => Number(t.partnerId) !== Number(partner.id));
+  const cpIdx = (DB.capitalPartners || []).findIndex(cp => String(cp.partnerId) === String(partner.id));
+  if (cpIdx >= 0) DB.capitalPartners.splice(cpIdx, 1);
   saveDB();
   renderPartners();
   showToast('تم الحذف');
@@ -29417,6 +29443,67 @@ function ensureCapitalPartnerState() {
     if (p.capitalAmount == null || toSafeFloat(p.capitalAmount, 0) === 0) p.capitalAmount = storedCapital;
     if (p.currentCapital == null) p.currentCapital = getCapitalPartnerCurrentCapital(p.id, p.openingCapital);
   });
+  syncCapitalPartnerRelationship();
+}
+
+function syncCapitalPartnerRelationship() {
+  const partners = DB.partners || [];
+  const capPartners = DB.capitalPartners || [];
+  if (!partners.length && !capPartners.length) return;
+  let changed = false;
+  const linkedPartnerIds = new Set();
+  capPartners.forEach(cp => {
+    if (cp.partnerId != null && partners.find(p => String(p.id) === String(cp.partnerId))) {
+      linkedPartnerIds.add(String(cp.partnerId));
+      return;
+    }
+    const match = findMatchingPartner(cp, partners);
+    if (match) {
+      cp.partnerId = match.id;
+      linkedPartnerIds.add(String(match.id));
+      changed = true;
+    }
+  });
+  partners.forEach(p => {
+    const pid = String(p.id);
+    if (linkedPartnerIds.has(pid)) return;
+    const alreadyLinked = capPartners.find(cp => String(cp.partnerId) === pid);
+    if (alreadyLinked) return;
+    const nameMatch = capPartners.find(cp => cp.partnerId == null && String(cp.name || '').toLowerCase() === String(p.name || '').toLowerCase());
+    if (nameMatch) {
+      nameMatch.partnerId = p.id;
+      linkedPartnerIds.add(pid);
+      changed = true;
+      return;
+    }
+    const cp = {
+      id: `CP-${Date.now()}-${p.id}`,
+      partnerId: p.id,
+      name: p.name,
+      phone: p.phone || '',
+      capitalAmount: roundMoney(toSafeFloat(p.capital, 0)),
+      openingCapital: roundMoney(toSafeFloat(p.initialCapital || p.capital, 0)),
+      percentage: toSafeFloat(p.percent, 50),
+      startDate: (p.createdAt || localDateString()).slice(0, 10),
+      status: 'active',
+      notes: '',
+      createdAt: localDateTimeString(),
+      createdBy: currentUser ? currentUser.username : 'system'
+    };
+    DB.capitalPartners.unshift(cp);
+    linkedPartnerIds.add(pid);
+    changed = true;
+  });
+  if (changed) saveDB();
+}
+
+function findMatchingPartner(capitalPartner, partnersList) {
+  if (capitalPartner.partnerId != null) return partnersList.find(p => String(p.id) === String(capitalPartner.partnerId));
+  const name = String(capitalPartner.name || '').toLowerCase().trim();
+  if (!name) return null;
+  const exact = partnersList.find(p => String(p.name || '').toLowerCase().trim() === name);
+  if (exact) return exact;
+  return null;
 }
 
 function getCapitalPartnerStoredCapital(partner = {}) {
@@ -29865,9 +29952,15 @@ function saveCapitalPartner() {
   const existing = id ? DB.capitalPartners.find(p => String(p.id) === String(id)) : null;
   if (existing) {
     Object.assign(existing, { name, phone, capitalAmount, percentage, startDate, status, notes, updatedAt: localDateTimeString(), updatedBy: currentUser ? currentUser.username : 'system' });
+    if (!existing.partnerId) {
+      const linked = (DB.partners || []).find(p => String(p.name || '').toLowerCase().trim() === String(name).toLowerCase().trim());
+      if (linked) existing.partnerId = linked.id;
+    }
     logAudit('edit partner', `تعديل شريك رأس مال: ${name}`, { module: 'financial', actionType: 'edit_partner', recordId: id, customer: name, description: 'Capital partner updated' }, { save: false });
   } else {
     const newPartner = { id: `CP-${Date.now()}`, name, phone, capitalAmount, percentage, startDate, status, notes, createdAt: localDateTimeString(), createdBy: currentUser ? currentUser.username : 'system' };
+    const linked = (DB.partners || []).find(p => String(p.name || '').toLowerCase().trim() === String(name).toLowerCase().trim());
+    if (linked) newPartner.partnerId = linked.id;
     DB.capitalPartners.unshift(newPartner);
     logAudit('create partner', `إضافة شريك رأس مال: ${name}`, { module: 'financial', actionType: 'create_partner', recordId: newPartner.id, customer: name, description: 'Capital partner created' }, { save: false });
   }
