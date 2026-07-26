@@ -4475,6 +4475,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-green btn-sm" onclick="openVoucherModal('receipt')">📥 سند قبض</button>
           <button class="btn btn-danger btn-sm" onclick="openVoucherModal('payment')">📤 سند صرف</button>
+          <button class="btn btn-yellow btn-sm" onclick="openVoucherModal('payment');setVoucherParty('partner')">₿ توزيع أرباح</button>
         </div>
       </div>
 
@@ -4497,6 +4498,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
           <option value="">كل الأطراف</option>
           <option value="customer">👥 العملاء</option>
           <option value="supplier">🏭 الموردين</option>
+          <option value="partner">₿ الشركاء</option>
           <option value="other">📌 أخرى</option>
         </select>
         <input type="date" id="vchFilterFrom" class="search-input" style="width:150px" onchange="renderVouchers()">
@@ -5928,6 +5930,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     <div style="display:flex;gap:6px;flex-wrap:wrap">
       <button id="vchPartyBtnCustomer" onclick="setVoucherParty('customer')" class="btn btn-accent btn-sm" style="flex:1">👥 عميل</button>
       <button id="vchPartyBtnSupplier" onclick="setVoucherParty('supplier')" class="btn btn-outline btn-sm" style="flex:1">🏭 مورد</button>
+      <button id="vchPartyBtnPartner" onclick="setVoucherParty('partner')" class="btn btn-outline btn-sm" style="flex:1">₿ شريك</button>
       <button id="vchPartyBtnOther" onclick="setVoucherParty('other')" class="btn btn-outline btn-sm" style="flex:1">📌 أخرى</button>
     </div>
     <input type="hidden" id="vchPartyType" value="customer">
@@ -28961,7 +28964,24 @@ function getCapitalPartnerStatementEvents(partnerId) {
     branchName: s.branchName || getBranchNameById(s.branchId || 'MAIN'),
     user: s.paidBy || '-'
   }));
-  return movementEvents.concat(settlementEvents, paymentEvents)
+  const profitKeywords = ['ربح', 'أرباح', 'توزيع', 'profit', 'distribution'];
+  const voucherEvents = (DB.vouchers || []).filter(v => {
+    if (String(v.partyId) !== String(partnerId)) return false;
+    if (v.transactionCategory === 'profit_distribution') return true;
+    if (v.partyType === 'partner') return true;
+    const desc = (v.desc || '').toLowerCase();
+    return profitKeywords.some(kw => desc.includes(kw));
+  }).map(v => ({
+    date: v.date,
+    type: 'توزيع أرباح يدوي',
+    reference: v.id,
+    debit: v.type === 'payment' ? toSafeFloat(v.amount, 0) : 0,
+    credit: v.type === 'receipt' ? toSafeFloat(v.amount, 0) : 0,
+    note: v.desc || '',
+    branchName: v.branchName || getBranchNameById(v.branchId || 'MAIN'),
+    user: v.user || '-'
+  }));
+  return movementEvents.concat(settlementEvents, paymentEvents, voucherEvents)
     .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
 }
 
@@ -33492,23 +33512,35 @@ function openVoucherModal(type) {
 
 function setVoucherParty(partyType) {
   document.getElementById('vchPartyType').value = partyType;
-  ['Customer','Supplier','Other'].forEach(t => {
+  ['Customer','Supplier','Partner','Other'].forEach(t => {
     const btn = document.getElementById('vchPartyBtn' + t);
-    btn.className = t.toLowerCase() === partyType ? 'btn btn-accent btn-sm' : 'btn btn-outline btn-sm';
-    btn.style.flex = '1';
+    if (btn) {
+      btn.className = t.toLowerCase() === partyType ? 'btn btn-accent btn-sm' : 'btn btn-outline btn-sm';
+      btn.style.flex = '1';
+    }
   });
 
   const isOther = partyType === 'other';
-  document.getElementById('vchPartySelectRow').style.display = isOther ? 'none' : 'block';
+  const isPartner = partyType === 'partner';
+  document.getElementById('vchPartySelectRow').style.display = (isOther || isPartner) ? 'none' : 'block';
   document.getElementById('vchPartyTextRow').style.display = isOther ? 'block' : 'none';
   document.getElementById('vchBalanceInfo').style.display = 'none';
 
-  if (!isOther) {
+  if (!isOther && !isPartner) {
     const label = partyType === 'customer' ? 'العميل' : 'المورد';
     document.getElementById('vchPartyLabel').textContent = label;
     const list = partyType === 'customer' ? DB.customers : DB.suppliers;
     document.getElementById('vchPartySelect').innerHTML =
       `<option value="">اختر ${label}...</option>` +
+      list.map(x => `<option value="${x.id}">${x.name} ${x.phone ? '— ' + x.phone : ''}</option>`).join('');
+    document.getElementById('vchPhone').value = '';
+  } else if (isPartner) {
+    document.getElementById('vchPartySelectRow').style.display = 'block';
+    document.getElementById('vchPartyTextRow').style.display = 'none';
+    document.getElementById('vchPartyLabel').textContent = 'شريك';
+    const list = DB.capitalPartners || [];
+    document.getElementById('vchPartySelect').innerHTML =
+      `<option value="">اختر الشريك...</option>` +
       list.map(x => `<option value="${x.id}">${x.name} ${x.phone ? '— ' + x.phone : ''}</option>`).join('');
     document.getElementById('vchPhone').value = '';
   }
@@ -33518,6 +33550,18 @@ function onVoucherPartySelect() {
   const partyType = document.getElementById('vchPartyType').value;
   const id = document.getElementById('vchPartySelect').value;
   if (!id) { document.getElementById('vchBalanceInfo').style.display = 'none'; return; }
+
+  if (partyType === 'partner') {
+    const partner = (DB.capitalPartners || []).find(x => String(x.id) === String(id));
+    if (!partner) return;
+    document.getElementById('vchPhone').value = partner.phone || '';
+    const account = getCapitalPartnerAccount(partner.id);
+    const balance = account ? account.currentBalance : 0;
+    const info = document.getElementById('vchBalanceInfo');
+    info.style.display = 'block';
+    info.innerHTML = `<span>رصيد الشريك الحالي:</span> <strong style="color:${balance >= 0 ? 'var(--green)' : 'var(--red)'}">${formatMoney(balance)}</strong>`;
+    return;
+  }
 
   const list = partyType === 'customer' ? DB.customers : DB.suppliers;
   const entity = list.find(x => x.id == id);
@@ -33559,6 +33603,11 @@ function saveVoucher() {
   if (partyType === 'other') {
     partyName = document.getElementById('vchPartyText').value.trim();
     if (!partyName) { showToast('أدخل اسم الطرف', 'error'); return; }
+  } else if (partyType === 'partner') {
+    partyId = document.getElementById('vchPartySelect').value;
+    const partner = (DB.capitalPartners || []).find(x => String(x.id) === String(partyId));
+    if (!partner) { showToast('اختر الشريك', 'error'); return; }
+    partyName = partner.name;
   } else {
     partyId = document.getElementById('vchPartySelect').value;
     const list = partyType === 'customer' ? DB.customers : DB.suppliers;
@@ -33574,7 +33623,7 @@ function saveVoucher() {
   const voucher = {
     id: vchId,
     type,           // 'receipt' | 'payment'
-    partyType,      // 'customer' | 'supplier' | 'other'
+    partyType,      // 'customer' | 'supplier' | 'partner' | 'other'
     partyId,
     partyName,
     phone,
@@ -33584,14 +33633,29 @@ function saveVoucher() {
     date: voucherDate,
     user: currentUser ? currentUser.username : 'system'
   };
+  if (partyType === 'partner') {
+    const branchId = document.getElementById('financeBranchFilter')?.value || 'MAIN';
+    voucher.transactionCategory = 'profit_distribution';
+    voucher.referenceType = 'capital_partner_profit';
+    voucher.branchId = branchId;
+    voucher.branchName = getBranchNameById(branchId);
+  }
 
   DB.vouchers.push(voucher);
 
   // Update cash flow
   const cashType = type === 'receipt' ? 'in' : 'out';
+  const cashMeta = partyType === 'partner' ? {
+    referenceType: 'capital_partner_profit',
+    referenceId: vchId,
+    entryKind: 'partner_profit_share',
+    sourceModule: 'capital-partners',
+    branchId: voucher.branchId,
+    branchName: voucher.branchName
+  } : {};
   addCashEntry(cashType, amount, method,
     `${type === 'receipt' ? 'سند قبض' : 'سند صرف'} #${vchId} - ${partyName} - ${desc}`,
-    voucherDate);
+    voucherDate, cashMeta);
 
   // NOTE: the voucher record pushed above is already part of the AR/AP transaction
   // ledger (getCustomerArApTransactions / getSupplierArApTransactions). Debt is derived
@@ -33644,6 +33708,8 @@ function renderVouchers() {
       ? '<span class="badge badge-blue">عميل</span>'
       : v.partyType === 'supplier'
       ? '<span class="badge badge-yellow">مورد</span>'
+      : v.partyType === 'partner'
+      ? '<span class="badge" style="background:rgba(0,200,83,.15);color:rgb(0,200,83)">شريك</span>'
       : '<span class="badge" style="background:rgba(124,58,237,.15);color:var(--purple)">أخرى</span>';
     return `<tr>
       <td style="font-weight:700;font-family:monospace">${v.id}</td>
@@ -33688,7 +33754,7 @@ function printVoucher(voucher) {
   const isReceipt = voucher.type === 'receipt';
   const typeAr = isReceipt ? 'سند قبض' : 'سند صرف';
   const typeColor = isReceipt ? '#00a854' : '#e53935';
-  const partyTypeAr = voucher.partyType === 'customer' ? 'عميل' : voucher.partyType === 'supplier' ? 'مورد' : 'أخرى';
+  const partyTypeAr = voucher.partyType === 'customer' ? 'عميل' : voucher.partyType === 'supplier' ? 'مورد' : voucher.partyType === 'partner' ? 'شريك' : 'أخرى';
 
   const html = `
     <div style="font-family:Cairo,sans-serif;color:#000;direction:rtl;max-width:680px;margin:0 auto">
