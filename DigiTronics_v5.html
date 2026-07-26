@@ -14741,7 +14741,6 @@ function showPage(page, options = {}) {
   if (page === 'financial') renderFinancial();
   if (page === 'financial-center') renderFinancialCenter();
   if (page === 'fixed-assets') renderFixedAssetsPage();
-  if (requestedPage === 'capital-partners') setTimeout(() => document.getElementById('capitalPartnersSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   if (requestedPage === 'customer-accounts') setTimeout(() => document.getElementById('arApCustomerSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   if (requestedPage === 'supplier-accounts') setTimeout(() => document.getElementById('arApSupplierSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
   if (page === 'quotations') renderQuotations();
