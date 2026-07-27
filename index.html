@@ -6824,10 +6824,12 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     <button class="tab-btn active" id="empProfileTabInfo" onclick="switchEmpProfileTab('info')">📋 المعلومات الأساسية</button>
     <button class="tab-btn" id="empProfileTabLedger" onclick="switchEmpProfileTab('ledger')">📊 كشف حساب</button>
     <button class="tab-btn" id="empProfileTabDashboard" onclick="switchEmpProfileTab('dashboard')">📈 لوحة الأداء</button>
+    <button class="tab-btn" id="empProfileTabSalary" onclick="switchEmpProfileTab('salary')">💰 سجل الرواتب</button>
   </div>
   <div id="empProfileInfo" style="display:block"></div>
   <div id="empProfileLedger" style="display:none"><div id="empLedgerContent"></div></div>
   <div id="empProfileDashboard" style="display:none"></div>
+  <div id="empProfileSalary" style="display:none"><div id="empSalaryHistoryContent"></div></div>
 </div></div>
 
 <!-- Employee Reports Page -->
@@ -27308,15 +27310,108 @@ function calculateEmployeeFinalSalary(emp, monthKey = getMonthlyPayrollKey()) {
 
 function generateMonthlyPayroll() {
   if (!requirePermission('manageEmployees')) return;
+  const now = new Date();
   const monthKey = getMonthlyPayrollKey();
+  const [curY, curM] = monthKey.split('-').map(Number);
   const employees = getVisibleEmployees().filter(e => (e.status || 'active') === 'active');
-  const rows = employees.map(e => ({ employeeId: e.id, employeeName: e.name, ...calculateEmployeeFinalSalary(e, monthKey), branchId: getEmployeeBranchId(e), branchName: getBranchNameById(getEmployeeBranchId(e)) }));
-  DB.payrollRuns.unshift({ id: Date.now(), month: monthKey, date: localDateTimeString(), rows, total: rows.reduce((s, r) => s + r.finalSalary, 0), user: currentUser ? currentUser.username : 'system', ...getCurrentBranchMeta() });
-  logAudit('إنشاء Payroll شهري', `${monthKey} - ${rows.length} موظف`, { module: 'employees', actionType: 'payroll', recordId: monthKey, description: 'Monthly payroll generated' }, { save: false });
+  const existing = new Set((DB.salaryLog || []).filter(s => s.month === monthKey).map(s => String(s.employeeId)));
+  document.getElementById('payrollGenMonth').value = monthKey;
+  document.getElementById('payrollGenDeduction').checked = false;
+  let html = `<div style="margin-bottom:12px"><label>الشهر: <input type="month" id="payrollGenMonth" value="${monthKey}" onchange="previewPayrollGeneration()"></label>
+    <label style="margin-right:12px"><input type="checkbox" id="payrollGenDeduction" onchange="previewPayrollGeneration()"> خصم أيام الغياب تلقائياً</label></div>
+    <div id="payrollGenPreview"><p>جارٍ المعاينة...</p></div>`;
+  showModalHTML('💰 إنشاء Payroll شهري', html + `<div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('dynamicModal')">إلغاء</button><button class="btn btn-accent" onclick="confirmGeneratePayroll()">✅ تأكيد الإنشاء</button></div>`);
+  previewPayrollGeneration();
+}
+function previewPayrollGeneration() {
+  const monthKey = document.getElementById('payrollGenMonth').value;
+  const autoDeduct = document.getElementById('payrollGenDeduction').checked;
+  const [y, m] = monthKey.split('-').map(Number);
+  const employees = getVisibleEmployees().filter(e => (e.status || 'active') === 'active');
+  const existing = new Set((DB.salaryLog || []).filter(s => s.month === monthKey).map(s => String(s.employeeId)));
+  let total = 0, count = 0, skipped = 0;
+  let rowsHtml = `<table class="table"><thead><tr><th>الموظف</th><th>الراتب</th><th>المكافآت</th><th>الخصم</th><th>الغياب</th><th>الإضافي</th><th>الصافي</th><th>الحالة</th></tr></thead><tbody>`;
+  employees.forEach(e => {
+    const sal = toSafeFloat(e.salary, 0);
+    const b = toSafeFloat(e.bonus, 0) + getMonthlyEmployeeBonuses(e.id, monthKey);
+    const d = toSafeFloat(e.advance, 0) + getMonthlyEmployeePenalties(e.id, monthKey) + getMonthlyEmployeeAdvances(e.id, monthKey);
+    const vacDays = autoDeduct ? toSafeInt(e.vacationDays, 0) : 0;
+    const vacDed = vacDays > 0 ? roundMoney((sal / 30) * vacDays) : 0;
+    const otHours = getEmployeeMonthlyOvertime(e, monthKey);
+    const otVal = roundMoney((sal / 30 / 8) * otHours * 1.25);
+    const net = Math.max(0, roundMoney(sal + b + otVal - d - vacDed));
+    const exists = existing.has(String(e.id));
+    if (!exists) { total += net; count++; }
+    else skipped++;
+    rowsHtml += `<tr${exists ? ' style="opacity:0.5"' : ''}>
+      <td>${escapeHtml(e.name)}</td>
+      <td>${formatMoney(sal)}</td>
+      <td>${formatMoney(b)}</td>
+      <td>${formatMoney(d)}</td>
+      <td>${vacDed > 0 ? formatMoney(vacDed) : '-'}</td>
+      <td>${otVal > 0 ? formatMoney(otVal) + ` (${otHours}h)` : '-'}</td>
+      <td><strong>${formatMoney(net)}</strong></td>
+      <td>${exists ? '✅ موجود' : '🆕 جديد'}</td>
+    </tr>`;
+  });
+  rowsHtml += `</tbody></table>`;
+  document.getElementById('payrollGenPreview').innerHTML = `<p><strong>إجمالي الصافي:</strong> ${formatMoney(total)} | <strong>الموظفين:</strong> ${count} جديد + ${skipped} موجود</p>${rowsHtml}`;
+}
+function confirmGeneratePayroll() {
+  const monthKey = document.getElementById('payrollGenMonth').value;
+  const autoDeduct = document.getElementById('payrollGenDeduction').checked;
+  const employees = getVisibleEmployees().filter(e => (e.status || 'active') === 'active');
+  const existing = new Set((DB.salaryLog || []).filter(s => s.month === monthKey).map(s => String(s.employeeId)));
+  let created = 0, totalNet = 0;
+  const rows = [];
+  employees.forEach(e => {
+    if (existing.has(String(e.id))) return;
+    const sal = toSafeFloat(e.salary, 0);
+    const b = toSafeFloat(e.bonus, 0) + getMonthlyEmployeeBonuses(e.id, monthKey);
+    const d = toSafeFloat(e.advance, 0) + getMonthlyEmployeePenalties(e.id, monthKey) + getMonthlyEmployeeAdvances(e.id, monthKey);
+    const vacDays = autoDeduct ? toSafeInt(e.vacationDays, 0) : 0;
+    const vacDed = vacDays > 0 ? roundMoney((sal / 30) * vacDays) : 0;
+    const otHours = getEmployeeMonthlyOvertime(e, monthKey);
+    const otVal = roundMoney((sal / 30 / 8) * otHours * 1.25);
+    const net = Math.max(0, roundMoney(sal + b + otVal - d - vacDed));
+    rows.push({ employeeId: e.id, employeeName: e.name, salary: sal, bonus: b, advance: d, vacationDeduction: vacDed, overtimeHours: otHours, overtimeValue: otVal, finalSalary: net, branchId: getEmployeeBranchId(e), branchName: getBranchNameById(getEmployeeBranchId(e)) });
+    DB.salaryLog.unshift({
+      date: new Date().toISOString(), month: monthKey,
+      employeeId: e.id, employeeName: e.name,
+      salary: sal, commission: 0, bonus: b, advance: d,
+      overtimeHours: otHours, overtimeValue: otVal,
+      vacationDeduction: vacDed, finalSalary: net,
+      status: 'generated',
+      branchId: getEmployeeBranchId(e),
+      branchName: getBranchNameById(getEmployeeBranchId(e)),
+      user: currentUser ? currentUser.username : 'system'
+    });
+    if (autoDeduct) e.vacationDays = 0;
+    totalNet += net;
+    created++;
+  });
+  if (created > 0) {
+    DB.payrollRuns = Array.isArray(DB.payrollRuns) ? DB.payrollRuns : [];
+    DB.payrollRuns.unshift({ id: Date.now(), month: monthKey, date: localDateTimeString(), rows, total: totalNet, user: currentUser ? currentUser.username : 'system', ...getCurrentBranchMeta() });
+  }
+  logAudit('إنشاء Payroll شهري', `${monthKey} - ${created} موظف`, { module: 'employees', actionType: 'payroll', recordId: monthKey, description: 'Monthly payroll generated' }, { save: false });
   saveDB();
+  closeModal('dynamicModal');
   renderHRManagement();
   renderEmployees();
-  showToast('تم إنشاء Payroll للشهر الحالي');
+  showToast(`✅ تم إنشاء Payroll لـ ${created} موظف للشهر ${monthKey}`);
+}
+function getMonthlyEmployeeBonuses(empId, monthKey) {
+  return (DB.employeeBonuses || []).filter(b => String(b.employeeId) === String(empId) && String(b.date || '').slice(0, 7) === monthKey)
+    .reduce((s, b) => s + toSafeFloat(b.amount, 0), 0);
+}
+function getMonthlyEmployeePenalties(empId, monthKey) {
+  return (DB.employeePenalties || []).filter(p => String(p.employeeId) === String(empId) && String(p.date || '').slice(0, 7) === monthKey)
+    .reduce((s, p) => s + toSafeFloat(p.amount, 0), 0);
+}
+function getMonthlyEmployeeAdvances(empId, monthKey) {
+  return (DB.employeeAdvances || []).filter(a => String(a.employeeId) === String(empId) && String(a.date || '').slice(0, 7) === monthKey)
+    .reduce((s, a) => s + toSafeFloat(a.amount, 0), 0);
 }
 
 function openEmployeeModal() {
@@ -27662,6 +27757,19 @@ function confirmPaySalary(id) {
   const method = document.getElementById('paySalMethod').value;
   const overtimeHours = getEmployeeMonthlyOvertime(emp);
   const total = Math.max(0, roundMoney((emp.salary || 0) + commission + bonus + overtimeValue - advance - vacationDeduction));
+  const monthKey = getMonthlyPayrollKey();
+  
+  // Create payment voucher
+  const nextNum = getVchNextNum();
+  const vchId = 'PAY-' + String(nextNum).padStart(5, '0');
+  DB.vouchers = DB.vouchers || [];
+  DB.vouchers.push({
+    id: vchId, type: 'payment', voucherType: 'salary', transactionCategory: 'salary',
+    partyType: 'employee', partyId: String(emp.id), partyName: emp.name,
+    amount: total, method, desc: `راتب ${emp.name} - ${monthKey}`,
+    date: localDateWithCurrentTime(), user: currentUser ? currentUser.username : 'system',
+    referenceType: 'salary', referenceId: vchId, branchId: getEmployeeBranchId(emp), branchName: getBranchNameById(getEmployeeBranchId(emp))
+  });
   
   emp.lastPaid = new Date().toISOString();
   emp.commission = 0;
@@ -27669,25 +27777,33 @@ function confirmPaySalary(id) {
   emp.advance = 0;
   emp.vacationDays = 0;
   
-  DB.salaryLog.unshift({
+  const salLogEntry = {
     date: new Date().toISOString(),
-    employeeId: id,
-    employeeName: emp.name,
-    salary: emp.salary,
-    commission,
-    bonus,
-    advance,
-    overtimeHours,
-    overtimeValue,
-    vacationDeduction,
-    finalSalary: total,
+    employeeId: id, employeeName: emp.name,
+    salary: emp.salary, commission, bonus, advance,
+    overtimeHours, overtimeValue, vacationDeduction,
+    finalSalary: total, voucherId: vchId,
+    month: monthKey, status: 'paid',
     branchId: getEmployeeBranchId(emp),
     branchName: getBranchNameById(getEmployeeBranchId(emp)),
     user: currentUser ? currentUser.username : 'system'
+  };
+  DB.salaryLog.unshift(salLogEntry);
+  
+  addCashEntry('out', total, method, `راتب #${vchId} - ${emp.name}`, null, {
+    referenceType: 'salary', referenceId: vchId, entryKind: 'salary',
+    sourceModule: 'employees', employeeId: emp.id, employeeName: emp.name,
+    branchId: getEmployeeBranchId(emp), branchName: getBranchNameById(getEmployeeBranchId(emp))
   });
   
-  addCashEntry('out', total, method, `راتب ${emp.name}`, null, { referenceType: 'salary', referenceId: String(id), entryKind: 'salary', sourceModule: 'employees', branchId: getEmployeeBranchId(emp), branchName: getBranchNameById(getEmployeeBranchId(emp)) });
-  logAudit('صرف راتب', `${emp.name} - ${formatMoney(total)}`, { module: 'employees', actionType: 'pay_salary', recordId: String(id), description: 'Salary paid' }, { save: false });
+  addEmployeeLedger(emp.id, {
+    date: localDateWithCurrentTime(), type: 'راتب', reference: vchId,
+    debit: total, credit: 0,
+    notes: `راتب ${monthKey}`, user: currentUser ? currentUser.username : 'system',
+    branchId: getEmployeeBranchId(emp), branchName: getBranchNameById(getEmployeeBranchId(emp))
+  });
+  
+  logAudit('صرف راتب', `${emp.name} - ${formatMoney(total)}`, { module: 'employees', actionType: 'pay_salary', recordId: vchId, description: `Salary ${monthKey}` }, { save: false });
   
   saveDB();
   closeModal('paySalaryModal');
@@ -27695,7 +27811,7 @@ function confirmPaySalary(id) {
   renderHRManagement();
   renderEmployeePerformance();
   renderTreasury();
-  showToast('تم صرف الراتب');
+  showToast(`✅ تم صرف راتب ${emp.name} #${vchId}`);
 }
 
 function deleteEmployee(idx) {
@@ -28066,6 +28182,8 @@ function openEmployeeProfile(empId) {
   const emp = DB.employees.find(e => String(e.id) === String(empId));
   if (!emp) return;
   document.getElementById('profileEmployeeId').value = emp.id;
+  const salBtn = document.getElementById('empProfileTabSalary');
+  if (salBtn) salBtn.onclick = () => switchEmpProfileTab('salary');
   switchEmpProfileTab('info');
   document.getElementById('empProfileInfo').innerHTML = `
     <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
@@ -28081,14 +28199,16 @@ function openEmployeeProfile(empId) {
   openModal('employeeProfileModal');
 }
 function switchEmpProfileTab(tab) {
-  const tabs = ['info','ledger','dashboard'];
+  const tabs = ['info','ledger','dashboard','salary'];
   tabs.forEach(t => {
-    document.getElementById('empProfileTab'+t.charAt(0).toUpperCase()+t.slice(1)).className = 'tab-btn' + (t === tab ? ' active' : '');
+    const btn = document.getElementById('empProfileTab'+t.charAt(0).toUpperCase()+t.slice(1));
+    if (btn) btn.className = 'tab-btn' + (t === tab ? ' active' : '');
     const el = document.getElementById('empProfile'+t.charAt(0).toUpperCase()+t.slice(1));
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
   if (tab === 'ledger') renderEmployeeLedger(document.getElementById('profileEmployeeId').value);
   if (tab === 'dashboard') renderEmpDashboard(document.getElementById('profileEmployeeId').value);
+  if (tab === 'salary') renderEmployeeSalaryHistory(document.getElementById('profileEmployeeId').value);
 }
 function renderEmpDashboard(empId) {
   const emp = DB.employees.find(e => String(e.id) === String(empId));
@@ -28119,6 +28239,39 @@ function renderEmpDashboard(empId) {
       <div class="stat-card ${lastEval && lastEval.percent >= 60 ? 'green' : 'yellow'}" style="padding:12px"><div class="stat-label">آخر تقييم</div><div class="stat-value" style="font-size:.9rem">${lastEval ? lastEval.percent + '%' : 'لا يوجد'}</div></div>
     </div>`;
 }
+function renderEmployeeSalaryHistory(empId) {
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  const records = DB.salaryLog.filter(s => String(s.employeeId) === String(empId)).sort((a, b) => (b.month || b.date || '').localeCompare(a.month || a.date || ''));
+  const content = document.getElementById('empSalaryHistoryContent');
+  if (!content) return;
+  let html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:10px">
+    <div class="stat-card blue" style="padding:10px"><div class="stat-label">إجمالي الرواتب المدفوعة</div><div class="stat-value" style="font-size:.9rem">${formatMoney(records.filter(r=>r.status==='paid').reduce((s,r)=>s+toSafeFloat(r.finalSalary,0),0))}</div></div>
+    <div class="stat-card purple" style="padding:10px"><div class="stat-label">عدد الأشهر</div><div class="stat-value" style="font-size:.9rem">${records.length}</div></div>
+  </div>`;
+  if (records.length === 0) {
+    html += '<p class="text-muted" style="text-align:center;padding:20px">لا توجد سجلات رواتب</p>';
+  } else {
+    html += `<div class="overflow-x"><table class="data-table"><thead><tr><th>الشهر</th><th>الراتب</th><th>مكافأة</th><th>خصم</th><th>غياب</th><th>إضافي</th><th>الصافي</th><th>رقم السند</th><th>الحالة</th><th>التاريخ</th></tr></thead><tbody>`;
+    records.forEach(r => {
+      const status = r.status === 'paid' ? '💰 مدفوع' : r.status === 'generated' ? '📄 مولّد' : '⏳ لم يُصرف';
+      html += `<tr>
+        <td><strong>${r.month || (r.date || '').slice(0, 7)}</strong></td>
+        <td>${formatMoney(r.salary || 0)}</td>
+        <td>${formatMoney((r.bonus || 0) + (r.commission || 0))}</td>
+        <td>${formatMoney(r.advance || 0)}</td>
+        <td>${(r.vacationDeduction || 0) > 0 ? formatMoney(r.vacationDeduction) : '-'}</td>
+        <td>${(r.overtimeValue || 0) > 0 ? formatMoney(r.overtimeValue) : '-'}</td>
+        <td><strong>${formatMoney(r.finalSalary || r.salary)}</strong></td>
+        <td>${r.voucherId || '-'}</td>
+        <td>${status}</td>
+        <td>${r.date ? new Date(r.date).toLocaleDateString('ar-EG') : '-'}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  }
+  content.innerHTML = html;
+}
 function renderAppEmpReports() {
   showPage('emp-reports');
   document.getElementById('empReportContent').innerHTML = '<div style="padding:20px;text-align:center">اختر تقريراً من القائمة</div>';
@@ -28144,7 +28297,16 @@ function loadEmpReport(type) {
   } else if (type === 'penalty') {
     html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card red" style="padding:12px"><div class="stat-label">إجمالي الجزاءات</div><div class="stat-value" style="font-size:1rem" id="repTotalPenalty">0</div></div><div class="stat-card" style="padding:12px"><div class="stat-label">عدد الجزاءات</div><div class="stat-value" style="font-size:1rem" id="repPenaltyCount">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>المبلغ</th><th>السبب</th><th>بواسطة</th></tr></thead><tbody id="repPenaltyTbody"></tbody></table></div>`;
   } else if (type === 'payroll') {
-    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card red" style="padding:12px"><div class="stat-label">إجمالي الرواتب</div><div class="stat-value" style="font-size:1rem" id="repPayTotal">0</div></div><div class="stat-card blue" style="padding:12px"><div class="stat-label">إجمالي المكافآت</div><div class="stat-value" style="font-size:1rem" id="repPayBonus">0</div></div><div class="stat-card green" style="padding:12px"><div class="stat-label">إجمالي الخصم</div><div class="stat-value" style="font-size:1rem" id="repPayDeduct">0</div></div><div class="stat-card purple" style="padding:12px"><div class="stat-label">الصافي</div><div class="stat-value" style="font-size:1rem" id="repPayNet">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>الشهر</th><th>الموظف</th><th>الأساسي</th><th>مكافأة</th><th>سلفة</th><th>خصم</th><th>الصافي</th><th>حالة</th></tr></thead><tbody id="repPayTbody"></tbody></table></div>`;
+    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card red" style="padding:12px"><div class="stat-label">إجمالي الرواتب</div><div class="stat-value" style="font-size:1rem" id="repPayTotal">0</div></div><div class="stat-card blue" style="padding:12px"><div class="stat-label">إجمالي المكافآت</div><div class="stat-value" style="font-size:1rem" id="repPayBonus">0</div></div><div class="stat-card green" style="padding:12px"><div class="stat-label">إجمالي الخصم</div><div class="stat-value" style="font-size:1rem" id="repPayDeduct">0</div></div><div class="stat-card purple" style="padding:12px"><div class="stat-label">الصافي</div><div class="stat-value" style="font-size:1rem" id="repPayNet">0</div></div></div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;border-bottom:1px solid var(--border);align-items:center">
+      <label>الشهر: <input type="month" id="repPayMonth" onchange="renderRepPayroll()"></label>
+      <label>الموظف: <select id="repPayEmp" onchange="renderRepPayroll()"><option value="">الكل</option>${DB.employees.filter(e=>canManageEmployee(e)).map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}</select></label>
+      <label>الحالة: <select id="repPayStatus" onchange="renderRepPayroll()"><option value="">الكل</option><option value="paid">مدفوع</option><option value="generated">مولّد</option></select></label>
+      <label>الفرع: <select id="repPayBranch" onchange="renderRepPayroll()"><option value="">الكل</option>${(DB.branches||[]).map(b=>`<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('')}</select></label>
+      <label>🔍 <input type="text" id="repPaySearch" placeholder="بحث..." oninput="renderRepPayroll()" style="width:150px"></label>
+      <button class="btn btn-sm btn-outline" onclick="exportPayrollCSV()">📥 تصدير CSV</button>
+    </div>
+    <div class="overflow-x"><table class="data-table"><thead><tr><th>الشهر</th><th>الموظف</th><th>الأساسي</th><th>مكافأة</th><th>سلفة</th><th>خصم</th><th>الصافي</th><th>رقم السند</th><th>حالة</th></tr></thead><tbody id="repPayTbody"></tbody></table></div>`;
   }
   content.innerHTML = html;
   setTimeout(() => {
@@ -28223,15 +28385,51 @@ function renderRepPenalty() {
 }
 function renderRepPayroll() {
   const payroll = DB.salaryLog || [];
-  const total = payroll.reduce((s,p)=>s+toSafeFloat(p.salary||0,0),0);
-  const bonus = payroll.reduce((s,p)=>s+toSafeFloat(p.bonus||0,0),0);
-  const deduct = payroll.reduce((s,p)=>s+toSafeFloat(p.advance||0,0)+toSafeFloat(p.vacationDeduction||0,0),0);
-  const net = payroll.reduce((s,p)=>s+toSafeFloat(p.finalSalary||0,0),0);
+  const monthFilter = document.getElementById('repPayMonth')?.value || '';
+  const empFilter = document.getElementById('repPayEmp')?.value || '';
+  const statusFilter = document.getElementById('repPayStatus')?.value || '';
+  const branchFilter = document.getElementById('repPayBranch')?.value || '';
+  const searchVal = (document.getElementById('repPaySearch')?.value || '').toLowerCase().trim();
+  let filtered = [...payroll];
+  if (monthFilter) filtered = filtered.filter(p => p.month === monthFilter);
+  if (empFilter) filtered = filtered.filter(p => String(p.employeeId) === empFilter);
+  if (statusFilter) filtered = filtered.filter(p => (p.status || 'paid') === statusFilter);
+  if (branchFilter) filtered = filtered.filter(p => p.branchId === branchFilter);
+  if (searchVal) filtered = filtered.filter(p => (p.employeeName||'').toLowerCase().includes(searchVal) || (p.voucherId||'').toLowerCase().includes(searchVal));
+  const total = filtered.reduce((s,p)=>s+toSafeFloat(p.salary||0,0),0);
+  const bonus = filtered.reduce((s,p)=>s+toSafeFloat(p.bonus||0,0)+toSafeFloat(p.commission||0,0),0);
+  const deduct = filtered.reduce((s,p)=>s+toSafeFloat(p.advance||0,0)+toSafeFloat(p.vacationDeduction||0,0)+toSafeFloat(p.penaltyDeductions||0,0),0);
+  const net = filtered.reduce((s,p)=>s+toSafeFloat(p.finalSalary||0,0),0);
   document.getElementById('repPayTotal').textContent = formatMoney(total);
   document.getElementById('repPayBonus').textContent = formatMoney(bonus);
   document.getElementById('repPayDeduct').textContent = formatMoney(deduct);
   document.getElementById('repPayNet').textContent = formatMoney(net);
-  document.getElementById('repPayTbody').innerHTML = payroll.slice(0,200).map(p=>`<tr><td>${escapeHtml((p.month||'')+' '+(p.year||''))}</td><td>${escapeHtml(p.employeeName)}</td><td>${formatMoney(p.salary||0)}</td><td>${formatMoney(p.bonus||0)}</td><td>${formatMoney(p.advance||0)}</td><td>${formatMoney((p.vacationDeduction||0)+(p.otherDeductions||0)+(p.penaltyDeductions||0)+(p.insuranceDeductions||0))}</td><td>${formatMoney(p.finalSalary||0)}</td><td>${p.status||'مدفوع'}</td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center">لا توجد بيانات</td></tr>';
+  document.getElementById('repPayTbody').innerHTML = filtered.length ? filtered.slice(0,500).map(p=>`<tr>
+    <td>${escapeHtml(p.month||(p.date||'').slice(0,7))}</td>
+    <td>${escapeHtml(p.employeeName)}</td>
+    <td>${formatMoney(p.salary||0)}</td>
+    <td>${formatMoney((p.bonus||0)+(p.commission||0))}</td>
+    <td>${formatMoney(p.advance||0)}</td>
+    <td>${formatMoney((p.vacationDeduction||0)+(p.penaltyDeductions||0))}</td>
+    <td><strong>${formatMoney(p.finalSalary||0)}</strong></td>
+    <td>${p.voucherId||'-'}</td>
+    <td>${p.status === 'paid' ? '💰 مدفوع' : p.status === 'generated' ? '📄 مولّد' : '⏳ لم يُصرف'}</td>
+  </tr>`).join('') : '<tr><td colspan="9" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function exportPayrollCSV() {
+  const rows = document.querySelectorAll('#repPayTbody tr');
+  if (!rows.length) { showToast('لا توجد بيانات للتصدير', 'error'); return; }
+  let csv = 'الشهر,الموظف,الأساسي,مكافأة,سلفة,خصم,الصافي,رقم السند,الحالة\n';
+  rows.forEach(tr => {
+    const tds = tr.querySelectorAll('td');
+    if (tds.length) csv += Array.from(tds).map(td => `"${td.textContent.trim()}"`).join(',') + '\n';
+  });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `payroll_export_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 // ================= PARTNERS =================
