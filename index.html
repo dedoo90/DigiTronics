@@ -1602,7 +1602,9 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     @media(max-width:900px){.d6-chart-grid{grid-template-columns:1fr}.d6-kpi-grid{grid-template-columns:repeat(3,1fr)}.d6-modules-grid{grid-template-columns:repeat(2,1fr)}}
     @media(max-width:640px){.d6-kpi-grid{grid-template-columns:repeat(2,1fr);padding:12px}.d6-header-center{display:none}.d6-modules-grid{grid-template-columns:1fr}.d6-chart-grid{padding:0 12px 12px}.d6-timeline{margin:0 12px 12px}.d6-quick-actions{padding:0 12px 12px}.d6-alerts-grid{padding:0 12px 12px}.d6-widget-row{padding:0 12px 12px}.d6-section{padding:0 12px}}
     @media(max-width:400px){.d6-kpi-grid{grid-template-columns:1fr}}
-
+    .tab-btn{padding:8px 16px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;border-radius:6px;font-size:.82rem;white-space:nowrap}
+    .tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .tabs-header{display:flex;flex-wrap:wrap;gap:6px}
   </style>
   <nav class="sidebar" id="sidebar">
     <div class="sidebar-logo">◈ OmniStore ERP</div>
@@ -1924,6 +1926,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     <div class="nav-dropdown-item" data-page="hr"><span class="icon">🧑‍💼</span> إدارة HR</div>
     <div class="nav-dropdown-item" data-page="employees"><span class="icon">👤</span> قائمة الموظفين</div>
     <div class="nav-dropdown-item" data-page="employee-performance"><span class="icon">📈</span> تقرير الأداء</div>
+    <div class="nav-dropdown-item" data-page="emp-reports"><span class="icon">📊</span> تقارير الموظفين</div>
     <div class="nav-dropdown-item" data-page="partners"><span class="icon">🤝</span> الشركاء</div>
   </div>
 
@@ -6753,6 +6756,102 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
   <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('employeeLeaveModal')">إلغاء</button><button class="btn btn-accent" onclick="saveEmployeeLeave()">💾 حفظ</button></div>
 </div></div>
 
+<!-- Employee Advance Modal -->
+<div class="modal-overlay" id="employeeAdvanceModal"><div class="modal">
+  <div class="modal-title">💰 سلفة موظف<button class="modal-close" onclick="closeModal('employeeAdvanceModal')">&times;</button></div>
+  <input type="hidden" id="empAdvEmployeeId">
+  <div class="form-group"><label>الموظف</label><input type="text" id="empAdvEmployeeName" readonly></div>
+  <div class="form-group"><label>المبلغ</label><input type="number" id="empAdvAmount" placeholder="0" min="0"></div>
+  <div class="form-group"><label>طريقة الدفع</label><select id="empAdvMethod"><option value="cash">💰 كاش</option><option value="instapay">📲 InstaPay</option><option value="vodafone">📱 Vodafone Cash</option><option value="fawry">🏪 Fawry</option></select></div>
+  <div class="form-group"><label>التاريخ</label><input type="date" id="empAdvDate"></div>
+  <div class="form-group"><label>ملاحظات</label><input type="text" id="empAdvNotes" placeholder="اختياري"></div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('employeeAdvanceModal')">إلغاء</button><button class="btn btn-danger" onclick="saveEmployeeAdvance()">💰 صرف السلفة</button></div>
+</div></div>
+
+<!-- Bonus Modal -->
+<div class="modal-overlay" id="bonusModal"><div class="modal">
+  <div class="modal-title">🎁 مكافأة موظف<button class="modal-close" onclick="closeModal('bonusModal')">&times;</button></div>
+  <input type="hidden" id="bonusEmployeeId">
+  <div class="form-group"><label>الموظف</label><input type="text" id="bonusEmployeeName" readonly></div>
+  <div class="form-group"><label>المبلغ</label><input type="number" id="bonusAmount" placeholder="0" min="0"></div>
+  <div class="form-group"><label>التاريخ</label><input type="date" id="bonusDate"></div>
+  <div class="form-group"><label>السبب</label><input type="text" id="bonusReason" placeholder="سبب المكافأة"></div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('bonusModal')">إلغاء</button><button class="btn btn-green" onclick="saveBonus()">💾 حفظ المكافأة</button></div>
+</div></div>
+
+<!-- Penalty Modal -->
+<div class="modal-overlay" id="penaltyModal"><div class="modal">
+  <div class="modal-title">⚠️ جزاء موظف<button class="modal-close" onclick="closeModal('penaltyModal')">&times;</button></div>
+  <input type="hidden" id="penaltyEmployeeId">
+  <div class="form-group"><label>الموظف</label><input type="text" id="penaltyEmployeeName" readonly></div>
+  <div class="form-group"><label>المبلغ (خصم)</label><input type="number" id="penaltyAmount" placeholder="0" min="0"></div>
+  <div class="form-group"><label>التاريخ</label><input type="date" id="penaltyDate"></div>
+  <div class="form-group"><label>السبب</label><input type="text" id="penaltyReason" placeholder="سبب الجزاء"></div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('penaltyModal')">إلغاء</button><button class="btn btn-yellow" onclick="savePenalty()">💾 حفظ الجزاء</button></div>
+</div></div>
+
+<!-- Absence Modal -->
+<div class="modal-overlay" id="absenceModal"><div class="modal">
+  <div class="modal-title">📅 تسجيل غياب<button class="modal-close" onclick="closeModal('absenceModal')">&times;</button></div>
+  <input type="hidden" id="absEmployeeId">
+  <div class="form-group"><label>الموظف</label><input type="text" id="absEmployeeName" readonly></div>
+  <div class="grid-2"><div class="form-group"><label>عدد الأيام</label><input type="number" id="absDays" value="1" min="1"></div><div class="form-group"><label>التاريخ</label><input type="date" id="absDate"></div></div>
+  <div class="form-group"><label>النوع</label><select id="absPaid"><option value="unpaid">غير مدفوع</option><option value="paid">مدفوع (خصم من الراتب)</option></select></div>
+  <div class="form-group"><label>السبب</label><input type="text" id="absReason" placeholder="اختياري"></div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('absenceModal')">إلغاء</button><button class="btn btn-yellow" onclick="saveAbsence()">💾 حفظ</button></div>
+</div></div>
+
+<!-- Performance Evaluation Modal -->
+<div class="modal-overlay" id="evaluationModal"><div class="modal">
+  <div class="modal-title">📊 تقييم موظف<button class="modal-close" onclick="closeModal('evaluationModal')">&times;</button></div>
+  <input type="hidden" id="evalEmployeeId">
+  <div class="form-group"><label>الموظف</label><input type="text" id="evalEmployeeName" readonly></div>
+  <div class="form-group"><label>الشهر</label><input type="month" id="evalMonth"></div>
+  <div class="grid-2"><div class="form-group"><label>الحضور (١-١٠)</label><input type="number" id="evalAttendance" min="1" max="10" value="5" onchange="autoCalcEvalScore()"></div><div class="form-group"><label>الالتزام (١-١٠)</label><input type="number" id="evalCommitment" min="1" max="10" value="5" onchange="autoCalcEvalScore()"></div></div>
+  <div class="grid-2"><div class="form-group"><label>الجودة (١-١٠)</label><input type="number" id="evalQuality" min="1" max="10" value="5" onchange="autoCalcEvalScore()"></div><div class="form-group"><label>السرعة (١-١٠)</label><input type="number" id="evalSpeed" min="1" max="10" value="5" onchange="autoCalcEvalScore()"></div></div>
+  <div class="grid-2"><div class="form-group"><label>السلوك (١-١٠)</label><input type="number" id="evalBehavior" min="1" max="10" value="5" onchange="autoCalcEvalScore()"></div><div class="form-group"><label>خدمة العملاء (١-١٠)</label><input type="number" id="evalService" min="1" max="10" value="5" onchange="autoCalcEvalScore()"></div></div>
+  <div class="form-group"><label>الانضباط (١-١٠)</label><input type="number" id="evalDiscipline" min="1" max="10" value="5" onchange="autoCalcEvalScore()"></div>
+  <div class="grid-2"><div class="form-group"><label>الدرجة</label><input type="number" id="evalScore" readonly></div><div class="form-group"><label>النسبة %</label><input type="number" id="evalPercent" readonly></div></div>
+  <div class="form-group"><label>ملاحظات المدير</label><input type="text" id="evalNotes" placeholder="اختياري"></div>
+  <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('evaluationModal')">إلغاء</button><button class="btn btn-accent" onclick="saveEvaluation()">💾 حفظ التقييم</button></div>
+</div></div>
+
+<!-- Employee Profile Modal -->
+<div class="modal-overlay" id="employeeProfileModal"><div class="modal" style="max-width:900px">
+  <div class="modal-title">👨‍💼 ملف الموظف<button class="modal-close" onclick="closeModal('employeeProfileModal')">&times;</button></div>
+  <input type="hidden" id="profileEmployeeId">
+  <div class="tabs-header" style="margin-bottom:12px">
+    <button class="tab-btn active" id="empProfileTabInfo" onclick="switchEmpProfileTab('info')">📋 المعلومات الأساسية</button>
+    <button class="tab-btn" id="empProfileTabLedger" onclick="switchEmpProfileTab('ledger')">📊 كشف حساب</button>
+    <button class="tab-btn" id="empProfileTabDashboard" onclick="switchEmpProfileTab('dashboard')">📈 لوحة الأداء</button>
+  </div>
+  <div id="empProfileInfo" style="display:block"></div>
+  <div id="empProfileLedger" style="display:none"><div id="empLedgerContent"></div></div>
+  <div id="empProfileDashboard" style="display:none"></div>
+</div></div>
+
+<!-- Employee Reports Page -->
+<div class="page" id="page-emp-reports">
+  <div class="page-header">
+    <div class="page-title">📊 تقارير الموظفين</div>
+    <div class="table-actions"><button class="btn btn-outline btn-sm" onclick="showPage(currentPage)">🔙 رجوع</button></div>
+  </div>
+  <div class="table-container">
+    <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px;border-bottom:1px solid var(--border)">
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('ledger')">📋 كشوفات حساب</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('salary')">💰 تقرير الرواتب</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('advance')">💵 تقرير السلف</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('attendance')">🕘 تقرير الحضور</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('absence')">📅 تقرير الغياب</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('performance')">📊 تقييم الأداء</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('bonus')">🎁 المكافآت</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('penalty')">⚠️ الجزاءات</button>
+      <button class="btn btn-sm btn-outline" onclick="loadEmpReport('payroll')">📄 ملخص الرواتب</button>
+    </div>
+    <div id="empReportContent" style="padding:15px"><div style="text-align:center;padding:30px;color:var(--text2)">اختر تقريراً من القائمة أعلاه</div></div>
+  </div>
+</div>
+
 <!-- Partner Modal -->
 <div class="modal-overlay" id="partnerModal"><div class="modal">
   <div class="modal-title"><span id="partnerModalTitleText">➕ إضافة شريك</span><button class="modal-close" onclick="closeModal('partnerModal')">&times;</button></div>
@@ -11371,6 +11470,7 @@ function canAccessPage(page) {
   if (can('all')) return true;
   if (page === 'backup') return can('manageSettings') || can('backupExport') || can('backupRestore');
   if (page === 'employees' || page === 'hr') return can('manageEmployees') || can('viewOwnAttendance');
+  if (page === 'emp-reports') return can('manageEmployees') || can('all');
   const rules = {
     dashboard: 'viewDashboard',
     'smart-business': 'viewSmartBusiness',
@@ -14295,7 +14395,7 @@ function getQaModuleDefinitions() {
   return [
     ['Sales','page-pos','saleInvoices'], ['Purchases','page-purchases','purchaseInvoices'], ['Inventory','page-products','products'],
     ['Repairs','page-maintenance','maintenance'], ['Warranty','page-warranty','devices'], ['CRM','page-crm','customers'],
-    ['HR','page-hr','employees'], ['Partners','page-partners','partners'], ['Installments','page-installments','installments'],
+    ['HR','page-hr','employees'], ['HR Reports','page-emp-reports','employees'], ['Partners','page-partners','partners'], ['Installments','page-installments','installments'],
     ['Financial Center','page-financial-center','cashFlow'], ['AR/AP','page-financial-center','arApOpeningBalances'], ['Assets','page-fixed-assets','fixedAssets'],
     ['Workflow','page-approvals','approvals'], ['Automation','page-automation','automationRules'], ['Documents','page-documents','enterpriseDocuments'],
     ['Recovery','page-recovery','enterpriseRecovery'], ['Performance','page-performance-engine','performanceEngine'],
@@ -15113,6 +15213,7 @@ function showPage(page, options = {}) {
   if (page === 'employee-performance') renderEmployeePerformance();
   if (page === 'hr') renderHRManagement();
   if (page === 'employees') renderEmployees();
+  if (page === 'emp-reports') renderAppEmpReports();
   if (page === 'customer-statement') renderCustomerStatementLanding();
   if (page === 'devices') renderDevicesPage();
   if (page === 'partners') renderPartners();
@@ -27027,6 +27128,12 @@ function ensureHRState() {
   DB.employeeOvertime = Array.isArray(DB.employeeOvertime) ? DB.employeeOvertime : [];
   DB.payrollRuns = Array.isArray(DB.payrollRuns) ? DB.payrollRuns : [];
   DB.salaryLog = Array.isArray(DB.salaryLog) ? DB.salaryLog : [];
+  DB.employeeLedger = Array.isArray(DB.employeeLedger) ? DB.employeeLedger : [];
+  DB.employeeAdvances = Array.isArray(DB.employeeAdvances) ? DB.employeeAdvances : [];
+  DB.employeeEvaluations = Array.isArray(DB.employeeEvaluations) ? DB.employeeEvaluations : [];
+  DB.employeeBonuses = Array.isArray(DB.employeeBonuses) ? DB.employeeBonuses : [];
+  DB.employeePenalties = Array.isArray(DB.employeePenalties) ? DB.employeePenalties : [];
+  DB.employeeAbsences = Array.isArray(DB.employeeAbsences) ? DB.employeeAbsences : [];
   ensureBranches();
 }
 
@@ -27467,7 +27574,8 @@ function renderEmployees() {
     <td>${e.lastPaid ? new Date(e.lastPaid).toLocaleDateString('ar-EG') : 'لم يُصرف'}</td>
     <td>
       ${attendanceBtns}
-      ${canFullHR ? `<button class="btn btn-sm btn-green" onclick="paySalary(${e.id})">💰 صرف</button>
+      ${canFullHR ? `<button class="btn btn-sm btn-accent" onclick="openEmployeeProfile(${e.id})">👤 ملف</button>
+      <button class="btn btn-sm btn-green" onclick="paySalary(${e.id})">💰 صرف</button>
       <button class="btn btn-sm btn-yellow" onclick="openEmployeeLeaveModal(${e.id})">🌴 إجازة</button>
       <button class="btn btn-sm btn-outline" onclick="editEmployee(${e.id})">✏️ تعديل</button>
       <button class="btn btn-sm btn-danger" onclick="deleteEmployeeById(${e.id})">🗑️</button>` : ''}
@@ -27645,6 +27753,485 @@ function exportHRReport(type = 'csv') {
   const blob = new Blob(['\uFEFF' + sections], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `DigiTronics_HR_${stamp}.csv`; a.click(); URL.revokeObjectURL(a.href);
   logAudit('تصدير HR CSV', 'HR export', { module: 'employees', actionType: 'export', description: 'HR CSV export' });
+}
+
+// ================= EMPLOYEE ADVANCE =================
+function openEmployeeAdvanceModal(empId) {
+  if (!requirePermission('manageEmployees')) return;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  document.getElementById('empAdvEmployeeId').value = emp.id;
+  document.getElementById('empAdvEmployeeName').value = emp.name;
+  document.getElementById('empAdvAmount').value = '';
+  document.getElementById('empAdvDate').valueAsDate = new Date();
+  document.getElementById('empAdvNotes').value = '';
+  document.getElementById('empAdvMethod').value = 'cash';
+  openModal('employeeAdvanceModal');
+}
+function saveEmployeeAdvance() {
+  if (!requirePermission('manageEmployees')) return;
+  const empId = document.getElementById('empAdvEmployeeId').value;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
+  const amount = parseFloat(document.getElementById('empAdvAmount').value) || 0;
+  if (amount <= 0) { showToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+  const date = document.getElementById('empAdvDate').value || localDateString();
+  const advDate = localDateWithCurrentTime(date);
+  const notes = document.getElementById('empAdvNotes').value.trim();
+  const method = document.getElementById('empAdvMethod').value;
+  const nextNum = getVchNextNum();
+  const vchId = 'PAY-' + String(nextNum).padStart(5, '0');
+  const meta = { referenceType: 'employee_advance', referenceId: vchId, entryKind: 'employee_advance', sourceModule: 'hr', employeeId: emp.id, employeeName: emp.name };
+  const treasuryOk = addTreasuryOutRequired(amount, method, `سلفة موظف - ${emp.name} - ${notes}`, advDate, meta);
+  if (!treasuryOk) return;
+  DB.vouchers = DB.vouchers || [];
+  DB.vouchers.push({
+    id: vchId, type: 'payment', voucherType: 'employee_advance', transactionCategory: 'employee_advance',
+    partyType: 'employee', partyId: String(emp.id), partyName: emp.name,
+    amount, method, desc: notes || `سلفة موظف ${emp.name}`,
+    date: advDate, user: currentUser ? currentUser.username : 'system',
+    referenceType: 'employee_advance', referenceId: vchId, branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  addCashEntry('out', amount, method, `سلفة موظف #${vchId} - ${emp.name}`, advDate, meta);
+  addEmployeeLedger(emp.id, {
+    date: advDate, type: 'سلفة', reference: vchId, debit: amount, credit: 0,
+    notes: notes || 'سلفة موظف', user: currentUser ? currentUser.username : 'system',
+    branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  DB.employeeAdvances = Array.isArray(DB.employeeAdvances) ? DB.employeeAdvances : [];
+  DB.employeeAdvances.push({
+    id: Date.now(), employeeId: emp.id, employeeName: emp.name, amount, date: advDate, notes,
+    voucherId: vchId, method, status: 'paid',
+    user: currentUser ? currentUser.username : 'system',
+    branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  saveDB();
+  closeModal('employeeAdvanceModal');
+  renderEmployees(); renderTreasury();
+  showToast(`✅ تم صرف سلفة ${emp.name} #${vchId}`);
+  logActivity('سلفة موظف', `#${vchId} - ${emp.name} - ${formatMoney(amount)}`);
+  logAudit('سلفة موظف', emp.name, { module: 'hr', actionType: 'advance', recordId: String(emp.id), description: `${formatMoney(amount)} - ${notes}` });
+}
+function getEmpBranch(emp) { return String(emp.branchId || emp.branch || 'MAIN'); }
+
+// ================= EMPLOYEE LEDGER =================
+function addEmployeeLedger(empId, entry) {
+  DB.employeeLedger = Array.isArray(DB.employeeLedger) ? DB.employeeLedger : [];
+  DB.employeeLedger.push({ id: Date.now(), employeeId: String(empId), createdAt: localDateTimeString(), ...entry });
+}
+function getEmployeeLedgerEvents(empId) {
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return [];
+  const ledgerEntries = (DB.employeeLedger || []).filter(e => String(e.employeeId) === String(empId)).map(e => ({
+    date: e.date, type: e.type, reference: e.reference || e.id,
+    debit: toSafeFloat(e.debit, 0), credit: toSafeFloat(e.credit, 0),
+    note: e.notes || '', branchName: e.branchName || getBranchNameById(e.branchId || 'MAIN'), user: e.user || '-'
+  }));
+  const legacyAdvances = (DB.employeeAdvances || []).filter(a => String(a.employeeId) === String(empId)).map(a => ({
+    date: a.date, type: 'سلفة', reference: a.voucherId || `ADV-${a.id}`,
+    debit: toSafeFloat(a.amount, 0), credit: 0,
+    note: a.notes || '', branchName: a.branchName || '-', user: a.user || '-'
+  }));
+  const salaryPayments = (DB.salaryLog || []).filter(s => String(s.employeeId) === String(empId)).map(s => ({
+    date: s.date, type: 'راتب', reference: s.id || s.voucherId || '-',
+    debit: toSafeFloat(s.finalSalary || s.salary || 0, 0), credit: 0,
+    note: `راتب ${s.month || ''} ${s.year || ''}`.trim(), branchName: s.branchName || '-', user: s.user || '-'
+  }));
+  const bonuses = (DB.employeeBonuses || []).filter(b => String(b.employeeId) === String(empId)).map(b => ({
+    date: b.date, type: 'مكافأة', reference: b.voucherId || `BON-${b.id}`,
+    debit: toSafeFloat(b.amount, 0), credit: 0,
+    note: b.reason || '', branchName: b.branchName || '-', user: b.user || '-'
+  }));
+  const penalties = (DB.employeePenalties || []).filter(p => String(p.employeeId) === String(empId)).map(p => ({
+    date: p.date, type: 'جزاء', reference: `PEN-${p.id}`,
+    debit: 0, credit: toSafeFloat(p.amount, 0),
+    note: p.reason || '', branchName: p.branchName || '-', user: p.user || '-'
+  }));
+  return ledgerEntries.concat(legacyAdvances, salaryPayments, bonuses, penalties)
+    .sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+}
+function renderEmployeeLedger(empId) {
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  const events = getEmployeeLedgerEvents(empId);
+  let runningBalance = 0;
+  const rows = events.map(e => {
+    runningBalance += (e.debit || 0) - (e.credit || 0);
+    return `<tr><td>${escapeHtml(new Date(e.date || Date.now()).toLocaleString('ar-EG'))}</td><td>${escapeHtml(e.type)}</td><td>${escapeHtml(e.reference || '-')}</td><td style="color:var(--red)">${formatMoney(e.debit || 0)}</td><td style="color:var(--green)">${formatMoney(e.credit || 0)}</td><td style="font-weight:700">${formatMoney(runningBalance)}</td><td>${escapeHtml(e.user || '-')}</td><td>${escapeHtml(e.note || '-')}</td></tr>`;
+  }).join('');
+  const totalDebit = events.reduce((s, e) => s + (e.debit || 0), 0);
+  const totalCredit = events.reduce((s, e) => s + (e.credit || 0), 0);
+  const content = document.getElementById('empLedgerContent');
+  if (!content) return;
+  content.innerHTML = `
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:10px">
+      <div class="stat-card blue" style="padding:10px"><div class="stat-label">إجمالي المديونية</div><div class="stat-value" style="font-size:.9rem;color:var(--red)">${formatMoney(totalDebit)}</div></div>
+      <div class="stat-card green" style="padding:10px"><div class="stat-label">إجمالي التسديد</div><div class="stat-value" style="font-size:.9rem;color:var(--green)">${formatMoney(totalCredit)}</div></div>
+      <div class="stat-card ${totalDebit - totalCredit > 0 ? 'red' : 'green'}" style="padding:10px"><div class="stat-label">الرصيد الحالي</div><div class="stat-value" style="font-size:.9rem;color:${totalDebit - totalCredit > 0 ? 'var(--red)' : 'var(--green)'}">${formatMoney(totalDebit - totalCredit)}</div></div>
+    </div>
+    <div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>رقم المستند</th><th>مدين</th><th>دائن</th><th>الرصيد</th><th>المستخدم</th><th>ملاحظات</th></tr></thead><tbody>${rows || '<tr><td colspan="8" style="text-align:center">لا توجد حركات</td></tr>'}</tbody></table></div>`;
+}
+
+// ================= BONUSES =================
+function openBonusModal(empId) {
+  if (!requirePermission('manageEmployees')) return;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  document.getElementById('bonusEmployeeId').value = emp.id;
+  document.getElementById('bonusEmployeeName').value = emp.name;
+  document.getElementById('bonusAmount').value = '';
+  document.getElementById('bonusReason').value = '';
+  document.getElementById('bonusDate').valueAsDate = new Date();
+  openModal('bonusModal');
+}
+function saveBonus() {
+  if (!requirePermission('manageEmployees')) return;
+  const empId = document.getElementById('bonusEmployeeId').value;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
+  const amount = parseFloat(document.getElementById('bonusAmount').value) || 0;
+  if (amount <= 0) { showToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+  const date = document.getElementById('bonusDate').value || localDateString();
+  const bonusDate = localDateWithCurrentTime(date);
+  const reason = document.getElementById('bonusReason').value.trim();
+  const method = 'cash';
+  const nextNum = getVchNextNum();
+  const vchId = 'PAY-' + String(nextNum).padStart(5, '0');
+  const meta = { referenceType: 'employee_bonus', referenceId: vchId, entryKind: 'employee_bonus', sourceModule: 'hr', employeeId: emp.id, employeeName: emp.name };
+  const treasuryOk = addTreasuryOutRequired(amount, method, `مكافأة - ${emp.name} - ${reason}`, bonusDate, meta);
+  if (!treasuryOk) return;
+  DB.vouchers = DB.vouchers || [];
+  DB.vouchers.push({
+    id: vchId, type: 'payment', voucherType: 'employee_bonus', transactionCategory: 'employee_bonus',
+    partyType: 'employee', partyId: String(emp.id), partyName: emp.name,
+    amount, method, desc: reason || `مكافأة ${emp.name}`,
+    date: bonusDate, user: currentUser ? currentUser.username : 'system',
+    referenceType: 'employee_bonus', referenceId: vchId, branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  addCashEntry('out', amount, method, `مكافأة #${vchId} - ${emp.name}`, bonusDate, meta);
+  addEmployeeLedger(emp.id, {
+    date: bonusDate, type: 'مكافأة', reference: vchId, debit: amount, credit: 0,
+    notes: reason || 'مكافأة', user: currentUser ? currentUser.username : 'system',
+    branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  DB.employeeBonuses = Array.isArray(DB.employeeBonuses) ? DB.employeeBonuses : [];
+  DB.employeeBonuses.push({
+    id: Date.now(), employeeId: emp.id, employeeName: emp.name, amount, date: bonusDate, reason,
+    voucherId: vchId, user: currentUser ? currentUser.username : 'system',
+    branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  saveDB();
+  closeModal('bonusModal');
+  renderEmployees(); renderTreasury();
+  showToast(`✅ تم صرف مكافأة ${emp.name} #${vchId}`);
+  logAudit('مكافأة موظف', emp.name, { module: 'hr', actionType: 'bonus', recordId: String(emp.id), description: `${formatMoney(amount)} - ${reason}` });
+}
+
+// ================= PENALTIES =================
+function openPenaltyModal(empId) {
+  if (!requirePermission('manageEmployees')) return;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  document.getElementById('penaltyEmployeeId').value = emp.id;
+  document.getElementById('penaltyEmployeeName').value = emp.name;
+  document.getElementById('penaltyAmount').value = '';
+  document.getElementById('penaltyReason').value = '';
+  document.getElementById('penaltyDate').valueAsDate = new Date();
+  openModal('penaltyModal');
+}
+function savePenalty() {
+  if (!requirePermission('manageEmployees')) return;
+  const empId = document.getElementById('penaltyEmployeeId').value;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
+  const amount = parseFloat(document.getElementById('penaltyAmount').value) || 0;
+  if (amount <= 0) { showToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+  const date = document.getElementById('penaltyDate').value || localDateString();
+  const penDate = localDateWithCurrentTime(date);
+  const reason = document.getElementById('penaltyReason').value.trim();
+  addEmployeeLedger(emp.id, {
+    date: penDate, type: 'جزاء', reference: `PEN-${Date.now()}`, debit: 0, credit: amount,
+    notes: reason || 'جزاء', user: currentUser ? currentUser.username : 'system',
+    branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  DB.employeePenalties = Array.isArray(DB.employeePenalties) ? DB.employeePenalties : [];
+  DB.employeePenalties.push({
+    id: Date.now(), employeeId: emp.id, employeeName: emp.name, amount, date: penDate, reason,
+    user: currentUser ? currentUser.username : 'system',
+    branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  saveDB();
+  closeModal('penaltyModal');
+  renderEmployees();
+  showToast(`✅ تم تسجيل جزاء ${emp.name}`);
+  logAudit('جزاء موظف', emp.name, { module: 'hr', actionType: 'penalty', recordId: String(emp.id), description: `${formatMoney(amount)} - ${reason}` });
+}
+
+// ================= ABSENCE =================
+function openAbsenceModal(empId) {
+  if (!requirePermission('manageEmployees')) return;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  document.getElementById('absEmployeeId').value = emp.id;
+  document.getElementById('absEmployeeName').value = emp.name;
+  document.getElementById('absDays').value = 1;
+  document.getElementById('absDate').valueAsDate = new Date();
+  document.getElementById('absReason').value = '';
+  document.getElementById('absPaid').value = 'unpaid';
+  openModal('absenceModal');
+}
+function saveAbsence() {
+  if (!requirePermission('manageEmployees')) return;
+  const empId = document.getElementById('absEmployeeId').value;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
+  const days = parseInt(document.getElementById('absDays').value) || 1;
+  const date = document.getElementById('absDate').value || localDateString();
+  const reason = document.getElementById('absReason').value.trim();
+  const paid = document.getElementById('absPaid').value;
+  DB.employeeAbsences = Array.isArray(DB.employeeAbsences) ? DB.employeeAbsences : [];
+  DB.employeeAbsences.push({
+    id: Date.now(), employeeId: emp.id, employeeName: emp.name, days, date, reason, paid,
+    user: currentUser ? currentUser.username : 'system',
+    branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+  });
+  if (paid === 'paid') {
+    const deduction = ((emp.salary || 0) / 30) * days;
+    addEmployeeLedger(emp.id, {
+      date: localDateWithCurrentTime(date), type: 'خصم غياب', reference: `ABS-${Date.now()}`, debit: 0, credit: deduction,
+      notes: `غياب مدفوع - ${reason || 'بدون سبب'} (${days} يوم)`, user: currentUser ? currentUser.username : 'system',
+      branchId: getEmpBranch(emp), branchName: getBranchNameById(getEmpBranch(emp))
+    });
+  }
+  saveDB();
+  closeModal('absenceModal');
+  renderEmployees();
+  showToast(`✅ تم تسجيل غياب ${emp.name}`);
+  logAudit('غياب موظف', emp.name, { module: 'hr', actionType: 'absence', recordId: String(emp.id), description: `${days} يوم - ${paid}` });
+}
+
+// ================= PERFORMANCE EVALUATION =================
+function openEvaluationModal(empId) {
+  if (!requirePermission('manageEmployees')) return;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  document.getElementById('evalEmployeeId').value = emp.id;
+  document.getElementById('evalEmployeeName').value = emp.name;
+  document.getElementById('evalMonth').value = new Date().toISOString().slice(0, 7);
+  document.getElementById('evalAttendance').value = 5;
+  document.getElementById('evalCommitment').value = 5;
+  document.getElementById('evalQuality').value = 5;
+  document.getElementById('evalSpeed').value = 5;
+  document.getElementById('evalBehavior').value = 5;
+  document.getElementById('evalService').value = 5;
+  document.getElementById('evalDiscipline').value = 5;
+  document.getElementById('evalNotes').value = '';
+  openModal('evaluationModal');
+}
+function autoCalcEvalScore() {
+  const fields = ['attendance','commitment','quality','speed','behavior','service','discipline'];
+  const total = fields.reduce((sum, f) => sum + ((parseFloat(document.getElementById('eval'+f.charAt(0).toUpperCase()+f.slice(1)).value)||0)), 0);
+  const max = fields.length * 10;
+  document.getElementById('evalScore').value = total;
+  document.getElementById('evalPercent').value = max > 0 ? Math.round((total / max) * 100) : 0;
+}
+function saveEvaluation() {
+  if (!requirePermission('manageEmployees')) return;
+  const empId = document.getElementById('evalEmployeeId').value;
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
+  const fields = ['attendance','commitment','quality','speed','behavior','service','discipline'];
+  const ev = {};
+  fields.forEach(f => { ev[f] = parseInt(document.getElementById('eval'+f.charAt(0).toUpperCase()+f.slice(1)).value)||0; });
+  ev.employeeId = emp.id; ev.employeeName = emp.name;
+  ev.month = document.getElementById('evalMonth').value;
+  ev.score = parseInt(document.getElementById('evalScore').value)||0;
+  ev.percent = parseInt(document.getElementById('evalPercent').value)||0;
+  ev.notes = document.getElementById('evalNotes').value.trim();
+  ev.user = currentUser ? currentUser.username : 'system';
+  ev.date = localDateString();
+  ev.id = Date.now();
+  ev.branchId = getEmpBranch(emp);
+  ev.branchName = getBranchNameById(getEmpBranch(emp));
+  DB.employeeEvaluations = Array.isArray(DB.employeeEvaluations) ? DB.employeeEvaluations : [];
+  DB.employeeEvaluations.push(ev);
+  saveDB();
+  closeModal('evaluationModal');
+  showToast(`✅ تم تسجيل تقييم ${emp.name}`);
+  logAudit('تقييم موظف', emp.name, { module: 'hr', actionType: 'evaluation', recordId: String(emp.id), description: `${ev.month} - ${ev.percent}%` });
+}
+
+// ================= EMPLOYEE PROFILE =================
+function openEmployeeProfile(empId) {
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  document.getElementById('profileEmployeeId').value = emp.id;
+  switchEmpProfileTab('info');
+  document.getElementById('empProfileInfo').innerHTML = `
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <div class="stat-card blue" style="padding:12px"><div class="stat-label">الاسم</div><div class="stat-value" style="font-size:.9rem">${escapeHtml(emp.name)}</div></div>
+      <div class="stat-card" style="padding:12px"><div class="stat-label">الوظيفة</div><div class="stat-value" style="font-size:.9rem">${escapeHtml(emp.position || '-')}</div></div>
+      <div class="stat-card" style="padding:12px"><div class="stat-label">الفرع</div><div class="stat-value" style="font-size:.9rem">${escapeHtml(emp.branchName || getBranchNameById(getEmpBranch(emp)))}</div></div>
+      <div class="stat-card" style="padding:12px"><div class="stat-label">التليفون</div><div class="stat-value" style="font-size:.9rem;direction:ltr">${escapeHtml(emp.phone || '-')}</div></div>
+      <div class="stat-card" style="padding:12px"><div class="stat-label">تاريخ التعيين</div><div class="stat-value" style="font-size:.9rem">${emp.hireDate ? new Date(emp.hireDate).toLocaleDateString('ar-EG') : '-'}</div></div>
+      <div class="stat-card green" style="padding:12px"><div class="stat-label">الراتب</div><div class="stat-value" style="font-size:.9rem;color:var(--green)">${formatMoney(emp.salary)}</div></div>
+      <div class="stat-card" style="padding:12px"><div class="stat-label">الحالة</div><div class="stat-value" style="font-size:.9rem">${emp.status === 'active' ? 'نشط' : emp.status === 'inactive' ? 'غير نشط' : 'ترك العمل'}</div></div>
+      <div class="stat-card" style="padding:12px"><div class="stat-label">ملاحظات</div><div class="stat-value" style="font-size:.9rem">${escapeHtml(emp.notes || '-')}</div></div>
+    </div>`;
+  openModal('employeeProfileModal');
+}
+function switchEmpProfileTab(tab) {
+  const tabs = ['info','ledger','dashboard'];
+  tabs.forEach(t => {
+    document.getElementById('empProfileTab'+t.charAt(0).toUpperCase()+t.slice(1)).className = 'tab-btn' + (t === tab ? ' active' : '');
+    const el = document.getElementById('empProfile'+t.charAt(0).toUpperCase()+t.slice(1));
+    if (el) el.style.display = t === tab ? 'block' : 'none';
+  });
+  if (tab === 'ledger') renderEmployeeLedger(document.getElementById('profileEmployeeId').value);
+  if (tab === 'dashboard') renderEmpDashboard(document.getElementById('profileEmployeeId').value);
+}
+function renderEmpDashboard(empId) {
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  const advances = (DB.employeeAdvances || []).filter(a => String(a.employeeId) === String(empId));
+  const bonuses = (DB.employeeBonuses || []).filter(b => String(b.employeeId) === String(empId));
+  const penalties = (DB.employeePenalties || []).filter(p => String(p.employeeId) === String(empId));
+  const attendance = (DB.employeeAttendance || []).filter(a => String(a.employeeId) === String(empId));
+  const absences = (DB.employeeAbsences || []).filter(a => String(a.employeeId) === String(empId));
+  const evals = (DB.employeeEvaluations || []).filter(e => String(e.employeeId) === String(empId));
+  const lastSalary = DB.salaryLog.filter(s => String(s.employeeId) === String(empId)).sort((a,b) => new Date(b.date) - new Date(a.date))[0];
+  const totalAdvances = advances.reduce((s, a) => s + toSafeFloat(a.amount, 0), 0);
+  const presentDays = attendance.filter(a => a.checkIn).length;
+  const lateCount = attendance.filter(a => { if (!a.checkIn) return false; const parts = a.checkIn.split(':'); return parseInt(parts[0]) >= 9 && parseInt(parts[0]) < 24; }).length;
+  const lastEval = evals.sort((a,b) => (b.month||'').localeCompare(a.month||''))[0];
+  const content = document.getElementById('empProfileDashboard');
+  if (!content) return;
+  content.innerHTML = `
+    <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:10px">
+      <div class="stat-card blue" style="padding:12px"><div class="stat-label">الراتب الحالي</div><div class="stat-value" style="font-size:.9rem;color:var(--blue)">${formatMoney(emp.salary || 0)}</div></div>
+      <div class="stat-card red" style="padding:12px"><div class="stat-label">السلف المستحقة</div><div class="stat-value" style="font-size:.9rem;color:var(--red)">${formatMoney(totalAdvances)}</div></div>
+      <div class="stat-card green" style="padding:12px"><div class="stat-label">آخر راتب</div><div class="stat-value" style="font-size:.9rem;color:var(--green)">${lastSalary ? formatMoney(lastSalary.finalSalary || lastSalary.salary) : 'لم يُصرف'}</div></div>
+      <div class="stat-card purple" style="padding:12px"><div class="stat-label">نسبة الحضور</div><div class="stat-value" style="font-size:.9rem">${attendance.length > 0 ? Math.round((presentDays / attendance.length) * 100) + '%' : '0%'}</div></div>
+      <div class="stat-card yellow" style="padding:12px"><div class="stat-label">تأخير</div><div class="stat-value" style="font-size:.9rem">${lateCount}</div></div>
+      <div class="stat-card red" style="padding:12px"><div class="stat-label">غياب</div><div class="stat-value" style="font-size:.9rem">${absences.length}</div></div>
+      <div class="stat-card green" style="padding:12px"><div class="stat-label">مكافآت</div><div class="stat-value" style="font-size:.9rem;color:var(--green)">${bonuses.length} (${formatMoney(bonuses.reduce((s,b)=>s+toSafeFloat(b.amount,0),0))})</div></div>
+      <div class="stat-card" style="padding:12px"><div class="stat-label">جزاءات</div><div class="stat-value" style="font-size:.9rem;color:var(--red)">${penalties.length} (${formatMoney(penalties.reduce((s,p)=>s+toSafeFloat(p.amount,0),0))})</div></div>
+      <div class="stat-card ${lastEval && lastEval.percent >= 60 ? 'green' : 'yellow'}" style="padding:12px"><div class="stat-label">آخر تقييم</div><div class="stat-value" style="font-size:.9rem">${lastEval ? lastEval.percent + '%' : 'لا يوجد'}</div></div>
+    </div>`;
+}
+function renderAppEmpReports() {
+  showPage('emp-reports');
+  document.getElementById('empReportContent').innerHTML = '<div style="padding:20px;text-align:center">اختر تقريراً من القائمة</div>';
+}
+function loadEmpReport(type) {
+  const content = document.getElementById('empReportContent');
+  if (!content) return;
+  let html = '';
+  if (type === 'ledger') {
+    html = `<div class="form-group" style="max-width:300px"><label>الموظف</label><select id="repLedgerEmp" onchange="renderRepEmpLedger()"><option value="">اختر الموظف</option>${DB.employees.filter(e=>canManageEmployee(e)).map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}</select></div><div id="repLedgerContent"></div>`;
+  } else if (type === 'salary') {
+    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card blue" style="padding:12px"><div class="stat-label">إجمالي الرواتب</div><div class="stat-value" style="font-size:1rem" id="repTotalSalary">0</div></div><div class="stat-card purple" style="padding:12px"><div class="stat-label">عدد المدفوعات</div><div class="stat-value" style="font-size:1rem" id="repSalaryCount">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الشهر</th><th>الراتب</th><th>المكافأة</th><th>الخصم</th><th>الصافي</th><th>بواسطة</th></tr></thead><tbody id="repSalaryTbody"></tbody></table></div>`;
+  } else if (type === 'advance') {
+    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card red" style="padding:12px"><div class="stat-label">إجمالي السلف</div><div class="stat-value" style="font-size:1rem" id="repTotalAdv">0</div></div><div class="stat-card" style="padding:12px"><div class="stat-label">عدد السلف</div><div class="stat-value" style="font-size:1rem" id="repAdvCount">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>المبلغ</th><th>رقم السند</th><th>بواسطة</th><th>ملاحظات</th></tr></thead><tbody id="repAdvTbody"></tbody></table></div>`;
+  } else if (type === 'attendance') {
+    html = `<div class="form-group" style="max-width:300px"><label>الشهر</label><input type="month" id="repAttMonth" onchange="renderRepAttendance()"></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الفرع</th><th>حضور</th><th>انصراف</th><th>تأخير (دقيقة)</th><th>ساعات العمل</th><th>الحالة</th></tr></thead><tbody id="repAttTbody"></tbody></table></div>`;
+  } else if (type === 'absence') {
+    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card red" style="padding:12px"><div class="stat-label">إجمالي أيام الغياب</div><div class="stat-value" style="font-size:1rem" id="repTotalAbs">0</div></div><div class="stat-card" style="padding:12px"><div class="stat-label">عدد حالات الغياب</div><div class="stat-value" style="font-size:1rem" id="repAbsCount">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>الأيام</th><th>مدفوع/غير مدفوع</th><th>السبب</th></tr></thead><tbody id="repAbsTbody"></tbody></table></div>`;
+  } else if (type === 'performance') {
+    html = `<div class="form-group" style="max-width:300px"><label>الموظف</label><select id="repEvalEmp" onchange="renderRepEval()"><option value="">الكل</option>${DB.employees.filter(e=>canManageEmployee(e)).map(e=>`<option value="${e.id}">${escapeHtml(e.name)}</option>`).join('')}</select></div><div class="overflow-x"><table class="data-table"><thead><tr><th>الشهر</th><th>الموظف</th><th>حضور</th><th>التزام</th><th>جودة</th><th>سرعة</th><th>سلوك</th><th>خدمة</th><th>انضباط</th><th>الدرجة</th><th>%</th><th>ملاحظات</th></tr></thead><tbody id="repEvalTbody"></tbody></table></div>`;
+  } else if (type === 'bonus') {
+    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card green" style="padding:12px"><div class="stat-label">إجمالي المكافآت</div><div class="stat-value" style="font-size:1rem" id="repTotalBonus">0</div></div><div class="stat-card" style="padding:12px"><div class="stat-label">عدد المكافآت</div><div class="stat-value" style="font-size:1rem" id="repBonusCount">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>المبلغ</th><th>السبب</th><th>رقم السند</th><th>بواسطة</th></tr></thead><tbody id="repBonusTbody"></tbody></table></div>`;
+  } else if (type === 'penalty') {
+    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card red" style="padding:12px"><div class="stat-label">إجمالي الجزاءات</div><div class="stat-value" style="font-size:1rem" id="repTotalPenalty">0</div></div><div class="stat-card" style="padding:12px"><div class="stat-label">عدد الجزاءات</div><div class="stat-value" style="font-size:1rem" id="repPenaltyCount">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>الموظف</th><th>المبلغ</th><th>السبب</th><th>بواسطة</th></tr></thead><tbody id="repPenaltyTbody"></tbody></table></div>`;
+  } else if (type === 'payroll') {
+    html = `<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:10px"><div class="stat-card red" style="padding:12px"><div class="stat-label">إجمالي الرواتب</div><div class="stat-value" style="font-size:1rem" id="repPayTotal">0</div></div><div class="stat-card blue" style="padding:12px"><div class="stat-label">إجمالي المكافآت</div><div class="stat-value" style="font-size:1rem" id="repPayBonus">0</div></div><div class="stat-card green" style="padding:12px"><div class="stat-label">إجمالي الخصم</div><div class="stat-value" style="font-size:1rem" id="repPayDeduct">0</div></div><div class="stat-card purple" style="padding:12px"><div class="stat-label">الصافي</div><div class="stat-value" style="font-size:1rem" id="repPayNet">0</div></div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>الشهر</th><th>الموظف</th><th>الأساسي</th><th>مكافأة</th><th>سلفة</th><th>خصم</th><th>الصافي</th><th>حالة</th></tr></thead><tbody id="repPayTbody"></tbody></table></div>`;
+  }
+  content.innerHTML = html;
+  setTimeout(() => {
+    if (type === 'salary') renderRepSalary();
+    else if (type === 'advance') renderRepAdvance();
+    else if (type === 'attendance') renderRepAttendance();
+    else if (type === 'absence') renderRepAbsence();
+    else if (type === 'performance') renderRepEval();
+    else if (type === 'bonus') renderRepBonus();
+    else if (type === 'penalty') renderRepPenalty();
+    else if (type === 'payroll') renderRepPayroll();
+  }, 50);
+}
+function renderRepEmpLedger() {
+  const empId = document.getElementById('repLedgerEmp').value;
+  const content = document.getElementById('repLedgerContent');
+  if (!empId || !content) { if (content) content.innerHTML = ''; return; }
+  const emp = DB.employees.find(e => String(e.id) === String(empId));
+  if (!emp) return;
+  const events = getEmployeeLedgerEvents(empId);
+  let rb = 0;
+  const rows = events.map(e => { rb += (e.debit||0)-(e.credit||0); return `<tr><td>${escapeHtml(new Date(e.date).toLocaleString('ar-EG'))}</td><td>${escapeHtml(e.type)}</td><td>${escapeHtml(e.reference)}</td><td style="color:var(--red)">${formatMoney(e.debit||0)}</td><td style="color:var(--green)">${formatMoney(e.credit||0)}</td><td style="font-weight:700">${formatMoney(rb)}</td><td>${escapeHtml(e.user)}</td><td>${escapeHtml(e.note)}</td></tr>`; }).join('');
+  content.innerHTML = `<h4 style="margin:0 0 10px">كشف حساب ${escapeHtml(emp.name)}</h4><div class="overflow-x"><table class="data-table"><thead><tr><th>التاريخ</th><th>النوع</th><th>رقم المستند</th><th>مدين</th><th>دائن</th><th>الرصيد</th><th>المستخدم</th><th>ملاحظات</th></tr></thead><tbody>${rows||'<tr><td colspan="8" style="text-align:center">لا توجد حركات</td></tr>'}</tbody></table></div>`;
+}
+function renderRepSalary() {
+  const salaryLog = DB.salaryLog || [];
+  const total = salaryLog.reduce((s,l)=>s+toSafeFloat(l.finalSalary||l.salary||0,0),0);
+  document.getElementById('repTotalSalary').textContent = formatMoney(total);
+  document.getElementById('repSalaryCount').textContent = salaryLog.length;
+  document.getElementById('repSalaryTbody').innerHTML = salaryLog.slice(0,200).map(l=>`<tr><td>${escapeHtml(new Date(l.date).toLocaleDateString('ar-EG'))}</td><td>${escapeHtml(l.employeeName)}</td><td>${escapeHtml(l.month||'')} ${l.year||''}</td><td>${formatMoney(l.salary||0)}</td><td>${formatMoney(l.bonus||0)}</td><td>${formatMoney((l.advance||0)+(l.vacationDeduction||0))}</td><td>${formatMoney(l.finalSalary||0)}</td><td>${escapeHtml(l.user||'-')}</td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function renderRepAdvance() {
+  const adv = DB.employeeAdvances || [];
+  document.getElementById('repTotalAdv').textContent = formatMoney(adv.reduce((s,a)=>s+toSafeFloat(a.amount,0),0));
+  document.getElementById('repAdvCount').textContent = adv.length;
+  document.getElementById('repAdvTbody').innerHTML = adv.slice(0,200).map(a=>`<tr><td>${escapeHtml(new Date(a.date).toLocaleDateString('ar-EG'))}</td><td>${escapeHtml(a.employeeName)}</td><td>${formatMoney(a.amount)}</td><td>${escapeHtml(a.voucherId||'-')}</td><td>${escapeHtml(a.user||'-')}</td><td>${escapeHtml(a.notes||'-')}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function renderRepAttendance() {
+  const month = document.getElementById('repAttMonth').value;
+  const att = DB.employeeAttendance || [];
+  const filtered = month ? att.filter(a => (a.date||'').startsWith(month)) : att;
+  document.getElementById('repAttTbody').innerHTML = filtered.slice(0,200).map(a => {
+    const checkIn = a.checkIn || '';
+    const checkOut = a.checkOut || '';
+    let lateMin = 0, workHours = 0;
+    if (checkIn) { const p = checkIn.split(':'); const h = parseInt(p[0])||0, m = parseInt(p[1])||0; if (h > 8 || (h === 8 && m > 0)) lateMin = (h - 8) * 60 + m; }
+    if (checkIn && checkOut) { const ci = checkIn.split(':'), co = checkOut.split(':'); workHours = (parseInt(co[0])*60+parseInt(co[1])-parseInt(ci[0])*60-parseInt(ci[1]))/60; if (workHours < 0) workHours += 24; }
+    const status = a.checkOut ? (lateMin > 30 ? 'متأخر' : 'حاضر') : a.checkIn ? 'حضور فقط' : 'غائب';
+    return `<tr><td>${escapeHtml(a.date||'-')}</td><td>${escapeHtml(a.employeeName||'-')}</td><td>${escapeHtml(a.branchName||getBranchNameById(a.branchId||'MAIN')||'-')}</td><td>${escapeHtml(checkIn||'-')}</td><td>${escapeHtml(checkOut||'-')}</td><td>${lateMin}</td><td>${workHours.toFixed(1)}</td><td>${status}</td></tr>`;
+  }).join('')||'<tr><td colspan="8" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function renderRepAbsence() {
+  const abs = DB.employeeAbsences || [];
+  const total = abs.reduce((s,a)=>s+(a.days||0),0);
+  document.getElementById('repTotalAbs').textContent = total;
+  document.getElementById('repAbsCount').textContent = abs.length;
+  document.getElementById('repAbsTbody').innerHTML = abs.slice(0,200).map(a=>`<tr><td>${escapeHtml(new Date(a.date).toLocaleDateString('ar-EG'))}</td><td>${escapeHtml(a.employeeName)}</td><td>${a.days||1}</td><td>${a.paid === 'paid' ? 'مدفوع' : 'غير مدفوع'}</td><td>${escapeHtml(a.reason||'-')}</td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function renderRepEval() {
+  const empId = document.getElementById('repEvalEmp').value;
+  let evals = DB.employeeEvaluations || [];
+  if (empId) evals = evals.filter(e => String(e.employeeId) === String(empId));
+  document.getElementById('repEvalTbody').innerHTML = evals.slice(0,200).map(e=>`<tr><td>${escapeHtml(e.month||'')}</td><td>${escapeHtml(e.employeeName)}</td><td>${e.attendance||0}</td><td>${e.commitment||0}</td><td>${e.quality||0}</td><td>${e.speed||0}</td><td>${e.behavior||0}</td><td>${e.service||0}</td><td>${e.discipline||0}</td><td>${e.score||0}</td><td>${e.percent||0}%</td><td>${escapeHtml(e.notes||'-')}</td></tr>`).join('')||'<tr><td colspan="12" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function renderRepBonus() {
+  const bonus = DB.employeeBonuses || [];
+  document.getElementById('repTotalBonus').textContent = formatMoney(bonus.reduce((s,b)=>s+toSafeFloat(b.amount,0),0));
+  document.getElementById('repBonusCount').textContent = bonus.length;
+  document.getElementById('repBonusTbody').innerHTML = bonus.slice(0,200).map(b=>`<tr><td>${escapeHtml(new Date(b.date).toLocaleDateString('ar-EG'))}</td><td>${escapeHtml(b.employeeName)}</td><td>${formatMoney(b.amount)}</td><td>${escapeHtml(b.reason||'-')}</td><td>${escapeHtml(b.voucherId||'-')}</td><td>${escapeHtml(b.user||'-')}</td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function renderRepPenalty() {
+  const pen = DB.employeePenalties || [];
+  document.getElementById('repTotalPenalty').textContent = formatMoney(pen.reduce((s,p)=>s+toSafeFloat(p.amount,0),0));
+  document.getElementById('repPenaltyCount').textContent = pen.length;
+  document.getElementById('repPenaltyTbody').innerHTML = pen.slice(0,200).map(p=>`<tr><td>${escapeHtml(new Date(p.date).toLocaleDateString('ar-EG'))}</td><td>${escapeHtml(p.employeeName)}</td><td>${formatMoney(p.amount)}</td><td>${escapeHtml(p.reason||'-')}</td><td>${escapeHtml(p.user||'-')}</td></tr>`).join('')||'<tr><td colspan="5" style="text-align:center">لا توجد بيانات</td></tr>';
+}
+function renderRepPayroll() {
+  const payroll = DB.salaryLog || [];
+  const total = payroll.reduce((s,p)=>s+toSafeFloat(p.salary||0,0),0);
+  const bonus = payroll.reduce((s,p)=>s+toSafeFloat(p.bonus||0,0),0);
+  const deduct = payroll.reduce((s,p)=>s+toSafeFloat(p.advance||0,0)+toSafeFloat(p.vacationDeduction||0,0),0);
+  const net = payroll.reduce((s,p)=>s+toSafeFloat(p.finalSalary||0,0),0);
+  document.getElementById('repPayTotal').textContent = formatMoney(total);
+  document.getElementById('repPayBonus').textContent = formatMoney(bonus);
+  document.getElementById('repPayDeduct').textContent = formatMoney(deduct);
+  document.getElementById('repPayNet').textContent = formatMoney(net);
+  document.getElementById('repPayTbody').innerHTML = payroll.slice(0,200).map(p=>`<tr><td>${escapeHtml((p.month||'')+' '+(p.year||''))}</td><td>${escapeHtml(p.employeeName)}</td><td>${formatMoney(p.salary||0)}</td><td>${formatMoney(p.bonus||0)}</td><td>${formatMoney(p.advance||0)}</td><td>${formatMoney((p.vacationDeduction||0)+(p.otherDeductions||0)+(p.penaltyDeductions||0)+(p.insuranceDeductions||0))}</td><td>${formatMoney(p.finalSalary||0)}</td><td>${p.status||'مدفوع'}</td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center">لا توجد بيانات</td></tr>';
 }
 
 // ================= PARTNERS =================
