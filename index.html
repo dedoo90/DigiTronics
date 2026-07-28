@@ -11101,6 +11101,39 @@ const digitronicsDataAdapter = {
     }
   },
   _syncPending: false,
+  _refreshPending: false,
+  _lastBackendRefresh: null,
+  async refreshSales() {
+    if (!USE_BACKEND || this._refreshPending) return;
+    this._refreshPending = true;
+    try {
+      const res = await backendApi.sales.list();
+      if (!res || !res.success || !Array.isArray(res.data)) return;
+      const backendSales = res.data.map(inv => this._normalizeBackendSale(inv));
+      const localById = {};
+      (DB.saleInvoices || []).forEach(inv => { const key = inv._backendId || inv.id; localById[key] = inv; });
+      const unsyncedKeys = {};
+      (DB.saleInvoices || []).filter(inv => !inv._syncedToBackend).forEach(inv => { unsyncedKeys[inv.id] = true; });
+      let changed = false;
+      for (const bs of backendSales) {
+        const key = bs._backendId || bs.id;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[bs.id]) {
+          bs._syncedToBackend = true;
+          bs._backendId = bs._backendId || bs.id;
+          bs._importedFromBackend = true;
+          DB.saleInvoices.push(bs);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPending = false;
+    }
+  },
   async syncPendingSales() {
     if (!USE_BACKEND || this._syncPending) return;
     this._syncPending = true;
@@ -11125,6 +11158,18 @@ const digitronicsDataAdapter = {
 function scheduleBackgroundSync(delay) {
   if (!USE_BACKEND) return;
   setTimeout(() => digitronicsDataAdapter.syncPendingSales().catch(() => {}), delay || 5000);
+}
+
+function detectSaleConflict(localSale, backendSale) {
+  if (!localSale || !backendSale) return null;
+  const localUpdated = new Date(localSale.updatedAt || localSale.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendSale.updatedAt || backendSale.createdAt || 0).getTime();
+  return { id: localSale.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localSale._syncedToBackend };
+}
+
+function scheduleBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  setTimeout(() => digitronicsDataAdapter.refreshSales().catch(() => {}), delay || 10000);
 }
 
 // ================= STATE =================
