@@ -11099,8 +11099,33 @@ const digitronicsDataAdapter = {
     } catch (e) {
       return DB.saleInvoices.find(inv => String(inv.id) === String(id)) || null;
     }
+  },
+  _syncPending: false,
+  async syncPendingSales() {
+    if (!USE_BACKEND || this._syncPending) return;
+    this._syncPending = true;
+    try {
+      const pending = (DB.saleInvoices || []).filter(inv => !inv._syncedToBackend);
+      for (const inv of pending) {
+        try {
+          const res = await backendApi.sales.create(inv);
+          if (res && res.success) {
+            inv._syncedToBackend = true;
+            inv._backendId = res.data?.id || null;
+          }
+        } catch (_) {}
+      }
+      if (pending.length > 0) saveDB();
+    } finally {
+      this._syncPending = false;
+    }
   }
 };
+
+function scheduleBackgroundSync(delay) {
+  if (!USE_BACKEND) return;
+  setTimeout(() => digitronicsDataAdapter.syncPendingSales().catch(() => {}), delay || 5000);
+}
 
 // ================= STATE =================
 const USE_BACKEND = false; // Feature flag: set true to route Sales CRUD through backend API
