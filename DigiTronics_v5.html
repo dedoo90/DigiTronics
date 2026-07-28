@@ -338,6 +338,8 @@ body.accent-orange{--accent:#ea580c;--accent2:#c2410c;--accent-color:#ea580c;}
   html{font-size:14px;}
   .hamburger{display:block;}
   .sidebar{width:60px;right:0;transform:translateX(0);}
+  .exec-quick-actions{gap:4px;padding:6px}
+  .exec-quick-actions .btn{font-size:.65rem;padding:4px 8px;flex:1 0 auto;min-height:38px}
   .sidebar.expanded{width:280px;}
   /* On mobile: dropdowns appear as fullscreen overlay below sidebar */
   .nav-dropdown{
@@ -414,6 +416,8 @@ body.accent-orange{--accent:#ea580c;--accent2:#c2410c;--accent-color:#ea580c;}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
 .exec-chart-box{min-height:180px;width:100%}
 .exec-chart-box canvas{display:block;max-width:100%}
+.exec-quick-actions{display:flex;flex-wrap:wrap;gap:8px;padding:8px;border-bottom:1px solid var(--border);margin-bottom:10px}
+
 .stat-card{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:22px;padding:20px 18px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s,background .25s;cursor:default;box-shadow:var(--glass-shadow);backdrop-filter:blur(var(--glass-blur)) saturate(145%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(145%);}
 .stat-card:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 16px 36px rgba(15,23,42,0.12);}
 .stat-card::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:0 12px 0 60px;opacity:.12;}
@@ -624,6 +628,7 @@ body.accent-orange{--accent:#ea580c;--accent2:#c2410c;--accent-color:#ea580c;}
 [data-theme="dark"] .data-table tr:hover td { background:rgba(0,102,255,.08); }
 [data-theme="dark"] .product-card:hover { background:rgba(0,102,255,.12); }
 [data-theme="dark"] .stat-card:hover { box-shadow:0 6px 24px rgba(0,0,0,.6); }
+[data-theme="dark"] .exec-chart-box canvas { background:rgba(0,0,0,.18); border-radius:8px; }
 [data-theme="dark"] body::after{opacity:.58;}
 
 .anim-off *, .anim-reduced *{animation:none!important;transition:none!important;scroll-behavior:auto!important;}
@@ -2161,7 +2166,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
         </div>
       </div>
 
-      <div style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;border-bottom:1px solid var(--border);margin-bottom:10px">
+      <div class="exec-quick-actions">
         <span style="font-weight:700">Quick Actions:</span>
         <button class="btn btn-sm btn-accent" onclick="openNewSaleInvoiceModal()">🛒 New Sale</button>
         <button class="btn btn-sm btn-outline" onclick="showPage('purchases')">📦 New Purchase</button>
@@ -24982,15 +24987,14 @@ function renderExecDashboard() {
     { id:'execInventoryCanvas', data:getMonthlyInventoryData(from, to), legend:['Value'], colors:['#7c4dff'] }
   ];
   chartData.forEach(c => drawExecBarChart(c.id, c.data, c.legend, c.colors));
-  // Set up resize observer for chart containers
-  if (!window._execChartResize) {
-    window._execChartResize = new ResizeObserver(() => {
-      if (document.getElementById('page-exec-dashboard')?.classList.contains('active')) {
-        chartData.forEach(c => drawExecBarChart(c.id, c.data, c.legend, c.colors));
-      }
-    });
-    document.querySelectorAll('.exec-chart-box').forEach(el => window._execChartResize.observe(el));
-  }
+  // ResizeObserver with fresh data every render
+  if (window._execChartResize) window._execChartResize.disconnect();
+  window._execChartResize = new ResizeObserver(() => {
+    if (document.getElementById('page-exec-dashboard')?.classList.contains('active')) {
+      chartData.forEach(c => drawExecBarChart(c.id, c.data, c.legend, c.colors));
+    }
+  });
+  document.querySelectorAll('.exec-chart-box').forEach(el => window._execChartResize.observe(el));
 }
 
 function populateExecBranchFilter() {
@@ -25142,11 +25146,16 @@ function drawExecBarChart(canvasId, data, legend, colors) {
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.width, h = canvas.height;
   const isDark = document.body.classList.contains('dark-mode');
+  const isRtl = document.documentElement.dir === 'rtl';
   const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
   const axisColor = isDark ? 'rgba(255,255,255,0.15)' : '#ddd';
   const textColor = isDark ? 'rgba(255,255,255,0.6)' : '#666';
   const titleColor = isDark ? 'rgba(255,255,255,0.8)' : '#333';
   const noDataColor = isDark ? 'rgba(255,255,255,0.4)' : '#999';
+  const barColors = isDark ? colors.map(c => {
+    const r = parseInt(c.slice(1,3), 16), g = parseInt(c.slice(3,5), 16), b = parseInt(c.slice(5,7), 16);
+    return `rgb(${Math.min(255,r+30)},${Math.min(255,g+30)},${Math.min(255,b+30)})`;
+  }) : colors;
   ctx.scale(dpr, dpr);
   const dw = w / dpr, dh = h / dpr;
   const pad = { top: 20, bottom: 30, left: 50, right: 20 };
@@ -25178,7 +25187,7 @@ function drawExecBarChart(canvasId, data, legend, colors) {
       const x = pad.left + i * groupW + (groupW - barW * numSeries) / 2 + si * barW;
       const barH = (val / maxVal) * chartH;
       const y = pad.top + chartH - barH;
-      ctx.fillStyle = colors[si % colors.length];
+      ctx.fillStyle = barColors[si % barColors.length];
       ctx.fillRect(x, y, barW - 2, barH || 1);
     });
   });
@@ -25188,8 +25197,8 @@ function drawExecBarChart(canvasId, data, legend, colors) {
     ctx.fillText(label.length > 8 ? label.slice(0, 8) : label, x, dh - pad.bottom + 14);
   });
   legend.forEach((name, i) => {
-    const lx = dw - pad.right - 100 + i * 55;
-    ctx.fillStyle = colors[i % colors.length];
+    const lx = isRtl ? pad.left + 10 + i * 55 : dw - pad.right - 100 + i * 55;
+    ctx.fillStyle = barColors[i % barColors.length];
     ctx.fillRect(lx, pad.top - 15, 10, 10);
     ctx.fillStyle = titleColor; ctx.font = '8px sans-serif'; ctx.textAlign = 'left';
     ctx.fillText(name, lx + 13, pad.top - 6);
