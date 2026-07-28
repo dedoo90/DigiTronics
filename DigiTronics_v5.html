@@ -10782,6 +10782,31 @@ function clearHealthErrorLog() {
   renderHealthMonitor();
 }
 
+// ================= BACKEND API CLIENT (Phase 2: Sales only) =================
+const backendApi = {
+  _baseUrl: API_BASE_URL || '',
+  async _fetch(method, path, body) {
+    try {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      if (body && method !== 'GET') opts.body = JSON.stringify(body);
+      const res = await fetch(this._baseUrl + '/api/v1' + path, opts);
+      if (!res.ok && res.status >= 500) throw new Error('Server error ' + res.status);
+      const data = await res.json();
+      return data;
+    } catch (e) {
+      return null;
+    }
+  },
+  sales: {
+    getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/sales') : null,
+    getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/sales/' + id) : null,
+    getStats: () => USE_BACKEND ? backendApi._fetch('GET', '/sales/stats') : null,
+    create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/sales', data) : null,
+    update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/sales/' + id, data) : null,
+    delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/sales/' + id) : null
+  }
+};
+
 const digitronicsDataAdapter = {
   mode() {
     return isSupabaseEnabled() ? 'supabase' : 'legacy';
@@ -10818,6 +10843,13 @@ const digitronicsDataAdapter = {
         supabaseLastError = 'Supabase client unavailable';
         updateSupabaseStatusIndicator('offline');
         showToast('⚠️ Supabase Offline — تم حفظ البيع محلياً مؤقتاً', 'error');
+      }
+      if (USE_BACKEND) {
+        const apiResult = await backendApi.sales.create(preparedPayload).catch(() => null);
+        if (apiResult && apiResult.success) {
+          preparedPayload._syncedToBackend = true;
+          preparedPayload._backendId = apiResult.data?.id || null;
+        }
       }
       return legacyCreateSale(preparedPayload);
     }
@@ -10932,6 +10964,7 @@ const digitronicsDataAdapter = {
 };
 
 // ================= STATE =================
+const USE_BACKEND = false; // Feature flag: set true to route Sales CRUD through backend API
 const API_BASE_URL = ''; // Backend API base URL – set when backend is ready
 let DB = {
   products: [],
@@ -34129,6 +34162,9 @@ function deleteSaleInvoice(id) {
 
   // Remove the invoice
   DB.saleInvoices = DB.saleInvoices.filter(i => i.id !== id);
+  if (USE_BACKEND) {
+    backendApi.sales.delete(id).catch(() => {});
+  }
   logActivity('حذف فاتورة بيع', `#${id} - ${inv.customer} - ${formatMoney(inv.total)}`);
   saveDB();
   renderInvoices();
@@ -34332,6 +34368,9 @@ function saveEditSaleInvoice() {
 
   logActivity('تعديل فاتورة بيع', `#${id} - ${inv.customer} - ${formatMoney(newTotal)}${treasuryMsg}`);
   saveDB();
+  if (USE_BACKEND) {
+    backendApi.sales.update(id, JSON.parse(JSON.stringify(inv))).catch(() => {});
+  }
   closeModal('editSaleInvoiceModal');
   renderInvoices();
   renderTreasury();
