@@ -1659,6 +1659,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     <div class="nav-dropdown-header">📊 الرئيسية</div>
     <div class="nav-dropdown-item" data-page="dashboard"><span class="icon">🏠</span> لوحة التحكم</div>
     <div class="nav-dropdown-item" data-page="smart-business"><span class="icon">🧠📊</span> Smart Business</div>
+    <div class="nav-dropdown-item" data-page="exec-dashboard"><span class="icon">📈</span> Executive Dashboard</div>
     <div class="nav-dropdown-item" data-page="ai-owner"><span class="icon">🤖</span> المساعد الذكي لصاحب النشاط</div>
     <div class="nav-dropdown-item" data-page="daily"><span class="icon">📅</span> التقرير اليومي</div>
     <div class="nav-dropdown-item" data-page="serialsearch"><span class="icon">🔍</span> بحث بالسيريال</div>
@@ -2135,6 +2136,78 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
         </div>
         <div id="smartWidgetsGrid" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(190px,1fr));padding:0"></div>
       </div>
+    </div>
+
+    <!-- EXECUTIVE FINANCIAL DASHBOARD -->
+    <div class="page" id="page-exec-dashboard">
+      <div class="page-header">
+        <div class="page-title">📈 Executive Financial <span>Dashboard</span></div>
+        <div class="table-actions" style="flex-wrap:wrap;gap:6px">
+          <select id="execPeriod" class="search-input" onchange="renderExecDashboard()" style="width:110px">
+            <option value="today">Today</option>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+            <option value="quarter">Quarter</option>
+            <option value="year">Year</option>
+            <option value="custom">Custom</option>
+          </select>
+          <input id="execFromDate" class="search-input" type="date" onchange="renderExecDashboard()" style="width:135px">
+          <input id="execToDate" class="search-input" type="date" onchange="renderExecDashboard()" style="width:135px">
+          <select id="execBranchFilter" class="search-input" onchange="renderExecDashboard()" style="width:150px"></select>
+          <button class="btn btn-outline btn-sm" onclick="renderExecDashboard()">🔄 تحديث</button>
+          <button class="btn btn-outline btn-sm" onclick="showPage(currentPage)">🔙 رجوع</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;border-bottom:1px solid var(--border);margin-bottom:10px">
+        <span style="font-weight:700">Quick Actions:</span>
+        <button class="btn btn-sm btn-accent" onclick="openNewSaleInvoiceModal()">🛒 New Sale</button>
+        <button class="btn btn-sm btn-outline" onclick="showPage('purchases')">📦 New Purchase</button>
+        <button class="btn btn-sm btn-outline" onclick="showPage('treasury')">💸 New Expense</button>
+        <button class="btn btn-sm btn-outline" onclick="showPage('customers')">💰 Receive Payment</button>
+        <button class="btn btn-sm btn-outline" onclick="showPage('suppliers')">💳 Pay Supplier</button>
+        <button class="btn btn-sm btn-outline" onclick="showPage('hr')">👔 Pay Salary</button>
+        <button class="btn btn-sm btn-outline" onclick="showPage('hr')">💵 Employee Advance</button>
+        <button class="btn btn-sm btn-outline" onclick="showPage('capital-partners')">📤 Profit Distribution</button>
+        <button class="btn btn-sm btn-outline" onclick="generateMonthlyPayroll()">💰 Generate Payroll</button>
+      </div>
+
+      <div id="execSummaryCards" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"></div>
+
+      <div id="execTodayActivity" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-top:8px"></div>
+
+      <div id="execAlerts" style="margin-top:10px"></div>
+
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-top:10px;align-items:start">
+        <div class="table-container">
+          <div class="table-header"><div class="table-title">📊 Monthly Sales & Profit</div></div>
+          <div id="execChartSales" style="height:200px;padding:8px"><canvas id="execSalesCanvas" width="300" height="180"></canvas></div>
+        </div>
+        <div class="table-container">
+          <div class="table-header"><div class="table-title">📊 Monthly Purchases & Expenses</div></div>
+          <div id="execChartPurchases" style="height:200px;padding:8px"><canvas id="execPurchasesCanvas" width="300" height="180"></canvas></div>
+        </div>
+        <div class="table-container">
+          <div class="table-header"><div class="table-title">📊 Cash Flow Trend</div></div>
+          <div id="execChartCashFlow" style="height:200px;padding:8px"><canvas id="execCashCanvas" width="300" height="180"></canvas></div>
+        </div>
+        <div class="table-container">
+          <div class="table-header"><div class="table-title">📊 Top Selling Products</div></div>
+          <div id="execChartTopProducts" style="height:200px;padding:8px"><canvas id="execProductsCanvas" width="300" height="180"></canvas></div>
+        </div>
+        <div class="table-container">
+          <div class="table-header"><div class="table-title">📊 Payroll Cost Trend</div></div>
+          <div id="execChartPayroll" style="height:200px;padding:8px"><canvas id="execPayrollCanvas" width="300" height="180"></canvas></div>
+        </div>
+        <div class="table-container">
+          <div class="table-header"><div class="table-title">📊 Inventory Value Trend</div></div>
+          <div id="execChartInventory" style="height:200px;padding:8px"><canvas id="execInventoryCanvas" width="300" height="180"></canvas></div>
+        </div>
+      </div>
+
+      <div id="execKpiRow" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-top:8px"></div>
+
+      <div id="execTopRankings" class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-top:8px"></div>
     </div>
 
     <!-- AI OWNER ASSISTANT -->
@@ -11341,6 +11414,7 @@ function canAccessPage(page) {
   if (page === 'supplier-accounts') return canViewArApAccounts() && currentUser.role !== 'Cashier';
   if (page === 'fixed-assets') return canViewFixedAssets();
   if (page === 'production') return canViewProductionChecklist();
+  if (page === 'exec-dashboard') return can('all') || can('viewExecutiveDashboard') || currentUser.role === 'Owner' || currentUser.role === 'Admin' || currentUser.role === 'Manager';
   if (page === 'smart-business') return can('all') || can('viewSmartBusiness') || can('viewSmartBusinessSales') || can('viewSmartBusinessRepairs');
   if (page === 'ai-owner') return can('all') || can('viewAiOwnerAssistant');
   if (page === 'automation') return can('all') || can('viewAutomationCenter');
@@ -14649,6 +14723,7 @@ function showPage(page, options = {}) {
   if (page === 'accountstatement') renderAccountStatement();
   if (page === 'vouchers') renderVouchers();
   if (page === 'dashboard') renderDashboard();
+  if (page === 'exec-dashboard') renderExecDashboard();
   if (page === 'smart-business') renderSmartBusinessDashboard();
   if (page === 'ai-owner') renderAiOwnerAssistant();
   if (page === 'automation') renderAutomationCenter();
@@ -24702,6 +24777,397 @@ function renderSmartBusinessPanels(snapshot) {
   ].join('');
 }
 
+// ================= EXECUTIVE FINANCIAL DASHBOARD =================
+function renderExecDashboard() {
+  if (!canAccessPage('exec-dashboard')) { permissionDenied(); return; }
+  populateExecBranchFilter();
+  const { from, to, period } = getExecDateRange();
+  const branchId = document.getElementById('execBranchFilter')?.value || '';
+  const filterBranch = inv => !branchId || inv.branchId === branchId || inv.branch === branchId;
+  const filterCash = e => !branchId || e.branchId === branchId;
+
+  // Compute metrics
+  const invoices = (DB.saleInvoices || []).filter(inv => {
+    const d = new Date(inv.date).getTime();
+    return d >= from && d <= to && filterBranch(inv);
+  });
+  const purchases = (DB.purchaseInvoices || []).filter(inv => {
+    const d = new Date(inv.date).getTime();
+    return d >= from && d <= to && filterBranch(inv);
+  });
+  const expenses = (DB.cashFlow || []).filter(e => {
+    const d = new Date(e.date).getTime();
+    return d >= from && d <= to && e.type === 'out' && !e.entryKind?.includes('salary') && filterCash(e);
+  });
+  const payrollPaid = (DB.cashFlow || []).filter(e => {
+    const d = new Date(e.date).getTime();
+    return d >= from && d <= to && e.type === 'out' && (e.entryKind?.includes('salary') || e.sourceModule === 'employees') && filterCash(e);
+  });
+  const receipts = (DB.cashFlow || []).filter(e => {
+    const d = new Date(e.date).getTime();
+    return d >= from && d <= to && e.type === 'in' && filterCash(e);
+  });
+  const salaryLog = DB.salaryLog || [];
+  const employeeAdvancesTot = (DB.employeeAdvances || []).reduce((s, a) => s + toSafeFloat(a.amount, 0), 0);
+  const customerTotal = (DB.customers || []).reduce((s, c) => s + toSafeFloat(c.balance || c.debit || 0, 0), 0);
+  const supplierTotal = (DB.suppliers || []).reduce((s, sup) => s + toSafeFloat(sup.balance || sup.credit || 0, 0), 0);
+  const inventoryVal = (DB.products || []).reduce((s, p) => s + toSafeFloat(p.buy_price || 0, 0) * toSafeInt(p.stock_qty || 0, 0), 0);
+  const cashBalance = (DB.cashFlow || []).reduce((s, e) => s + (e.type === 'in' ? toSafeFloat(e.amount, 0) : -toSafeFloat(e.amount, 0)), 0);
+  const bankBalance = (DB.cashFlow || []).filter(e => e.method === 'bank' || e.method === 'cheque').reduce((s, e) => s + (e.type === 'in' ? toSafeFloat(e.amount, 0) : -toSafeFloat(e.amount, 0)), 0);
+  const capitalBalance = (DB.capitalPartners || []).reduce((s, cp) => s + toSafeFloat(cp.capital || cp.totalCapital || 0, 0), 0);
+  const retainedEarnings = toSafeFloat(DB.retainedEarnings || DB.retainedProfit || 0, 0);
+  const partnerWithdrawals = (DB.capitalPartnerSettlements || []).filter(s => s.type === 'withdrawal').reduce((s, w) => s + toSafeFloat(w.amount, 0), 0);
+  const salesTotal = invoices.reduce((s, inv) => s + toSafeFloat(inv.total || 0, 0), 0);
+  const purchasesTotal = purchases.reduce((s, inv) => s + toSafeFloat(inv.total || 0, 0), 0);
+  const expenseTotal = expenses.reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const payrollTotal = payrollPaid.reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const receiptTotal = receipts.reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const thisMonthPayroll = salaryLog.filter(s => {
+    const d = new Date(s.date).getTime();
+    return d >= from && d <= to;
+  }).reduce((s, r) => s + toSafeFloat(r.finalSalary || r.salary, 0), 0);
+  const salesCost = invoices.reduce((s, inv) => {
+    const items = inv.items || [];
+    return s + items.reduce((si, item) => si + (toSafeFloat(item.buy_price || 0, 0) * toSafeInt(item.qty || 0, 0)), 0);
+  }, 0);
+  const netProfit = salesTotal - purchasesTotal - expenseTotal - payrollTotal;
+  const grossProfit = salesTotal - salesCost;
+  const grossMargin = salesTotal > 0 ? roundMoney((grossProfit / salesTotal) * 100) : 0;
+  const netMargin = salesTotal > 0 ? roundMoney((netProfit / salesTotal) * 100) : 0;
+  const avgSale = invoices.length > 0 ? roundMoney(salesTotal / invoices.length) : 0;
+  const avgPurchase = purchases.length > 0 ? roundMoney(purchasesTotal / purchases.length) : 0;
+  const avgProfit = invoices.length > 0 ? roundMoney(grossProfit / invoices.length) : 0;
+  const stockTurnover = salesCost > 0 && inventoryVal > 0 ? roundMoney(salesCost / inventoryVal) : 0;
+  const inventoryDays = stockTurnover > 0 ? roundMoney(365 / stockTurnover) : 0;
+  const customerCollectionPeriod = salesTotal > 0 && customerTotal > 0 ? roundMoney((customerTotal / salesTotal) * 365) : 0;
+  const supplierPaymentPeriod = purchasesTotal > 0 && supplierTotal > 0 ? roundMoney((supplierTotal / purchasesTotal) * 365) : 0;
+  const payrollPercent = salesTotal > 0 ? roundMoney((payrollTotal / salesTotal) * 100) : 0;
+  const expenseRatio = salesTotal > 0 ? roundMoney((expenseTotal / salesTotal) * 100) : 0;
+  const totalAssets = cashBalance + bankBalance + inventoryVal + (DB.fixedAssets || []).reduce((s, fa) => s + toSafeFloat(fa.value || 0, 0), 0);
+
+  // Cards
+  const cards = [
+    { label:'💰 Current Treasury', value:cashBalance, color:'var(--green)', page:'treasury' },
+    { label:'🏦 Bank Balance', value:bankBalance, color:'var(--blue)', page:'treasury' },
+    { label:'📦 Inventory Value', value:inventoryVal, color:'var(--purple)', page:'products' },
+    { label:'🏢 Total Assets', value:totalAssets, color:'var(--blue)', page:'treasury' },
+    { label:'👤 Customer Receivables', value:customerTotal, color:'var(--red)', page:'customers' },
+    { label:'🤝 Supplier Payables', value:supplierTotal, color:'var(--orange)', page:'suppliers' },
+    { label:'💵 Advances Outstanding', value:employeeAdvancesTot, color:'var(--yellow)', page:'hr' },
+    { label:'👔 Current Payroll', value:thisMonthPayroll, color:'var(--green)', page:'emp-reports' },
+    { label:'🛒 Sales', value:salesTotal, color:'var(--green)', page:'invoices' },
+    { label:'📦 Purchases', value:purchasesTotal, color:'var(--red)', page:'purchases' },
+    { label:'💸 Expenses', value:expenseTotal, color:'var(--orange)', page:'treasury' },
+    { label:'📈 Net Profit', value:netProfit, color:netProfit >= 0 ? 'var(--green)' : 'var(--red)', page:'invoices' },
+    { label:'🤝 Capital Balance', value:capitalBalance, color:'var(--purple)', page:'capital-partners' },
+    { label:'🏦 Retained Earnings', value:retainedEarnings, color:'var(--blue)', page:'capital-partners' },
+    { label:'💳 Partner Withdrawals', value:partnerWithdrawals, color:'var(--red)', page:'capital-partners' },
+    { label:'💰 Gross Profit', value:grossProfit, color:'var(--green)', page:'invoices' }
+  ];
+  document.getElementById('execSummaryCards').innerHTML = cards.map(c => `
+    <div class="stat-card" style="padding:10px;cursor:pointer" onclick="showPage('${c.page}')">
+      <div class="stat-label">${c.label}</div>
+      <div class="stat-value" style="font-size:1.2rem;color:${c.color};font-weight:900">${formatMoney(c.value)}</div>
+    </div>`).join('');
+
+  // Today activity
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+  const todayInvoices = (DB.saleInvoices || []).filter(inv => { const d = new Date(inv.date).getTime(); return d >= todayStart && d <= todayEnd && filterBranch(inv); });
+  const todayPurchases = (DB.purchaseInvoices || []).filter(inv => { const d = new Date(inv.date).getTime(); return d >= todayStart && d <= todayEnd && filterBranch(inv); });
+  const todayExpenses = (DB.cashFlow || []).filter(e => { const d = new Date(e.date).getTime(); return d >= todayStart && d <= todayEnd && e.type === 'out' && filterCash(e); });
+  const todayReceipts = (DB.cashFlow || []).filter(e => { const d = new Date(e.date).getTime(); return d >= todayStart && d <= todayEnd && e.type === 'in' && filterCash(e); });
+  const todaySales = todayInvoices.reduce((s, inv) => s + toSafeFloat(inv.total || 0, 0), 0);
+  const todayPurch = todayPurchases.reduce((s, inv) => s + toSafeFloat(inv.total || 0, 0), 0);
+  const todayExp = todayExpenses.reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const todayRec = todayReceipts.reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const todayPayments = todayExpenses.filter(e => e.sourceModule === 'suppliers' || e.entryKind === 'supplier').reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const todayPayroll = todayExpenses.filter(e => e.sourceModule === 'employees' || e.entryKind?.includes('salary')).reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const todayProfitDist = (DB.cashFlow || []).filter(e => { const d = new Date(e.date).getTime(); return d >= todayStart && d <= todayEnd && e.entryKind === 'profit_distribution'; }).reduce((s, e) => s + toSafeFloat(e.amount, 0), 0);
+  const todayAttendance = (DB.employeeAttendance || []).filter(a => { const d = new Date(a.date || a.createdAt || Date.now()).getTime(); return d >= todayStart && d <= todayEnd; }).length;
+  document.getElementById('execTodayActivity').innerHTML = `
+    <div class="stat-card blue" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">🛒 Sales Today</div><div class="stat-value" style="font-size:1rem">${formatMoney(todaySales)}</div></div>
+    <div class="stat-card orange" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">📦 Purchases Today</div><div class="stat-value" style="font-size:1rem">${formatMoney(todayPurch)}</div></div>
+    <div class="stat-card red" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">💸 Expenses Today</div><div class="stat-value" style="font-size:1rem">${formatMoney(todayExp)}</div></div>
+    <div class="stat-card green" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">💰 Receipts Today</div><div class="stat-value" style="font-size:1rem">${formatMoney(todayRec)}</div></div>
+    <div class="stat-card orange" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">💳 Payments Today</div><div class="stat-value" style="font-size:1rem">${formatMoney(todayPayments)}</div></div>
+    <div class="stat-card yellow" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">👔 Payroll Today</div><div class="stat-value" style="font-size:1rem">${formatMoney(todayPayroll)}</div></div>
+    <div class="stat-card purple" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">📤 Profit Dist. Today</div><div class="stat-value" style="font-size:1rem">${formatMoney(todayProfitDist)}</div></div>
+    <div class="stat-card blue" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">👥 Attendance Today</div><div class="stat-value" style="font-size:1rem">${todayAttendance}</div></div>`;
+
+  // Alerts
+  const lowStock = (DB.products || []).filter(p => toSafeInt(p.stock_qty || 0, 0) > 0 && toSafeInt(p.stock_qty || 0, 0) <= (toSafeInt(p.min_stock || 0, 0) || 5));
+  const negativeStock = (DB.products || []).filter(p => toSafeInt(p.stock_qty || 0, 0) < 0);
+  const unpaidPayroll = salaryLog.filter(s => s.status === 'generated');
+  const overdueCustomers = (DB.customers || []).filter(c => toSafeFloat(c.balance || c.debit || 0, 0) > 1000);
+  const dueSuppliers = (DB.suppliers || []).filter(s => toSafeFloat(s.balance || s.credit || 0, 0) > 1000);
+  const pendingPartnerProfit = (DB.capitalPartners || []).filter(cp => {
+    const due = toSafeFloat(cp.profitDue || cp.dueProfit || 0, 0);
+    return due > 100;
+  });
+  const largeExpenses = expenses.filter(e => toSafeFloat(e.amount, 0) > 5000);
+  const inactiveProducts = (DB.products || []).filter(p => {
+    const lastSale = invoices.filter(inv => (inv.items || []).some(item => String(item.product_id || item.productId || item.id) === String(p.id))).sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+    return !lastSale;
+  });
+  const pendingPayrollText = unpaidPayroll.length > 0 ? `<strong>${unpaidPayroll.length}</strong> employees pending · ${formatMoney(unpaidPayroll.reduce((s, r) => s + toSafeFloat(r.finalSalary || r.salary, 0), 0))}` : 'None';
+  const alertsHtml = [];
+  if (lowStock.length > 0) alertsHtml.push({ level: 'warning', icon: '📦', text: `Low Stock: <strong>${lowStock.length}</strong> products below minimum` });
+  if (negativeStock.length > 0) alertsHtml.push({ level: 'critical', icon: '🚨', text: `Negative Stock: <strong>${negativeStock.length}</strong> products` });
+  if (employeeAdvancesTot > 0) alertsHtml.push({ level: 'info', icon: '💵', text: `Employee Advances: <strong>${formatMoney(employeeAdvancesTot)}</strong> outstanding` });
+  if (unpaidPayroll.length > 0) alertsHtml.push({ level: 'warning', icon: '👔', text: `Unpaid Payroll: ${pendingPayrollText}` });
+  if (overdueCustomers.length > 0) alertsHtml.push({ level: 'warning', icon: '👤', text: `Overdue Customers: <strong>${overdueCustomers.length}</strong> with balance > 1,000` });
+  if (dueSuppliers.length > 0) alertsHtml.push({ level: 'info', icon: '🤝', text: `Suppliers Due: <strong>${dueSuppliers.length}</strong> with balance > 1,000` });
+  if (pendingPartnerProfit.length > 0) alertsHtml.push({ level: 'info', icon: '📤', text: `Partner Profit Pending: <strong>${pendingPartnerProfit.length}</strong> partners` });
+  if (largeExpenses.length > 0) alertsHtml.push({ level: 'warning', icon: '💸', text: `Large Expenses: <strong>${largeExpenses.length}</strong> expenses > 5,000 in period` });
+  if (inactiveProducts.length > 0) alertsHtml.push({ level: 'info', icon: '📦', text: `Inactive Products: <strong>${inactiveProducts.length}</strong> with no sales in period` });
+  document.getElementById('execAlerts').innerHTML = alertsHtml.length ? `<div class="table-container"><div class="table-header"><div class="table-title">🚨 Alerts (${alertsHtml.length})</div></div><div style="padding:8px">${alertsHtml.map(a => `<div class="alert alert-${a.level}">${a.icon} ${a.text}</div>`).join('')}</div></div>` : '';
+
+  // KPIs
+  document.getElementById('execKpiRow').innerHTML = `
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">📊 Gross Margin</div><div class="stat-value" style="font-size:.95rem;color:var(--green)">${grossMargin}%</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">📊 Net Margin</div><div class="stat-value" style="font-size:.95rem;color:${netMargin >= 0 ? 'var(--green)' : 'var(--red)'}">${netMargin}%</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">🛒 Avg Sale</div><div class="stat-value" style="font-size:.95rem">${formatMoney(avgSale)}</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">📦 Avg Purchase</div><div class="stat-value" style="font-size:.95rem">${formatMoney(avgPurchase)}</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">📈 Avg Profit</div><div class="stat-value" style="font-size:.95rem">${formatMoney(avgProfit)}</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">🔄 Stock Turnover</div><div class="stat-value" style="font-size:.95rem">${stockTurnover}x</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">📅 Inventory Days</div><div class="stat-value" style="font-size:.95rem">${inventoryDays}d</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">👤 Collection Period</div><div class="stat-value" style="font-size:.95rem">${customerCollectionPeriod}d</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">🤝 Payment Period</div><div class="stat-value" style="font-size:.95rem">${supplierPaymentPeriod}d</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">👔 Payroll %</div><div class="stat-value" style="font-size:.95rem">${payrollPercent}%</div></div>
+    <div class="stat-card" style="padding:8px;text-align:center"><div class="stat-label" style="font-size:.7rem">💸 Expense Ratio</div><div class="stat-value" style="font-size:.95rem">${expenseRatio}%</div></div>`;
+
+  // Top rankings
+  const topProducts = Object.entries(invoices.reduce((acc, inv) => {
+    (inv.items || []).forEach(item => {
+      const name = item.product_name || item.productName || item.name || `Product ${item.product_id || item.id}`;
+      const qty = toSafeInt(item.qty || 0, 0);
+      acc[name] = (acc[name] || 0) + qty;
+    });
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topCustomers = Object.entries(invoices.reduce((acc, inv) => {
+    const name = inv.customer_name || inv.customerName || inv.customer || 'Unknown';
+    acc[name] = (acc[name] || 0) + toSafeFloat(inv.total || 0, 0);
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const topSuppliers = Object.entries(purchases.reduce((acc, inv) => {
+    const name = inv.supplier_name || inv.supplierName || inv.supplier || 'Unknown';
+    acc[name] = (acc[name] || 0) + toSafeFloat(inv.total || 0, 0);
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  document.getElementById('execTopRankings').innerHTML = `
+    <div class="table-container">
+      <div class="table-header"><div class="table-title">🏆 Top Selling Products</div></div>
+      <div style="padding:6px">${topProducts.map(([name, qty], i) => `<div style="display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--line)"><span>${i+1}. ${escapeHtml(name)}</span><strong>${qty} sold</strong></div>`).join('') || '<div style="padding:12px;text-align:center">No data</div>'}</div>
+    </div>
+    <div class="table-container">
+      <div class="table-header"><div class="table-title">🏆 Top Customers</div></div>
+      <div style="padding:6px">${topCustomers.map(([name, total], i) => `<div style="display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--line)"><span>${i+1}. ${escapeHtml(name)}</span><strong>${formatMoney(total)}</strong></div>`).join('') || '<div style="padding:12px;text-align:center">No data</div>'}</div>
+    </div>
+    <div class="table-container">
+      <div class="table-header"><div class="table-title">🏆 Top Suppliers</div></div>
+      <div style="padding:6px">${topSuppliers.map(([name, total], i) => `<div style="display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--line)"><span>${i+1}. ${escapeHtml(name)}</span><strong>${formatMoney(total)}</strong></div>`).join('') || '<div style="padding:12px;text-align:center">No data</div>'}</div>
+    </div>`;
+
+  // Charts
+  drawExecBarChart('execSalesCanvas', getMonthlySalesData(from, to, branchId), ['Sales', 'Profit'], ['#0066ff', '#00c853']);
+  drawExecBarChart('execPurchasesCanvas', getMonthlyPurchasesData(from, to, branchId), ['Purchases', 'Expenses'], ['#ff6d00', '#d50000']);
+  drawExecBarChart('execCashCanvas', getMonthlyCashData(from, to, branchId), ['Inflow', 'Outflow'], ['#00c853', '#d50000']);
+  drawExecBarChart('execProductsCanvas', getTopProductData(from, to, branchId), ['Qty'], ['#0066ff']);
+  drawExecBarChart('execPayrollCanvas', getMonthlyPayrollData(from, to, branchId), ['Payroll'], ['#ff6d00']);
+  drawExecBarChart('execInventoryCanvas', getMonthlyInventoryData(from, to), ['Value'], ['#7c4dff']);
+}
+
+function populateExecBranchFilter() {
+  const sel = document.getElementById('execBranchFilter');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All Branches</option>' + (DB.branches || []).map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  sel.value = current;
+}
+
+function getExecDateRange() {
+  const period = document.getElementById('execPeriod')?.value || 'month';
+  const now = new Date();
+  let from = new Date(now), to = new Date(now);
+  if (period === 'today') { from.setHours(0,0,0,0); to.setHours(23,59,59,999); }
+  else if (period === 'week') { from.setDate(now.getDate() - now.getDay()); from.setHours(0,0,0,0); to.setHours(23,59,59,999); }
+  else if (period === 'month') { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999); }
+  else if (period === 'quarter') { const qStart = Math.floor(now.getMonth() / 3) * 3; from = new Date(now.getFullYear(), qStart, 1); to = new Date(now.getFullYear(), qStart + 3, 0, 23, 59, 59, 999); }
+  else if (period === 'year') { from = new Date(now.getFullYear(), 0, 1); to = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999); }
+  else if (period === 'custom') {
+    const f = document.getElementById('execFromDate')?.value; const t = document.getElementById('execToDate')?.value;
+    if (f) from = new Date(f + 'T00:00:00'); if (t) to = new Date(t + 'T23:59:59');
+  }
+  return { from: from.getTime(), to: to.getTime(), period };
+}
+
+function getMonthlySalesData(from, to, branchId) {
+  const months = {};
+  for (let d = new Date(from); d.getTime() <= to; d.setMonth(d.getMonth() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months[key] = { sales: 0, profit: 0 };
+  }
+  (DB.saleInvoices || []).forEach(inv => {
+    const d = new Date(inv.date).getTime();
+    if (d < from || d > to) return;
+    if (branchId && inv.branchId !== branchId && inv.branch !== branchId) return;
+    const key = inv.date ? `${new Date(inv.date).getFullYear()}-${String(new Date(inv.date).getMonth() + 1).padStart(2, '0')}` : '';
+    if (!months[key]) months[key] = { sales: 0, profit: 0 };
+    months[key].sales += toSafeFloat(inv.total || 0, 0);
+    const cost = (inv.items || []).reduce((s, item) => s + toSafeFloat(item.buy_price || 0, 0) * toSafeInt(item.qty || 0, 0), 0);
+    months[key].profit += toSafeFloat(inv.total || 0, 0) - cost;
+  });
+  const labels = Object.keys(months).sort();
+  return { labels, series: [labels.map(k => roundMoney(months[k].sales)), labels.map(k => roundMoney(months[k].profit))] };
+}
+
+function getMonthlyPurchasesData(from, to, branchId) {
+  const months = {};
+  for (let d = new Date(from); d.getTime() <= to; d.setMonth(d.getMonth() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months[key] = { purchases: 0, expenses: 0 };
+  }
+  (DB.purchaseInvoices || []).forEach(inv => {
+    const d = new Date(inv.date).getTime();
+    if (d < from || d > to) return;
+    if (branchId && inv.branchId !== branchId && inv.branch !== branchId) return;
+    const key = inv.date ? `${new Date(inv.date).getFullYear()}-${String(new Date(inv.date).getMonth() + 1).padStart(2, '0')}` : '';
+    if (!months[key]) months[key] = { purchases: 0, expenses: 0 };
+    months[key].purchases += toSafeFloat(inv.total || 0, 0);
+  });
+  (DB.cashFlow || []).forEach(e => {
+    const d = new Date(e.date).getTime();
+    if (d < from || d > to) return;
+    if (e.type !== 'out' || e.entryKind?.includes('salary') || e.sourceModule === 'employees') return;
+    if (branchId && e.branchId !== branchId) return;
+    const key = e.date ? `${new Date(e.date).getFullYear()}-${String(new Date(e.date).getMonth() + 1).padStart(2, '0')}` : '';
+    if (!months[key]) months[key] = { purchases: 0, expenses: 0 };
+    months[key].expenses += toSafeFloat(e.amount, 0);
+  });
+  const labels = Object.keys(months).sort();
+  return { labels, series: [labels.map(k => roundMoney(months[k].purchases)), labels.map(k => roundMoney(months[k].expenses))] };
+}
+
+function getMonthlyCashData(from, to, branchId) {
+  const months = {};
+  for (let d = new Date(from); d.getTime() <= to; d.setMonth(d.getMonth() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months[key] = { inflow: 0, outflow: 0 };
+  }
+  (DB.cashFlow || []).forEach(e => {
+    const d = new Date(e.date).getTime();
+    if (d < from || d > to) return;
+    if (branchId && e.branchId !== branchId) return;
+    const key = e.date ? `${new Date(e.date).getFullYear()}-${String(new Date(e.date).getMonth() + 1).padStart(2, '0')}` : '';
+    if (!months[key]) months[key] = { inflow: 0, outflow: 0 };
+    if (e.type === 'in') months[key].inflow += toSafeFloat(e.amount, 0);
+    else months[key].outflow += toSafeFloat(e.amount, 0);
+  });
+  const labels = Object.keys(months).sort();
+  return { labels, series: [labels.map(k => roundMoney(months[k].inflow)), labels.map(k => roundMoney(months[k].outflow))] };
+}
+
+function getTopProductData(from, to, branchId) {
+  const productQty = {};
+  (DB.saleInvoices || []).forEach(inv => {
+    const d = new Date(inv.date).getTime();
+    if (d < from || d > to) return;
+    if (branchId && inv.branchId !== branchId && inv.branch !== branchId) return;
+    (inv.items || []).forEach(item => {
+      const name = item.product_name || item.productName || item.name || `ID:${item.product_id || item.id}`;
+      const short = name.length > 15 ? name.slice(0, 15) + '..' : name;
+      productQty[short] = (productQty[short] || 0) + toSafeInt(item.qty || 0, 0);
+    });
+  });
+  const sorted = Object.entries(productQty).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  return { labels: sorted.map(([n]) => n), series: [sorted.map(([, q]) => q)] };
+}
+
+function getMonthlyPayrollData(from, to, branchId) {
+  const months = {};
+  for (let d = new Date(from); d.getTime() <= to; d.setMonth(d.getMonth() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months[key] = 0;
+  }
+  (DB.salaryLog || []).forEach(s => {
+    const d = new Date(s.date).getTime();
+    if (d < from || d > to) return;
+    if (branchId && s.branchId !== branchId) return;
+    const key = s.month || (s.date ? `${new Date(s.date).getFullYear()}-${String(new Date(s.date).getMonth() + 1).padStart(2, '0')}` : '');
+    if (months[key] !== undefined) months[key] += toSafeFloat(s.finalSalary || s.salary, 0);
+  });
+  const labels = Object.keys(months).sort();
+  return { labels, series: [labels.map(k => roundMoney(months[k]))] };
+}
+
+function getMonthlyInventoryData(from, to) {
+  const months = {};
+  for (let d = new Date(from); d.getTime() <= to; d.setMonth(d.getMonth() + 1)) {
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    months[key] = (DB.products || []).reduce((s, p) => s + toSafeFloat(p.buy_price || 0, 0) * toSafeInt(p.stock_qty || 0, 0), 0);
+  }
+  const labels = Object.keys(months).sort();
+  return { labels, series: [labels.map(k => roundMoney(months[k]))] };
+}
+
+function drawExecBarChart(canvasId, data, legend, colors) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const pad = { top: 20, bottom: 30, left: 50, right: 20 };
+  const chartW = w - pad.left - pad.right;
+  const chartH = h - pad.top - pad.bottom;
+  ctx.clearRect(0, 0, w, h);
+  if (!data.labels || data.labels.length === 0) {
+    ctx.fillStyle = '#999'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('No data', w / 2, h / 2);
+    return;
+  }
+  const numLabels = data.labels.length;
+  const numSeries = data.series.length;
+  const groupW = chartW / numLabels;
+  const barW = Math.min(groupW / (numSeries + 1), 20);
+  const maxVal = Math.max(...data.series.flat(), 1);
+  // Draw axes
+  ctx.strokeStyle = '#ddd'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, h - pad.bottom); ctx.lineTo(w - pad.right, h - pad.bottom); ctx.stroke();
+  // Y-axis labels
+  ctx.fillStyle = '#666'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+  const steps = 5;
+  for (let i = 0; i <= steps; i++) {
+    const val = (maxVal / steps) * i;
+    const y = pad.top + chartH - (chartH * i / steps);
+    ctx.fillText(formatShort(val), pad.left - 4, y + 3);
+    ctx.strokeStyle = '#f0f0f0'; ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+  }
+  // Bars
+  data.series.forEach((s, si) => {
+    s.forEach((val, i) => {
+      const x = pad.left + i * groupW + (groupW - barW * numSeries) / 2 + si * barW;
+      const barH = (val / maxVal) * chartH;
+      const y = pad.top + chartH - barH;
+      ctx.fillStyle = colors[si % colors.length];
+      ctx.fillRect(x, y, barW - 2, barH || 1);
+    });
+  });
+  // X-axis labels
+  ctx.fillStyle = '#666'; ctx.font = '8px sans-serif'; ctx.textAlign = 'center';
+  data.labels.forEach((label, i) => {
+    const x = pad.left + i * groupW + groupW / 2;
+    ctx.fillText(label.length > 8 ? label.slice(0, 8) : label, x, h - pad.bottom + 14);
+  });
+  // Legend
+  legend.forEach((name, i) => {
+    const lx = w - pad.right - 100 + i * 55;
+    ctx.fillStyle = colors[i % colors.length];
+    ctx.fillRect(lx, pad.top - 15, 10, 10);
+    ctx.fillStyle = '#333'; ctx.font = '8px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText(name, lx + 13, pad.top - 6);
+  });
+}
 function renderSmartBusinessAlerts(alerts) {
   const panel = document.getElementById('smartAlertsPanel');
   if (!panel) return;
