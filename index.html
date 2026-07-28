@@ -11167,9 +11167,142 @@ function detectSaleConflict(localSale, backendSale) {
   return { id: localSale.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localSale._syncedToBackend };
 }
 
+// ================= SYNC ENGINE =================
+const QUEUE_KEY = 'sync_engine_queue';
+const syncEngine = {
+  _modules: {},
+  _queue: [],
+  _running: false,
+  _paused: false,
+  _timer: null,
+  _lastSync: null,
+  _retryDelay: 5000,
+  status: 'idle',
+  pending: 0,
+  failed: 0,
+  onConflict: null,
+  onSuccess: null,
+  onFailure: null,
+  onProgress: null,
+  registerModule(name, handlers) {
+    this._modules[name] = handlers;
+  },
+  enqueue(item) {
+    const entry = { id: item.id || Date.now() + '_' + Math.random().toString(36).slice(2, 8), module: item.module, operation: item.operation, payload: item.payload || {}, createdAt: Date.now(), retryCount: 0, status: 'pending', priority: item.priority || 0, metadata: item.metadata || {} };
+    this._queue.push(entry);
+    this._persistQueue();
+    this._updateStats();
+    return entry;
+  },
+  dequeue(id) {
+    this._queue = this._queue.filter(q => q.id !== id);
+    this._persistQueue();
+    this._updateStats();
+  },
+  start(interval) {
+    if (!USE_BACKEND) return;
+    if (this._timer) return;
+    this._loadQueue();
+    this._updateStats();
+    this._setupNetworkListeners();
+    this._timer = setInterval(() => this.backgroundScheduler(), interval || 30000);
+    this.status = 'running';
+  },
+  stop() {
+    if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    this.status = 'stopped';
+  },
+  pause() { this._paused = true; this.status = 'paused'; },
+  resume() { this._paused = false; this.status = 'running'; },
+  async forceSync(module) {
+    if (!USE_BACKEND || this._running) return;
+    await this.processQueue(module);
+  },
+  async retry(id) {
+    const item = this._queue.find(q => q.id === id);
+    if (!item) return;
+    item.retryCount = 0;
+    item.status = 'pending';
+    this._persistQueue();
+    this._updateStats();
+  },
+  async processQueue(moduleFilter) {
+    if (!USE_BACKEND || this._running || this._paused) return;
+    this._running = true;
+    this.status = 'processing';
+    const items = this._queue.filter(q => q.status === 'pending' && (!moduleFilter || q.module === moduleFilter)).sort((a, b) => b.priority - a.priority);
+    for (const item of items) {
+      const mod = this._modules[item.module];
+      if (!mod || !mod[item.operation]) { item.status = 'failed'; item.error = 'No handler'; continue; }
+      const delay = this._exponentialBackoff(item.retryCount);
+      if (delay > 0) { await new Promise(r => setTimeout(r, delay)); }
+      try {
+        const res = await mod[item.operation](item.payload);
+        if (res && res.conflict && this.onConflict) this.onConflict(item, res.conflict);
+        item.status = 'completed';
+        item.completedAt = Date.now();
+        this._lastSync = Date.now();
+        if (this.onSuccess) this.onSuccess(item);
+      } catch (e) {
+        item.retryCount++;
+        item.status = 'failed';
+        item.error = e.message;
+        item.lastErrorAt = Date.now();
+        this.failed++;
+        if (this.onFailure) this.onFailure(item, e);
+      }
+      this._persistQueue();
+      this._updateStats();
+      if (this.onProgress) this.onProgress({ completed: items.filter(i => i.status === 'completed').length, total: this._queue.length, pending: this.pending, failed: this.failed });
+    }
+    this._running = false;
+    this.status = this._paused ? 'paused' : 'running';
+  },
+  backgroundScheduler() {
+    if (!USE_BACKEND || this._running || this._paused) return;
+    this.processQueue();
+  },
+  _exponentialBackoff(retryCount) {
+    if (retryCount === 0) return 0;
+    return Math.min(this._retryDelay * Math.pow(2, retryCount - 1), 120000);
+  },
+  _persistQueue() {
+    try { localStorage.setItem(QUEUE_KEY, JSON.stringify(this._queue)); } catch (_) {}
+  },
+  _loadQueue() {
+    try { const raw = localStorage.getItem(QUEUE_KEY); if (raw) { this._queue = JSON.parse(raw); } } catch (_) { this._queue = []; }
+  },
+  _updateStats() {
+    this.pending = this._queue.filter(q => q.status === 'pending').length;
+    this.failed = this._queue.filter(q => q.status === 'failed').length;
+  },
+  _setupNetworkListeners() {
+    if (this._listenersSetup) return;
+    this._listenersSetup = true;
+    window.addEventListener('online', () => { if (this.status === 'running') { this.processQueue(); } });
+    window.addEventListener('offline', () => { this.pause(); });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && USE_BACKEND && this.status === 'paused') { this.resume(); this.processQueue(); } });
+  }
+};
+
+syncEngine.registerModule('sales', {
+  sync: async (payload) => { await digitronicsDataAdapter.syncPendingSales(); return {}; },
+  refresh: async (payload) => { await digitronicsDataAdapter.refreshSales(); return {}; },
+  create: async (payload) => { const r = await backendApi.sales.create(payload); if (r && r.success) { payload._syncedToBackend = true; payload._backendId = r.data?.id || null; saveDB(); return {}; } throw new Error('create failed'); },
+  update: async (payload) => { const r = await backendApi.sales.update(payload.id, payload.data); if (!r || !r.success) throw new Error('update failed'); return {}; },
+  delete: async (payload) => { const r = await backendApi.sales.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
+});
+
+function scheduleBackgroundSync(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'sales', operation: 'sync', priority: 1 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 5000);
+}
+
 function scheduleBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
-  setTimeout(() => digitronicsDataAdapter.refreshSales().catch(() => {}), delay || 10000);
+  syncEngine.enqueue({ module: 'sales', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
 // ================= STATE =================
