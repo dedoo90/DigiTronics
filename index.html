@@ -10917,6 +10917,14 @@ const backendApi = {
     create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/sales', data) : null,
     update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/sales/' + id, data) : null,
     delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/sales/' + id) : null
+  },
+  purchases: {
+    getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/purchases') : null,
+    getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/purchases/' + id) : null,
+    getStats: () => USE_BACKEND ? backendApi._fetch('GET', '/purchases/stats') : null,
+    create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/purchases', data) : null,
+    update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/purchases/' + id, data) : null,
+    delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/purchases/' + id) : null
   }
 };
 
@@ -11152,6 +11160,85 @@ const digitronicsDataAdapter = {
     } finally {
       this._syncPending = false;
     }
+  },
+  _normalizeBackendPurchase(bs) {
+    if (!bs) return null;
+    return { ...bs, id: bs.id || bs.invoiceId, invoiceId: bs.invoiceId || bs.id, date: bs.date || bs.createdAt, supplier: bs.supplier || bs.supplierName || '', payment: bs.payment || bs.paymentType || 'cash', invoiceType: bs.invoiceType || 'cash' };
+  },
+  async listPurchases() {
+    if (!USE_BACKEND) return DB.purchaseInvoices;
+    try {
+      const res = await backendApi.purchases.getAll();
+      if (res && res.success && Array.isArray(res.data)) {
+        return res.data.map(inv => this._normalizeBackendPurchase(inv));
+      }
+      return DB.purchaseInvoices;
+    } catch (e) {
+      return DB.purchaseInvoices;
+    }
+  },
+  async getPurchase(id) {
+    if (!USE_BACKEND) return DB.purchaseInvoices.find(inv => String(inv.id) === String(id)) || null;
+    try {
+      const res = await backendApi.purchases.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendPurchase(res.data);
+      return DB.purchaseInvoices.find(inv => String(inv.id) === String(id)) || null;
+    } catch (e) {
+      return DB.purchaseInvoices.find(inv => String(inv.id) === String(id)) || null;
+    }
+  },
+  _syncPendingPurchases: false,
+  _refreshPendingPurchases: false,
+  _lastBackendPurchaseRefresh: null,
+  async refreshPurchases() {
+    if (!USE_BACKEND || this._refreshPendingPurchases) return;
+    this._refreshPendingPurchases = true;
+    try {
+      const res = await backendApi.purchases.getAll();
+      if (!res || !res.success || !Array.isArray(res.data)) return;
+      const backendPurchases = res.data.map(inv => this._normalizeBackendPurchase(inv));
+      const localById = {};
+      (DB.purchaseInvoices || []).forEach(inv => { const key = inv._backendId || inv.id; localById[key] = inv; });
+      const unsyncedKeys = {};
+      (DB.purchaseInvoices || []).filter(inv => !inv._syncedToBackend).forEach(inv => { unsyncedKeys[inv.id] = true; });
+      let changed = false;
+      for (const bs of backendPurchases) {
+        const key = bs._backendId || bs.id;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[bs.id]) {
+          bs._syncedToBackend = true;
+          bs._backendId = bs._backendId || bs.id;
+          bs._importedFromBackend = true;
+          DB.purchaseInvoices.push(bs);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendPurchaseRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPendingPurchases = false;
+    }
+  },
+  async syncPendingPurchases() {
+    if (!USE_BACKEND || this._syncPendingPurchases) return;
+    this._syncPendingPurchases = true;
+    try {
+      const pending = (DB.purchaseInvoices || []).filter(inv => !inv._syncedToBackend);
+      for (const inv of pending) {
+        try {
+          const res = await backendApi.purchases.create(inv);
+          if (res && res.success) {
+            inv._syncedToBackend = true;
+            inv._backendId = res.data?.id || null;
+          }
+        } catch (_) {}
+      }
+      if (pending.length > 0) saveDB();
+    } finally {
+      this._syncPendingPurchases = false;
+    }
   }
 };
 
@@ -11165,6 +11252,13 @@ function detectSaleConflict(localSale, backendSale) {
   const localUpdated = new Date(localSale.updatedAt || localSale.createdAt || 0).getTime();
   const backendUpdated = new Date(backendSale.updatedAt || backendSale.createdAt || 0).getTime();
   return { id: localSale.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localSale._syncedToBackend };
+}
+
+function detectPurchaseConflict(localPurchase, backendPurchase) {
+  if (!localPurchase || !backendPurchase) return null;
+  const localUpdated = new Date(localPurchase.updatedAt || localPurchase.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendPurchase.updatedAt || backendPurchase.createdAt || 0).getTime();
+  return { id: localPurchase.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localPurchase._syncedToBackend };
 }
 
 // ================= SYNC ENGINE =================
@@ -11293,6 +11387,14 @@ syncEngine.registerModule('sales', {
   delete: async (payload) => { const r = await backendApi.sales.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
 });
 
+syncEngine.registerModule('purchases', {
+  sync: async (payload) => { await digitronicsDataAdapter.syncPendingPurchases(); return {}; },
+  refresh: async (payload) => { await digitronicsDataAdapter.refreshPurchases(); return {}; },
+  create: async (payload) => { const r = await backendApi.purchases.create(payload); if (r && r.success) { payload._syncedToBackend = true; payload._backendId = r.data?.id || null; saveDB(); return {}; } throw new Error('create failed'); },
+  update: async (payload) => { const r = await backendApi.purchases.update(payload.id, payload.data); if (!r || !r.success) throw new Error('update failed'); return {}; },
+  delete: async (payload) => { const r = await backendApi.purchases.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
+});
+
 function scheduleBackgroundSync(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'sales', operation: 'sync', priority: 1 });
@@ -11302,6 +11404,18 @@ function scheduleBackgroundSync(delay) {
 function scheduleBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'sales', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
+}
+
+function schedulePurchaseBackgroundSync(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'purchases', operation: 'sync', priority: 1 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 5000);
+}
+
+function schedulePurchaseBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'purchases', operation: 'refresh', priority: 0 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
