@@ -11073,6 +11073,32 @@ const digitronicsDataAdapter = {
   },
   async closeDay(payload, legacyCloseDay) {
     return legacyCloseDay();
+  },
+  _normalizeBackendSale(bs) {
+    if (!bs) return null;
+    return { ...bs, id: bs.id || bs.invoiceId, invoiceId: bs.invoiceId || bs.id, date: bs.date || bs.createdAt, customer: bs.customer || bs.customerName || '', payment: bs.payment || bs.paymentType || 'cash', invoiceType: bs.invoiceType || 'cash' };
+  },
+  async listSales() {
+    if (!USE_BACKEND) return DB.saleInvoices;
+    try {
+      const res = await backendApi.sales.list();
+      if (res && res.success && Array.isArray(res.data)) {
+        return res.data.map(inv => this._normalizeBackendSale(inv));
+      }
+      return DB.saleInvoices;
+    } catch (e) {
+      return DB.saleInvoices;
+    }
+  },
+  async getSale(id) {
+    if (!USE_BACKEND) return DB.saleInvoices.find(inv => String(inv.id) === String(id)) || null;
+    try {
+      const res = await backendApi.sales.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendSale(res.data);
+      return DB.saleInvoices.find(inv => String(inv.id) === String(id)) || null;
+    } catch (e) {
+      return DB.saleInvoices.find(inv => String(inv.id) === String(id)) || null;
+    }
   }
 };
 
