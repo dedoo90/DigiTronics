@@ -412,6 +412,8 @@ body.accent-orange{--accent:#ea580c;--accent2:#c2410c;--accent-color:#ea580c;}
 
 /* STATS */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px;}
+.exec-chart-box{min-height:180px;width:100%}
+.exec-chart-box canvas{display:block;max-width:100%}
 .stat-card{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:22px;padding:20px 18px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s,background .25s;cursor:default;box-shadow:var(--glass-shadow);backdrop-filter:blur(var(--glass-blur)) saturate(145%);-webkit-backdrop-filter:blur(var(--glass-blur)) saturate(145%);}
 .stat-card:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 16px 36px rgba(15,23,42,0.12);}
 .stat-card::before{content:'';position:absolute;top:0;right:0;width:60px;height:60px;border-radius:0 12px 0 60px;opacity:.12;}
@@ -2304,30 +2306,30 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
 
       <div id="execAlerts" style="margin-top:10px"></div>
 
-      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(320px,1fr));margin-top:10px;align-items:start">
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:10px;align-items:start">
         <div class="table-container">
           <div class="table-header"><div class="table-title">📊 Monthly Sales & Profit</div></div>
-          <div id="execChartSales" style="height:200px;padding:8px"><canvas id="execSalesCanvas" width="300" height="180"></canvas></div>
+          <div id="execChartSales" class="exec-chart-box" style="padding:8px;overflow:hidden"><canvas id="execSalesCanvas"></canvas></div>
         </div>
         <div class="table-container">
           <div class="table-header"><div class="table-title">📊 Monthly Purchases & Expenses</div></div>
-          <div id="execChartPurchases" style="height:200px;padding:8px"><canvas id="execPurchasesCanvas" width="300" height="180"></canvas></div>
+          <div id="execChartPurchases" class="exec-chart-box" style="padding:8px;overflow:hidden"><canvas id="execPurchasesCanvas"></canvas></div>
         </div>
         <div class="table-container">
           <div class="table-header"><div class="table-title">📊 Cash Flow Trend</div></div>
-          <div id="execChartCashFlow" style="height:200px;padding:8px"><canvas id="execCashCanvas" width="300" height="180"></canvas></div>
+          <div id="execChartCashFlow" class="exec-chart-box" style="padding:8px;overflow:hidden"><canvas id="execCashCanvas"></canvas></div>
         </div>
         <div class="table-container">
           <div class="table-header"><div class="table-title">📊 Top Selling Products</div></div>
-          <div id="execChartTopProducts" style="height:200px;padding:8px"><canvas id="execProductsCanvas" width="300" height="180"></canvas></div>
+          <div id="execChartTopProducts" class="exec-chart-box" style="padding:8px;overflow:hidden"><canvas id="execProductsCanvas"></canvas></div>
         </div>
         <div class="table-container">
           <div class="table-header"><div class="table-title">📊 Payroll Cost Trend</div></div>
-          <div id="execChartPayroll" style="height:200px;padding:8px"><canvas id="execPayrollCanvas" width="300" height="180"></canvas></div>
+          <div id="execChartPayroll" class="exec-chart-box" style="padding:8px;overflow:hidden"><canvas id="execPayrollCanvas"></canvas></div>
         </div>
         <div class="table-container">
           <div class="table-header"><div class="table-title">📊 Inventory Value Trend</div></div>
-          <div id="execChartInventory" style="height:200px;padding:8px"><canvas id="execInventoryCanvas" width="300" height="180"></canvas></div>
+          <div id="execChartInventory" class="exec-chart-box" style="padding:8px;overflow:hidden"><canvas id="execInventoryCanvas"></canvas></div>
         </div>
       </div>
 
@@ -25460,12 +25462,23 @@ function renderExecDashboard() {
     <div class="table-container"><div class="table-header"><div class="table-title">🏆 Top Customers</div></div><div style="padding:6px">${topCustomers.map(([n, t], i) => `<div style="display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--line)"><span>${i+1}. ${escapeHtml(n)}</span><strong>${formatMoney(t)}</strong></div>`).join('') || '<div style="padding:12px;text-align:center">No data</div>'}</div></div>
     <div class="table-container"><div class="table-header"><div class="table-title">🏆 Top Suppliers</div></div><div style="padding:6px">${topSuppliers.map(([n, t], i) => `<div style="display:flex;justify-content:space-between;padding:4px 6px;border-bottom:1px solid var(--line)"><span>${i+1}. ${escapeHtml(n)}</span><strong>${formatMoney(t)}</strong></div>`).join('') || '<div style="padding:12px;text-align:center">No data</div>'}</div></div>`;
 
-  drawExecBarChart('execSalesCanvas', getMonthlySalesData(from, to, branchId), ['Sales', 'Profit'], ['#0066ff', '#00c853']);
-  drawExecBarChart('execPurchasesCanvas', getMonthlyPurchasesData(from, to, branchId), ['Purchases', 'Expenses'], ['#ff6d00', '#d50000']);
-  drawExecBarChart('execCashCanvas', getMonthlyCashData(from, to, branchId), ['Inflow', 'Outflow'], ['#00c853', '#d50000']);
-  drawExecBarChart('execProductsCanvas', getTopProductData(from, to, branchId), ['Qty'], ['#0066ff']);
-  drawExecBarChart('execPayrollCanvas', getMonthlyPayrollData(from, to, branchId), ['Payroll'], ['#ff6d00']);
-  drawExecBarChart('execInventoryCanvas', getMonthlyInventoryData(from, to), ['Value'], ['#7c4dff']);
+  const chartData = [
+    { id:'execSalesCanvas', data:getMonthlySalesData(from, to, branchId), legend:['Sales','Profit'], colors:['#0066ff','#00c853'] },
+    { id:'execPurchasesCanvas', data:getMonthlyPurchasesData(from, to, branchId), legend:['Purchases','Expenses'], colors:['#ff6d00','#d50000'] },
+    { id:'execCashCanvas', data:getMonthlyCashData(from, to, branchId), legend:['Inflow','Outflow'], colors:['#00c853','#d50000'] },
+    { id:'execProductsCanvas', data:getTopProductData(from, to, branchId), legend:['Qty'], colors:['#0066ff'] },
+    { id:'execPayrollCanvas', data:getMonthlyPayrollData(from, to, branchId), legend:['Payroll'], colors:['#ff6d00'] },
+    { id:'execInventoryCanvas', data:getMonthlyInventoryData(from, to), legend:['Value'], colors:['#7c4dff'] }
+  ];
+  chartData.forEach(c => drawExecBarChart(c.id, c.data, c.legend, c.colors));
+  if (!window._execChartResize) {
+    window._execChartResize = new ResizeObserver(() => {
+      if (document.getElementById('page-exec-dashboard')?.classList.contains('active')) {
+        chartData.forEach(c => drawExecBarChart(c.id, c.data, c.legend, c.colors));
+      }
+    });
+    document.querySelectorAll('.exec-chart-box').forEach(el => window._execChartResize.observe(el));
+  }
 }
 
 function populateExecBranchFilter() {
@@ -25526,22 +25539,42 @@ function getMonthlyInventoryData(from, to) {
 
 function drawExecBarChart(canvasId, data, legend, colors) {
   const canvas = document.getElementById(canvasId); if (!canvas) return;
-  const ctx = canvas.getContext('2d'); const w = canvas.width, h = canvas.height;
+  const container = canvas.parentElement;
+  if (container) {
+    const rect = container.getBoundingClientRect();
+    const cw = Math.max(rect.width - 16, 200);
+    canvas.width = cw * (window.devicePixelRatio || 1);
+    canvas.height = 180 * (window.devicePixelRatio || 1);
+    canvas.style.width = cw + 'px';
+    canvas.style.height = '180px';
+  }
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.width, h = canvas.height;
+  const isDark = document.body.classList.contains('dark-mode');
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : '#f0f0f0';
+  const axisColor = isDark ? 'rgba(255,255,255,0.15)' : '#ddd';
+  const textColor = isDark ? 'rgba(255,255,255,0.6)' : '#666';
+  const titleColor = isDark ? 'rgba(255,255,255,0.8)' : '#333';
+  const noDataColor = isDark ? 'rgba(255,255,255,0.4)' : '#999';
+  ctx.scale(dpr, dpr);
+  const dw = w / dpr, dh = h / dpr;
   const pad = { top:20, bottom:30, left:50, right:20 };
-  const chartW = w-pad.left-pad.right; const chartH = h-pad.top-pad.bottom;
-  ctx.clearRect(0,0,w,h);
-  if (!data.labels || data.labels.length === 0) { ctx.fillStyle = '#999'; ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.fillText('No data', w/2, h/2); return; }
+  const chartW = dw-pad.left-pad.right; const chartH = dh-pad.top-pad.bottom;
+  ctx.clearRect(0,0,dw,dh);
+  if (!data.labels || data.labels.length === 0) { ctx.fillStyle = noDataColor; ctx.font='12px sans-serif'; ctx.textAlign='center'; ctx.fillText('No data', dw/2, dh/2); return; }
   const groupW = chartW / data.labels.length;
   const numSeries = data.series.length;
   const barW = Math.min(groupW/(numSeries+1), 20);
   const maxVal = Math.max(...data.series.flat(), 1);
-  ctx.strokeStyle = '#ddd'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad.left,pad.top); ctx.lineTo(pad.left,h-pad.bottom); ctx.lineTo(w-pad.right,h-pad.bottom); ctx.stroke();
-  ctx.fillStyle='#666'; ctx.font='9px sans-serif'; ctx.textAlign='right';
-  for (let i=0;i<=5;i++) { const v=(maxVal/5)*i; const y=pad.top+chartH-(chartH*i/5); ctx.fillText(formatShort(v),pad.left-4,y+3); ctx.strokeStyle='#f0f0f0'; ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(w-pad.right,y); ctx.stroke(); }
+  ctx.strokeStyle = axisColor; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(pad.left,pad.top); ctx.lineTo(pad.left,dh-pad.bottom); ctx.lineTo(dw-pad.right,dh-pad.bottom); ctx.stroke();
+  ctx.fillStyle=textColor; ctx.font='9px sans-serif'; ctx.textAlign='right';
+  for (let i=0;i<=5;i++) { const v=(maxVal/5)*i; const y=pad.top+chartH-(chartH*i/5); ctx.fillText(formatShort(v),pad.left-4,y+3); ctx.strokeStyle=gridColor; ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(dw-pad.right,y); ctx.stroke(); }
   data.series.forEach((s,si) => { s.forEach((val,i) => { const x=pad.left+i*groupW+(groupW-barW*numSeries)/2+si*barW; const barH=(val/maxVal)*chartH; const y=pad.top+chartH-barH; ctx.fillStyle=colors[si%colors.length]; ctx.fillRect(x,y,barW-2,barH||1); }); });
-  ctx.fillStyle='#666'; ctx.font='8px sans-serif'; ctx.textAlign='center';
-  data.labels.forEach((l,i) => { ctx.fillText(l.length>8?l.slice(0,8):l, pad.left+i*groupW+groupW/2, h-pad.bottom+14); });
-  legend.forEach((name,i) => { const lx = w-pad.right-100+i*55; ctx.fillStyle=colors[i%colors.length]; ctx.fillRect(lx,pad.top-15,10,10); ctx.fillStyle='#333'; ctx.font='8px sans-serif'; ctx.textAlign='left'; ctx.fillText(name,lx+13,pad.top-6); });
+  ctx.fillStyle=textColor; ctx.font='8px sans-serif'; ctx.textAlign='center';
+  data.labels.forEach((l,i) => { ctx.fillText(l.length>8?l.slice(0,8):l, pad.left+i*groupW+groupW/2, dh-pad.bottom+14); });
+  legend.forEach((name,i) => { const lx = dw-pad.right-100+i*55; ctx.fillStyle=colors[i%colors.length]; ctx.fillRect(lx,pad.top-15,10,10); ctx.fillStyle=titleColor; ctx.font='8px sans-serif'; ctx.textAlign='left'; ctx.fillText(name,lx+13,pad.top-6); });
+  ctx.setTransform(1,0,0,1,0,0);
 }
 
 function renderSmartBusinessAlerts(alerts) {
