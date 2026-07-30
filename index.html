@@ -10928,6 +10928,13 @@ const backendApi = {
     create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/purchases', data) : null,
     update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/purchases/' + id, data) : null,
     delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/purchases/' + id) : null
+  },
+  inventory: {
+    getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/inventory') : null,
+    getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/inventory/' + id) : null,
+    create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/inventory', data) : null,
+    update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/inventory/' + id, data) : null,
+    delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/inventory/' + id) : null
   }
 };
 
