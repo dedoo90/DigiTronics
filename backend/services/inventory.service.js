@@ -83,6 +83,20 @@ class InventoryService {
     return (db.products || []).find(p => this._matchesId(p, normalized)) || null;
   }
 
+  stats() {
+    const db = this._load();
+    const products = db.products || [];
+    const categories = new Set();
+    const brands = new Set();
+    let serialized = 0;
+    products.forEach(p => {
+      if (p.categoryId !== undefined && p.categoryId !== null) categories.add(String(p.categoryId));
+      if (p.brandId !== undefined && p.brandId !== null) brands.add(String(p.brandId));
+      if (p.hasSerial || p.serial_tracking) serialized++;
+    });
+    return { count: products.length, serialized, categories: categories.size, brands: brands.size };
+  }
+
   create(data) {
     const errors = this._validateRequired(data, true);
     if (errors.length) return { error: errors.join('; ') };
