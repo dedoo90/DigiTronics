@@ -10968,6 +10968,14 @@ const backendApi = {
     create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/treasury', data) : null,
     update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/treasury/' + id, data) : null,
     delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/treasury/' + id) : null
+  },
+  employees: {
+    getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/employees') : null,
+    getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/employees/' + id) : null,
+    getStats: () => USE_BACKEND ? backendApi._fetch('GET', '/employees/stats') : null,
+    create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/employees', data) : null,
+    update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/employees/' + id, data) : null,
+    delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/employees/' + id) : null
   }
 };
 
