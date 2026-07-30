@@ -11489,6 +11489,32 @@ const digitronicsDataAdapter = {
     } finally {
       this._refreshPendingSuppliers = false;
     }
+  },
+  _normalizeBackendTreasury(be) {
+    if (!be) return null;
+    return { ...be, type: be.type || 'in', amount: parseFloat(be.amount) || 0, date: be.date || be.createdAt, method: be.method || 'cash', desc: be.desc || '' };
+  },
+  async listTreasury() {
+    if (!USE_BACKEND) return getTreasuryEntries();
+    try {
+      const res = await backendApi.treasury.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.entries) ? res.data.entries : null)) : null;
+      if (arr) return arr.map(e => this._normalizeBackendTreasury(e));
+      return getTreasuryEntries();
+    } catch (e) {
+      return getTreasuryEntries();
+    }
+  },
+  async getTreasury(id) {
+    const local = () => getTreasuryEntries().find(e => String(e.id) === String(id)) || null;
+    if (!USE_BACKEND) return local();
+    try {
+      const res = await backendApi.treasury.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendTreasury(res.data);
+      return local();
+    } catch (e) {
+      return local();
+    }
   }
 };
 
