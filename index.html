@@ -11648,6 +11648,41 @@ const digitronicsDataAdapter = {
     } finally {
       this._syncPendingTreasury = false;
     }
+  },
+  _refreshPendingTreasury: false,
+  _lastBackendTreasuryRefresh: null,
+  async refreshTreasury() {
+    if (!USE_BACKEND || this._refreshPendingTreasury) return;
+    this._refreshPendingTreasury = true;
+    try {
+      const res = await backendApi.treasury.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.entries) ? res.data.entries : null)) : null;
+      if (!arr) return;
+      const backendEntries = arr.map(e => this._normalizeBackendTreasury(e));
+      const localEntries = getTreasuryEntries();
+      const localById = {};
+      localEntries.forEach(e => { const key = e._backendId || e.id; localById[key] = e; });
+      const unsyncedKeys = {};
+      localEntries.filter(e => !e._syncedToBackend).forEach(e => { unsyncedKeys[e.id] = true; });
+      let changed = false;
+      for (const be of backendEntries) {
+        const key = be._backendId || be.id;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[be.id]) {
+          be._syncedToBackend = true;
+          be._backendId = be._backendId || be.id;
+          be._importedFromBackend = true;
+          localEntries.push(be);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendTreasuryRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPendingTreasury = false;
+    }
   }
 };
 
@@ -11696,6 +11731,13 @@ function detectSupplierConflict(localSupplier, backendSupplier) {
   const localUpdated = new Date(localSupplier.updatedAt || localSupplier.createdAt || 0).getTime();
   const backendUpdated = new Date(backendSupplier.updatedAt || backendSupplier.createdAt || 0).getTime();
   return { id: localSupplier.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localSupplier._syncedToBackend };
+}
+
+function detectTreasuryConflict(localEntry, backendEntry) {
+  if (!localEntry || !backendEntry) return null;
+  const localUpdated = new Date(localEntry.updatedAt || localEntry.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendEntry.updatedAt || backendEntry.createdAt || 0).getTime();
+  return { id: localEntry.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localEntry._syncedToBackend };
 }
 
 // ================= SYNC ENGINE =================
@@ -11939,6 +11981,12 @@ function scheduleCustomerBackgroundRefresh(delay) {
 function scheduleSupplierBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'suppliers', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
+}
+
+function scheduleTreasuryBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'treasury', operation: 'refresh', priority: 0 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
