@@ -9276,8 +9276,10 @@ function buildSupabaseProductRestoreCandidates(snapshot) {
         buy_price: firstUsefulPrice(group.purchase, ['unit_price', 'purchase_price', 'price', 'buy_price']),
         sell_price: firstUsefulPrice(group.sale, ['unit_price', 'sale_price', 'price', 'sell_price']),
         has_serial: hasSerial,
-...(sku ? { sku } : {})
-      }).sort((a, b) => a.legacyId.localeCompare(b.legacyId));
+        ...(sku ? { sku } : {})
+      }
+    };
+  }).sort((a, b) => a.legacyId.localeCompare(b.legacyId));
 }
 
 async function loadSupabaseProductRestoreSnapshot() {
