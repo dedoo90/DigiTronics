@@ -11624,6 +11624,40 @@ const digitronicsDataAdapter = {
     } finally {
       this._syncPendingEmployees = false;
     }
+  },
+  _refreshPendingEmployees: false,
+  _lastBackendEmployeeRefresh: null,
+  async refreshEmployees() {
+    if (!USE_BACKEND || this._refreshPendingEmployees) return;
+    this._refreshPendingEmployees = true;
+    try {
+      const res = await backendApi.employees.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.employees) ? res.data.employees : null)) : null;
+      if (!arr) return;
+      const backendEmployees = arr.map(e => this._normalizeBackendEmployee(e));
+      const localById = {};
+      (DB.employees || []).forEach(e => { const key = e._backendId || e.id; localById[key] = e; });
+      const unsyncedKeys = {};
+      (DB.employees || []).filter(e => !e._syncedToBackend).forEach(e => { unsyncedKeys[e.id] = true; });
+      let changed = false;
+      for (const be of backendEmployees) {
+        const key = be._backendId || be.id;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[be.id]) {
+          be._syncedToBackend = true;
+          be._backendId = be._backendId || be.id;
+          be._importedFromBackend = true;
+          DB.employees.push(be);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendEmployeeRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPendingEmployees = false;
+    }
   }
 };
 
@@ -11679,6 +11713,13 @@ function detectTreasuryConflict(localEntry, backendEntry) {
   const localUpdated = new Date(localEntry.updatedAt || localEntry.createdAt || 0).getTime();
   const backendUpdated = new Date(backendEntry.updatedAt || backendEntry.createdAt || 0).getTime();
   return { id: localEntry.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localEntry._syncedToBackend };
+}
+
+function detectEmployeeConflict(localEmployee, backendEmployee) {
+  if (!localEmployee || !backendEmployee) return null;
+  const localUpdated = new Date(localEmployee.updatedAt || localEmployee.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendEmployee.updatedAt || backendEmployee.createdAt || 0).getTime();
+  return { id: localEmployee.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localEmployee._syncedToBackend };
 }
 
 // ================= SYNC ENGINE =================
@@ -11942,6 +11983,12 @@ function scheduleSupplierBackgroundRefresh(delay) {
 function scheduleTreasuryBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'treasury', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
+}
+
+function scheduleEmployeeBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'employees', operation: 'refresh', priority: 0 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
