@@ -10895,6 +10895,9 @@ function clearHealthErrorLog() {
   renderHealthMonitor();
 }
 
+const USE_BACKEND = false; // Feature flag: set true to route Sales CRUD through backend API
+const API_BASE_URL = ''; // Backend API base URL – set when backend is ready
+
 // ================= BACKEND API CLIENT (Phase 2: Sales only) =================
 const backendApi = {
   _baseUrl: API_BASE_URL || '',
@@ -11420,8 +11423,6 @@ function schedulePurchaseBackgroundRefresh(delay) {
 }
 
 // ================= STATE =================
-const USE_BACKEND = false; // Feature flag: set true to route Sales CRUD through backend API
-const API_BASE_URL = ''; // Backend API base URL – set when backend is ready
 let DB = {
   products: [],
   categories: [],
