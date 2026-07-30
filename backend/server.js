@@ -28,7 +28,7 @@ const inventoryTransactionsRoutes = require('./routes/inventoryTransactions.rout
 const customersRoutes = require('./routes/customers.routes');
 const suppliersRoutes = require('./routes/suppliers.routes');
 const treasuryRoutes = require('./routes/treasury.routes');
-const employeeRoutes = require('./routes/employee.routes');
+const employeesRoutes = require('./routes/employees.routes');
 const partnerRoutes = require('./routes/partner.routes');
 const voucherRoutes = require('./routes/voucher.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
@@ -42,7 +42,7 @@ app.use('/api/v1/inventory-transactions', inventoryTransactionsRoutes);
 app.use('/api/v1/customers', customersRoutes);
 app.use('/api/v1/suppliers', suppliersRoutes);
 app.use('/api/v1/treasury', treasuryRoutes);
-app.use('/api/v1/employees', employeeRoutes);
+app.use('/api/v1/employees', employeesRoutes);
 app.use('/api/v1/partners', partnerRoutes);
 app.use('/api/v1/vouchers', voucherRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);

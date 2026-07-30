@@ -1,7 +1,8 @@
 const router = require('express').Router();
-const ctrl = require('../controllers/employee.controller');
+const ctrl = require('../controllers/employees.controller');
 
 router.get('/', ctrl.list);
+router.get('/stats', ctrl.getStats);
 router.get('/:id', ctrl.getById);
 router.post('/', ctrl.create);
 router.put('/:id', ctrl.update);
