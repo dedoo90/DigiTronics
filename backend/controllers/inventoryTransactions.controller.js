@@ -23,6 +23,16 @@ function getById(req, res) {
   }
 }
 
+function getStats(req, res) {
+  try {
+    const result = inventoryTransactionsService.stats();
+    success(res, result, 'Inventory transaction stats retrieved');
+  } catch (err) {
+    logger.error('inventoryTransactions.stats error:', err.message);
+    error(res, 'Failed to retrieve inventory transaction stats', 500);
+  }
+}
+
 function create(req, res) {
   try {
     const result = inventoryTransactionsService.create(req.body);
@@ -58,4 +68,4 @@ function remove(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, getStats, getById, create, update, remove };

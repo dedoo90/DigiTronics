@@ -10940,6 +10940,7 @@ const backendApi = {
   inventoryTransactions: {
     getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/inventory-transactions') : null,
     getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/inventory-transactions/' + id) : null,
+    getStats: () => USE_BACKEND ? backendApi._fetch('GET', '/inventory-transactions/stats') : null,
     create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/inventory-transactions', data) : null,
     update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/inventory-transactions/' + id, data) : null,
     delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/inventory-transactions/' + id) : null
@@ -11593,6 +11594,14 @@ syncEngine.registerModule('inventory', {
   create: async (payload) => { const r = await backendApi.inventory.create(payload); if (r && r.success) { payload._syncedToBackend = true; payload._backendId = r.data?.id || null; saveDB(); return {}; } throw new Error('create failed'); },
   update: async (payload) => { const r = await backendApi.inventory.update(payload.id, payload.data); if (!r || !r.success) throw new Error('update failed'); return {}; },
   delete: async (payload) => { const r = await backendApi.inventory.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
+});
+
+syncEngine.registerModule('inventoryTransactions', {
+  sync: async (payload) => { await digitronicsDataAdapter.syncPendingInventoryTransactions(); return {}; },
+  refresh: async (payload) => { await digitronicsDataAdapter.refreshInventoryTransactions(); return {}; },
+  create: async (payload) => { const r = await backendApi.inventoryTransactions.create(payload); if (r && r.success) { payload._syncedToBackend = true; payload._backendId = r.data?.id || null; saveDB(); return {}; } throw new Error('create failed'); },
+  update: async (payload) => { const r = await backendApi.inventoryTransactions.update(payload.id, payload.data); if (!r || !r.success) throw new Error('update failed'); return {}; },
+  delete: async (payload) => { const r = await backendApi.inventoryTransactions.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
 });
 
 function scheduleBackgroundSync(delay) {

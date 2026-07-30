@@ -92,6 +92,19 @@ class InventoryTransactionsService {
     return (db.transactions || []).find(t => this._matchesId(t, normalized)) || null;
   }
 
+  stats() {
+    const db = this._load();
+    const transactions = db.transactions || [];
+    let stockIn = 0, stockOut = 0, adjustments = 0;
+    transactions.forEach(t => {
+      const type = String(t.type || '').toLowerCase();
+      if (type === 'in') stockIn++;
+      else if (type === 'out') stockOut++;
+      else if (type === 'adjustment') adjustments++;
+    });
+    return { count: transactions.length, stockIn, stockOut, adjustments };
+  }
+
   create(data) {
     const errors = this._validateRequired(data, true);
     if (errors.length) return { error: errors.join('; ') };
