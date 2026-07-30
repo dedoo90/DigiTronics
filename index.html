@@ -11560,6 +11560,40 @@ const digitronicsDataAdapter = {
     } finally {
       this._syncPendingSuppliers = false;
     }
+  },
+  _refreshPendingSuppliers: false,
+  _lastBackendSupplierRefresh: null,
+  async refreshSuppliers() {
+    if (!USE_BACKEND || this._refreshPendingSuppliers) return;
+    this._refreshPendingSuppliers = true;
+    try {
+      const res = await backendApi.suppliers.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.suppliers) ? res.data.suppliers : null)) : null;
+      if (!arr) return;
+      const backendSuppliers = arr.map(s => this._normalizeBackendSupplier(s));
+      const localById = {};
+      (DB.suppliers || []).forEach(s => { const key = s._backendId || s.id; localById[key] = s; });
+      const unsyncedKeys = {};
+      (DB.suppliers || []).filter(s => !s._syncedToBackend).forEach(s => { unsyncedKeys[s.id] = true; });
+      let changed = false;
+      for (const bs of backendSuppliers) {
+        const key = bs._backendId || bs.id;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[bs.id]) {
+          bs._syncedToBackend = true;
+          bs._backendId = bs._backendId || bs.id;
+          bs._importedFromBackend = true;
+          DB.suppliers.push(bs);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendSupplierRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPendingSuppliers = false;
+    }
   }
 };
 
@@ -11601,6 +11635,13 @@ function detectCustomerConflict(localCustomer, backendCustomer) {
   const localUpdated = new Date(localCustomer.updatedAt || localCustomer.createdAt || 0).getTime();
   const backendUpdated = new Date(backendCustomer.updatedAt || backendCustomer.createdAt || 0).getTime();
   return { id: localCustomer.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localCustomer._syncedToBackend };
+}
+
+function detectSupplierConflict(localSupplier, backendSupplier) {
+  if (!localSupplier || !backendSupplier) return null;
+  const localUpdated = new Date(localSupplier.updatedAt || localSupplier.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendSupplier.updatedAt || backendSupplier.createdAt || 0).getTime();
+  return { id: localSupplier.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localSupplier._syncedToBackend };
 }
 
 // ================= SYNC ENGINE =================
@@ -11824,6 +11865,12 @@ function scheduleInventoryTransactionBackgroundRefresh(delay) {
 function scheduleCustomerBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'customers', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
+}
+
+function scheduleSupplierBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'suppliers', operation: 'refresh', priority: 0 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
