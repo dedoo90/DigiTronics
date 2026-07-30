@@ -11275,6 +11275,26 @@ const digitronicsDataAdapter = {
     } catch (e) {
       return local();
     }
+  },
+  _syncPendingProducts: false,
+  async syncPendingProducts() {
+    if (!USE_BACKEND || this._syncPendingProducts) return;
+    this._syncPendingProducts = true;
+    try {
+      const pending = (DB.products || []).filter(p => !p._syncedToBackend);
+      for (const p of pending) {
+        try {
+          const res = await backendApi.inventory.create(p);
+          if (res && res.success) {
+            p._syncedToBackend = true;
+            p._backendId = res.data?.id || null;
+          }
+        } catch (_) {}
+      }
+      if (pending.length > 0) saveDB();
+    } finally {
+      this._syncPendingProducts = false;
+    }
   }
 };
 
@@ -11446,6 +11466,12 @@ function scheduleBackgroundRefresh(delay) {
 function schedulePurchaseBackgroundSync(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'purchases', operation: 'sync', priority: 1 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 5000);
+}
+
+function scheduleInventoryBackgroundSync(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'inventory', operation: 'sync', priority: 1 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 5000);
 }
 
