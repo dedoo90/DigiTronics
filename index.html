@@ -11337,6 +11337,32 @@ const digitronicsDataAdapter = {
     } finally {
       this._refreshPendingProducts = false;
     }
+  },
+  _normalizeBackendInventoryTransaction(bt) {
+    if (!bt) return null;
+    return { ...bt, type: bt.type || 'in', qty: parseFloat(bt.qty) || 0, date: bt.date || bt.createdAt, reason: bt.reason || '' };
+  },
+  async listInventoryTransactions() {
+    if (!USE_BACKEND) return DB.stockMovement;
+    try {
+      const res = await backendApi.inventoryTransactions.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.transactions) ? res.data.transactions : null)) : null;
+      if (arr) return arr.map(t => this._normalizeBackendInventoryTransaction(t));
+      return DB.stockMovement;
+    } catch (e) {
+      return DB.stockMovement;
+    }
+  },
+  async getInventoryTransaction(id) {
+    const local = () => (DB.stockMovement || []).find(t => String(t.id) === String(id)) || null;
+    if (!USE_BACKEND) return local();
+    try {
+      const res = await backendApi.inventoryTransactions.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendInventoryTransaction(res.data);
+      return local();
+    } catch (e) {
+      return local();
+    }
   }
 };
 
