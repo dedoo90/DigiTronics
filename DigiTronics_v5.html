@@ -11182,6 +11182,40 @@ const digitronicsDataAdapter = {
     } finally {
       this._syncPendingProducts = false;
     }
+  },
+  _refreshPendingProducts: false,
+  _lastBackendProductRefresh: null,
+  async refreshProducts() {
+    if (!USE_BACKEND || this._refreshPendingProducts) return;
+    this._refreshPendingProducts = true;
+    try {
+      const res = await backendApi.inventory.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.products) ? res.data.products : null)) : null;
+      if (!arr) return;
+      const backendProducts = arr.map(p => this._normalizeBackendProduct(p));
+      const localById = {};
+      (DB.products || []).forEach(p => { const key = p._backendId || p.id; localById[key] = p; });
+      const unsyncedKeys = {};
+      (DB.products || []).filter(p => !p._syncedToBackend).forEach(p => { unsyncedKeys[p.id] = true; });
+      let changed = false;
+      for (const bp of backendProducts) {
+        const key = bp._backendId || bp.id;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[bp.id]) {
+          bp._syncedToBackend = true;
+          bp._backendId = bp._backendId || bp.id;
+          bp._importedFromBackend = true;
+          DB.products.push(bp);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendProductRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPendingProducts = false;
+    }
   }
 };
 
@@ -11202,6 +11236,13 @@ function detectPurchaseConflict(localPurchase, backendPurchase) {
   const localUpdated = new Date(localPurchase.updatedAt || localPurchase.createdAt || 0).getTime();
   const backendUpdated = new Date(backendPurchase.updatedAt || backendPurchase.createdAt || 0).getTime();
   return { id: localPurchase.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localPurchase._syncedToBackend };
+}
+
+function detectProductConflict(localProduct, backendProduct) {
+  if (!localProduct || !backendProduct) return null;
+  const localUpdated = new Date(localProduct.updatedAt || localProduct.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendProduct.updatedAt || backendProduct.createdAt || 0).getTime();
+  return { id: localProduct.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localProduct._syncedToBackend };
 }
 
 // ================= SYNC ENGINE =================
@@ -11365,6 +11406,12 @@ function scheduleInventoryBackgroundSync(delay) {
 function schedulePurchaseBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'purchases', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
+}
+
+function scheduleInventoryBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'inventory', operation: 'refresh', priority: 0 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
