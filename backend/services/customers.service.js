@@ -93,6 +93,17 @@ class CustomersService {
     return (db.customers || []).find(c => this._matchesId(c, normalized)) || null;
   }
 
+  stats() {
+    const db = this._load();
+    const customers = db.customers || [];
+    let withPhone = 0, withBalance = 0;
+    customers.forEach(c => {
+      if (String(c.phone || '').trim() !== '') withPhone++;
+      if (Number(c.balance || 0) !== 0) withBalance++;
+    });
+    return { count: customers.length, withPhone, withBalance };
+  }
+
   create(data) {
     const errors = this._validateRequired(data, true);
     if (errors.length) return { error: errors.join('; ') };

@@ -11699,6 +11699,14 @@ syncEngine.registerModule('inventoryTransactions', {
   delete: async (payload) => { const r = await backendApi.inventoryTransactions.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
 });
 
+syncEngine.registerModule('customers', {
+  sync: async (payload) => { await digitronicsDataAdapter.syncPendingCustomers(); return {}; },
+  refresh: async (payload) => { await digitronicsDataAdapter.refreshCustomers(); return {}; },
+  create: async (payload) => { const r = await backendApi.customers.create(payload); if (r && r.success) { payload._syncedToBackend = true; payload._backendId = r.data?.id || null; saveDB(); return {}; } throw new Error('create failed'); },
+  update: async (payload) => { const r = await backendApi.customers.update(payload.id, payload.data); if (!r || !r.success) throw new Error('update failed'); return {}; },
+  delete: async (payload) => { const r = await backendApi.customers.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
+});
+
 function scheduleBackgroundSync(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'sales', operation: 'sync', priority: 1 });

@@ -23,6 +23,16 @@ function getById(req, res) {
   }
 }
 
+function getStats(req, res) {
+  try {
+    const result = customersService.stats();
+    success(res, result, 'Customer stats retrieved');
+  } catch (err) {
+    logger.error('customers.stats error:', err.message);
+    error(res, 'Failed to retrieve customer stats', 500);
+  }
+}
+
 function create(req, res) {
   try {
     const result = customersService.create(req.body);
@@ -58,4 +68,4 @@ function remove(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, getStats, getById, create, update, remove };
