@@ -11691,6 +11691,32 @@ const digitronicsDataAdapter = {
     } finally {
       this._refreshPendingTreasury = false;
     }
+  },
+  _normalizeBackendEmployee(be) {
+    if (!be) return null;
+    return { ...be, name: be.name || '', position: be.position || '', phone: be.phone || '', phone2: be.phone2 || '', address: be.address || '', status: be.status || 'active', salary: parseFloat(be.salary) || 0, commission: parseFloat(be.commission) || 0, bonus: parseFloat(be.bonus) || 0, advance: parseFloat(be.advance) || 0, vacationDays: parseInt(be.vacationDays, 10) || 0 };
+  },
+  async listEmployees() {
+    if (!USE_BACKEND) return DB.employees;
+    try {
+      const res = await backendApi.employees.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.employees) ? res.data.employees : null)) : null;
+      if (arr) return arr.map(e => this._normalizeBackendEmployee(e));
+      return DB.employees;
+    } catch (e) {
+      return DB.employees;
+    }
+  },
+  async getEmployee(id) {
+    const local = () => (DB.employees || []).find(e => String(e.id) === String(id)) || null;
+    if (!USE_BACKEND) return local();
+    try {
+      const res = await backendApi.employees.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendEmployee(res.data);
+      return local();
+    } catch (e) {
+      return local();
+    }
   }
 };
 
