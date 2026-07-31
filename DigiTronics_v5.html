@@ -12065,6 +12065,26 @@ const digitronicsDataAdapter = {
     } catch (e) {
       return currentUser;
     }
+  },
+  _syncPendingUsers: false,
+  async syncPendingUsers() {
+    if (!USE_BACKEND || this._syncPendingUsers) return;
+    this._syncPendingUsers = true;
+    try {
+      const pending = DB.users.filter(u => !u._syncedToBackend);
+      for (const u of pending) {
+        try {
+          const res = await backendApi.users.create(u);
+          if (res && res.success) {
+            u._syncedToBackend = true;
+            u._backendId = res.data?.id || null;
+          }
+        } catch (_) {}
+      }
+      if (pending.length > 0) saveDB();
+    } finally {
+      this._syncPendingUsers = false;
+    }
   }
 };
 
@@ -12446,6 +12466,12 @@ function scheduleDashboardBackgroundSync(delay) {
 function scheduleVoucherBackgroundSync(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'vouchers', operation: 'sync', priority: 1 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 5000);
+}
+
+function scheduleUserBackgroundSync(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'users', operation: 'sync', priority: 1 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 5000);
 }
 
