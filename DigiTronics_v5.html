@@ -11843,6 +11843,32 @@ const digitronicsDataAdapter = {
     } finally {
       this._refreshPendingReports = false;
     }
+  },
+  _normalizeBackendDashboard(br) {
+    if (!br) return null;
+    return { ...br, key: br.key || '', title: br.title || '', period: br.period || '' };
+  },
+  async listDashboard() {
+    if (!USE_BACKEND) return DB.dashboard || [];
+    try {
+      const res = await backendApi.dashboard.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.dashboard) ? res.data.dashboard : null)) : null;
+      if (arr) return arr.map(r => this._normalizeBackendDashboard(r));
+      return DB.dashboard || [];
+    } catch (e) {
+      return DB.dashboard || [];
+    }
+  },
+  async getDashboard(id) {
+    const local = () => (DB.dashboard || []).find(r => String(r.id) === String(id)) || null;
+    if (!USE_BACKEND) return local();
+    try {
+      const res = await backendApi.dashboard.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendDashboard(res.data);
+      return local();
+    } catch (e) {
+      return local();
+    }
   }
 };
 
