@@ -10887,6 +10887,14 @@ const backendApi = {
     create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/dashboard', data) : null,
     update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/dashboard/' + id, data) : null,
     delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/dashboard/' + id) : null
+  },
+  vouchers: {
+    getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/vouchers') : null,
+    getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/vouchers/' + id) : null,
+    getStats: () => USE_BACKEND ? backendApi._fetch('GET', '/vouchers/stats') : null,
+    create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/vouchers', data) : null,
+    update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/vouchers/' + id, data) : null,
+    delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/vouchers/' + id) : null
   }
 };
 
