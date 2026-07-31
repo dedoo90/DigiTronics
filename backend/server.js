@@ -33,6 +33,8 @@ const partnersRoutes = require('./routes/partners.routes');
 const voucherRoutes = require('./routes/voucher.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const reportsRoutes = require('./routes/reports.routes');
+const usersRoutes = require('./routes/users.routes');
+const authRoutes = require('./routes/auth.routes');
 
 app.use('/api/v1', apiRouter);
 app.use('/api/v1/sales', salesRoutes);
@@ -47,6 +49,8 @@ app.use('/api/v1/partners', partnersRoutes);
 app.use('/api/v1/vouchers', voucherRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/reports', reportsRoutes);
+app.use('/api/v1/users', usersRoutes);
+app.use('/api/v1/auth', authRoutes);
 
 // Error handling
 app.use(notFound);
