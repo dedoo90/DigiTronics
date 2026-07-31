@@ -12141,6 +12141,43 @@ const digitronicsDataAdapter = {
     } finally {
       this._refreshPendingVouchers = false;
     }
+  },
+  _normalizeBackendUser(br) {
+    if (!br) return null;
+    return { ...br, username: br.username || '', role: br.role || '', fullName: br.fullName || '' };
+  },
+  async listUsers() {
+    if (!USE_BACKEND) return DB.users;
+    try {
+      const res = await backendApi.users.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.users) ? res.data.users : null)) : null;
+      if (arr) return arr.map(u => this._normalizeBackendUser(u));
+      return DB.users;
+    } catch (e) {
+      return DB.users;
+    }
+  },
+  async getUser(id) {
+    const local = () => DB.users.find(u => String(u.id) === String(id) || String(u.username) === String(id)) || null;
+    if (!USE_BACKEND) return local();
+    try {
+      const res = await backendApi.users.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendUser(res.data);
+      return local();
+    } catch (e) {
+      return local();
+    }
+  },
+  async currentUser() {
+    if (!USE_BACKEND) return currentUser;
+    try {
+      if (!currentUser) return null;
+      const res = await backendApi.auth.me(currentUser.username);
+      if (res && res.success && res.data && res.data.user) return this._normalizeBackendUser(res.data.user);
+      return currentUser;
+    } catch (e) {
+      return currentUser;
+    }
   }
 };
 
