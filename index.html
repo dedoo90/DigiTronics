@@ -10984,6 +10984,14 @@ const backendApi = {
     create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/partners', data) : null,
     update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/partners/' + id, data) : null,
     delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/partners/' + id) : null
+  },
+  reports: {
+    getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/reports') : null,
+    getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/reports/' + id) : null,
+    getStats: () => USE_BACKEND ? backendApi._fetch('GET', '/reports/stats') : null,
+    create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/reports', data) : null,
+    update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/reports/' + id, data) : null,
+    delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/reports/' + id) : null
   }
 };
 
