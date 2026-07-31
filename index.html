@@ -12091,6 +12091,41 @@ const digitronicsDataAdapter = {
     } finally {
       this._syncPendingVouchers = false;
     }
+  },
+  _refreshPendingVouchers: false,
+  _lastBackendVoucherRefresh: null,
+  async refreshVouchers() {
+    if (!USE_BACKEND || this._refreshPendingVouchers) return;
+    this._refreshPendingVouchers = true;
+    try {
+      const res = await backendApi.vouchers.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.vouchers) ? res.data.vouchers : null)) : null;
+      if (!arr) return;
+      const backendVouchers = arr.map(v => this._normalizeBackendVoucher(v));
+      DB.vouchers = Array.isArray(DB.vouchers) ? DB.vouchers : [];
+      const localById = {};
+      DB.vouchers.forEach(v => { const key = v._backendId || v.id; localById[key] = v; });
+      const unsyncedKeys = {};
+      DB.vouchers.filter(v => !v._syncedToBackend).forEach(v => { unsyncedKeys[v.id] = true; });
+      let changed = false;
+      for (const br of backendVouchers) {
+        const key = br._backendId || br.id;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[br.id]) {
+          br._syncedToBackend = true;
+          br._backendId = br._backendId || br.id;
+          br._importedFromBackend = true;
+          DB.vouchers.push(br);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendVoucherRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPendingVouchers = false;
+    }
   }
 };
 
@@ -12174,6 +12209,13 @@ function detectDashboardConflict(localEntry, backendEntry) {
   const localUpdated = new Date(localEntry.updatedAt || localEntry.createdAt || 0).getTime();
   const backendUpdated = new Date(backendEntry.updatedAt || backendEntry.createdAt || 0).getTime();
   return { id: localEntry.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localEntry._syncedToBackend };
+}
+
+function detectVoucherConflict(localVoucher, backendVoucher) {
+  if (!localVoucher || !backendVoucher) return null;
+  const localUpdated = new Date(localVoucher.updatedAt || localVoucher.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendVoucher.updatedAt || backendVoucher.createdAt || 0).getTime();
+  return { id: localVoucher.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localVoucher._syncedToBackend };
 }
 
 // ================= SYNC ENGINE =================
@@ -12517,6 +12559,12 @@ function scheduleReportBackgroundRefresh(delay) {
 function scheduleDashboardBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'dashboard', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
+}
+
+function scheduleVoucherBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'vouchers', operation: 'refresh', priority: 0 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
