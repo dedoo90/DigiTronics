@@ -11867,6 +11867,32 @@ const digitronicsDataAdapter = {
     } finally {
       this._refreshPendingPartners = false;
     }
+  },
+  _normalizeBackendReport(br) {
+    if (!br) return null;
+    return { ...br, type: br.type || '', title: br.title || '', month: br.month || '' };
+  },
+  async listReports() {
+    if (!USE_BACKEND) return DB.reports || [];
+    try {
+      const res = await backendApi.reports.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.reports) ? res.data.reports : null)) : null;
+      if (arr) return arr.map(r => this._normalizeBackendReport(r));
+      return DB.reports || [];
+    } catch (e) {
+      return DB.reports || [];
+    }
+  },
+  async getReport(id) {
+    const local = () => (DB.reports || []).find(r => String(r.id) === String(id)) || null;
+    if (!USE_BACKEND) return local();
+    try {
+      const res = await backendApi.reports.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendReport(res.data);
+      return local();
+    } catch (e) {
+      return local();
+    }
   }
 };
 
