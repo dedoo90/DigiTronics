@@ -12216,6 +12216,14 @@ syncEngine.registerModule('partners', {
   delete: async (payload) => { const r = await backendApi.partners.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
 });
 
+syncEngine.registerModule('reports', {
+  sync: async (payload) => { await digitronicsDataAdapter.syncPendingReports(); return {}; },
+  refresh: async (payload) => { await digitronicsDataAdapter.refreshReports(); return {}; },
+  create: async (payload) => { const r = await backendApi.reports.create(payload); if (r && r.success) { payload._syncedToBackend = true; payload._backendId = r.data?.id || null; saveDB(); return {}; } throw new Error('create failed'); },
+  update: async (payload) => { const r = await backendApi.reports.update(payload.id, payload.data); if (!r || !r.success) throw new Error('update failed'); return {}; },
+  delete: async (payload) => { const r = await backendApi.reports.delete(payload.id); if (!r || !r.success) throw new Error('delete failed'); return {}; }
+});
+
 function scheduleBackgroundSync(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'sales', operation: 'sync', priority: 1 });
