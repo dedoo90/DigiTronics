@@ -11932,6 +11932,32 @@ const digitronicsDataAdapter = {
     } finally {
       this._refreshPendingDashboard = false;
     }
+  },
+  _normalizeBackendVoucher(br) {
+    if (!br) return null;
+    return { ...br, type: br.type || '', partyName: br.partyName || '', partyType: br.partyType || '', method: br.method || '', amount: Number(br.amount) || 0 };
+  },
+  async listVouchers() {
+    if (!USE_BACKEND) return DB.vouchers;
+    try {
+      const res = await backendApi.vouchers.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.vouchers) ? res.data.vouchers : null)) : null;
+      if (arr) return arr.map(v => this._normalizeBackendVoucher(v));
+      return DB.vouchers;
+    } catch (e) {
+      return DB.vouchers;
+    }
+  },
+  async getVoucher(id) {
+    const local = () => DB.vouchers.find(v => String(v.id) === String(id)) || null;
+    if (!USE_BACKEND) return local();
+    try {
+      const res = await backendApi.vouchers.getById(id);
+      if (res && res.success && res.data) return this._normalizeBackendVoucher(res.data);
+      return local();
+    } catch (e) {
+      return local();
+    }
   }
 };
 
