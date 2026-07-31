@@ -12198,6 +12198,41 @@ const digitronicsDataAdapter = {
     } finally {
       this._syncPendingUsers = false;
     }
+  },
+  _refreshPendingUsers: false,
+  _lastBackendUserRefresh: null,
+  async refreshUsers() {
+    if (!USE_BACKEND || this._refreshPendingUsers) return;
+    this._refreshPendingUsers = true;
+    try {
+      const res = await backendApi.users.getAll();
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.users) ? res.data.users : null)) : null;
+      if (!arr) return;
+      const backendUsers = arr.map(u => this._normalizeBackendUser(u));
+      DB.users = Array.isArray(DB.users) ? DB.users : [];
+      const localById = {};
+      DB.users.forEach(u => { const key = u._backendId || u.id || u.username; localById[key] = u; });
+      const unsyncedKeys = {};
+      DB.users.filter(u => !u._syncedToBackend).forEach(u => { unsyncedKeys[u._backendId || u.id || u.username] = true; });
+      let changed = false;
+      for (const br of backendUsers) {
+        const key = br._backendId || br.id || br.username;
+        if (!key) continue;
+        const existing = localById[key];
+        if (!existing && !unsyncedKeys[key] && !unsyncedKeys[br.username]) {
+          br._syncedToBackend = true;
+          br._backendId = br._backendId || br.id;
+          br._importedFromBackend = true;
+          DB.users.push(br);
+          changed = true;
+        }
+      }
+      if (changed) saveDB();
+      this._lastBackendUserRefresh = Date.now();
+    } catch (_) {
+    } finally {
+      this._refreshPendingUsers = false;
+    }
   }
 };
 
@@ -12288,6 +12323,13 @@ function detectVoucherConflict(localVoucher, backendVoucher) {
   const localUpdated = new Date(localVoucher.updatedAt || localVoucher.createdAt || 0).getTime();
   const backendUpdated = new Date(backendVoucher.updatedAt || backendVoucher.createdAt || 0).getTime();
   return { id: localVoucher.id, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localVoucher._syncedToBackend };
+}
+
+function detectUserConflict(localUser, backendUser) {
+  if (!localUser || !backendUser) return null;
+  const localUpdated = new Date(localUser.updatedAt || localUser.createdAt || 0).getTime();
+  const backendUpdated = new Date(backendUser.updatedAt || backendUser.createdAt || 0).getTime();
+  return { id: localUser.id || localUser.username, hasConflict: localUpdated !== backendUpdated, localUpdated, backendUpdated, localNewer: localUpdated > backendUpdated, backendNewer: backendUpdated > localUpdated, syncedToBackend: !!localUser._syncedToBackend };
 }
 
 // ================= SYNC ENGINE =================
@@ -12651,6 +12693,12 @@ function scheduleDashboardBackgroundRefresh(delay) {
 function scheduleVoucherBackgroundRefresh(delay) {
   if (!USE_BACKEND) return;
   syncEngine.enqueue({ module: 'vouchers', operation: 'refresh', priority: 0 });
+  setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
+}
+
+function scheduleUserBackgroundRefresh(delay) {
+  if (!USE_BACKEND) return;
+  syncEngine.enqueue({ module: 'users', operation: 'refresh', priority: 0 });
   setTimeout(() => syncEngine.processQueue().catch(() => {}), delay || 10000);
 }
 
