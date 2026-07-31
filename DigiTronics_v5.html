@@ -10895,6 +10895,21 @@ const backendApi = {
     create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/vouchers', data) : null,
     update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/vouchers/' + id, data) : null,
     delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/vouchers/' + id) : null
+  },
+  users: {
+    getAll: () => USE_BACKEND ? backendApi._fetch('GET', '/users') : null,
+    getById: (id) => USE_BACKEND ? backendApi._fetch('GET', '/users/' + id) : null,
+    getStats: () => USE_BACKEND ? backendApi._fetch('GET', '/users/stats') : null,
+    create: (data) => USE_BACKEND ? backendApi._fetch('POST', '/users', data) : null,
+    update: (id, data) => USE_BACKEND ? backendApi._fetch('PUT', '/users/' + id, data) : null,
+    delete: (id) => USE_BACKEND ? backendApi._fetch('DELETE', '/users/' + id) : null
+  },
+  auth: {
+    login: (username, password) => USE_BACKEND ? backendApi._fetch('POST', '/auth/login', { username, password }) : null,
+    logout: () => USE_BACKEND ? backendApi._fetch('POST', '/auth/logout') : null,
+    me: (username) => USE_BACKEND ? backendApi._fetch('GET', '/auth/me?username=' + encodeURIComponent(username)) : null,
+    roles: () => USE_BACKEND ? backendApi._fetch('GET', '/auth/roles') : null,
+    permissions: (username) => USE_BACKEND ? backendApi._fetch('GET', '/auth/permissions?username=' + encodeURIComponent(username)) : null
   }
 };
 
