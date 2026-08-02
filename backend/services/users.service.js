@@ -182,4 +182,14 @@ class UsersService {
   }
 }
 
+// Strip the password hash from records returned to API consumers.
+// Internal flows (authenticate, token signing, persistence) keep the full record.
+function sanitizeUser(user) {
+  if (!user || typeof user !== 'object') return user;
+  const safe = { ...user };
+  delete safe.password;
+  return safe;
+}
+
 module.exports = new UsersService();
+module.exports.sanitizeUser = sanitizeUser;

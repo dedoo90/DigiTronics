@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 function list(req, res) {
   try {
     const result = usersService.list(req.query);
+    result.users = result.users.map(usersService.sanitizeUser);
     success(res, result, 'Users retrieved');
   } catch (err) {
     logger.error('users.list error:', err.message);
@@ -16,7 +17,7 @@ function getById(req, res) {
   try {
     const user = usersService.getById(req.params.id);
     if (!user) return error(res, 'User not found', 404);
-    success(res, user, 'User retrieved');
+    success(res, usersService.sanitizeUser(user), 'User retrieved');
   } catch (err) {
     logger.error('users.getById error:', err.message);
     error(res, 'Failed to retrieve user', 500);
@@ -37,7 +38,7 @@ function create(req, res) {
   try {
     const result = usersService.create(req.body);
     if (result.error) return error(res, result.error, 400);
-    success(res, result.user, 'User created', 201);
+    success(res, usersService.sanitizeUser(result.user), 'User created', 201);
   } catch (err) {
     logger.error('users.create error:', err.message);
     error(res, 'Failed to create user', 500);
@@ -49,7 +50,7 @@ function update(req, res) {
     const result = usersService.update(req.params.id, req.body);
     if (result.error === 'User not found') return error(res, result.error, 404);
     if (result.error) return error(res, result.error, 400);
-    success(res, result.user, 'User updated');
+    success(res, usersService.sanitizeUser(result.user), 'User updated');
   } catch (err) {
     logger.error('users.update error:', err.message);
     error(res, 'Failed to update user', 500);

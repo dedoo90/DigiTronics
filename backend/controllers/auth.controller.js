@@ -28,7 +28,7 @@ function login(req, res) {
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
     _setAuthCookies(res, accessToken, refreshToken);
-    success(res, { user, accessToken, refreshToken }, 'Login successful');
+    success(res, { user: usersService.sanitizeUser(user), accessToken, refreshToken }, 'Login successful');
   } catch (err) {
     logger.error('auth.login error:', err.message);
     error(res, 'Failed to login', 500);
@@ -72,13 +72,13 @@ function me(req, res) {
     if (req.user) {
       const user = usersService.getById(req.user.id);
       if (!user) return error(res, 'User not found', 404);
-      return success(res, { user }, 'Current user retrieved');
+      return success(res, { user: usersService.sanitizeUser(user) }, 'Current user retrieved');
     }
     const username = req.query.username;
     if (!username) return error(res, 'username is required', 400);
     const user = usersService.getByUsername(username);
     if (!user) return error(res, 'User not found', 404);
-    success(res, { user }, 'Current user retrieved');
+    success(res, { user: usersService.sanitizeUser(user) }, 'Current user retrieved');
   } catch (err) {
     logger.error('auth.me error:', err.message);
     error(res, 'Failed to retrieve current user', 500);
