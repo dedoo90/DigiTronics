@@ -13,8 +13,8 @@ registerCleanup(() => [server], () => [dataDir]);
 beforeAll(async () => {
   dataDir = makeTempDataDir('auth');
   server = await startServer(dataDir);
-  await createUser(server.baseUrl, { username: 'alice', password: 'Alice#123', fullName: 'Alice A', role: 'Admin' });
-  await createUser(server.baseUrl, {
+  await createUser(server.app, { username: 'alice', password: 'Alice#123', fullName: 'Alice A', role: 'Admin' });
+  await createUser(server.app, {
     username: 'bob',
     password: 'Bob#12345',
     fullName: 'Bob B',
@@ -25,7 +25,7 @@ beforeAll(async () => {
 
 describe('POST /api/v1/auth/login', () => {
   test('login success returns tokens and a sanitized user', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/auth/login')
       .send({ username: 'alice', password: 'Alice#123' });
     expect(res.statusCode).toBe(200);
@@ -38,7 +38,7 @@ describe('POST /api/v1/auth/login', () => {
   });
 
   test('login failure with wrong password returns 401', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/auth/login')
       .send({ username: 'alice', password: 'wrong' });
     expect(res.statusCode).toBe(401);
@@ -46,22 +46,22 @@ describe('POST /api/v1/auth/login', () => {
   });
 
   test('login failure with unknown user returns 401', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/auth/login')
       .send({ username: 'nobody', password: 'x' });
     expect(res.statusCode).toBe(401);
   });
 
   test('login without credentials returns 400', async () => {
-    const res = await request(server.baseUrl).post('/api/v1/auth/login').send({});
+    const res = await request(server.app).post('/api/v1/auth/login').send({});
     expect(res.statusCode).toBe(400);
   });
 });
 
 describe('POST /api/v1/auth/refresh', () => {
   test('refresh with a valid refresh token issues a new access token', async () => {
-    const session = await login(server.baseUrl, 'alice', 'Alice#123');
-    const res = await request(server.baseUrl)
+    const session = await login(server.app, 'alice', 'Alice#123');
+    const res = await request(server.app)
       .post('/api/v1/auth/refresh')
       .send({ refreshToken: session.refreshToken });
     expect(res.statusCode).toBe(200);
@@ -69,42 +69,42 @@ describe('POST /api/v1/auth/refresh', () => {
   });
 
   test('refresh with an invalid token returns 401', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/auth/refresh')
       .send({ refreshToken: 'not-a-token' });
     expect(res.statusCode).toBe(401);
   });
 
   test('refresh without a token returns 400', async () => {
-    const res = await request(server.baseUrl).post('/api/v1/auth/refresh').send({});
+    const res = await request(server.app).post('/api/v1/auth/refresh').send({});
     expect(res.statusCode).toBe(400);
   });
 });
 
 describe('POST /api/v1/auth/logout', () => {
   test('logout revokes the refresh token', async () => {
-    const session = await login(server.baseUrl, 'alice', 'Alice#123');
-    const out = await request(server.baseUrl)
+    const session = await login(server.app, 'alice', 'Alice#123');
+    const out = await request(server.app)
       .post('/api/v1/auth/logout')
       .set(authHeader(session.accessToken))
       .send({ refreshToken: session.refreshToken });
     expect(out.statusCode).toBe(200);
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/auth/refresh')
       .send({ refreshToken: session.refreshToken });
     expect(res.statusCode).toBe(401);
   });
 
   test('logout succeeds even without a token', async () => {
-    const res = await request(server.baseUrl).post('/api/v1/auth/logout').send({});
+    const res = await request(server.app).post('/api/v1/auth/logout').send({});
     expect(res.statusCode).toBe(200);
   });
 });
 
 describe('GET /api/v1/auth/me', () => {
   test('me with a bearer token returns the token user', async () => {
-    const session = await login(server.baseUrl, 'bob', 'Bob#12345');
-    const res = await request(server.baseUrl)
+    const session = await login(server.app, 'bob', 'Bob#12345');
+    const res = await request(server.app)
       .get('/api/v1/auth/me')
       .set(authHeader(session.accessToken));
     expect(res.statusCode).toBe(200);
@@ -113,26 +113,26 @@ describe('GET /api/v1/auth/me', () => {
   });
 
   test('me with username query returns that user (legacy flow)', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/auth/me?username=bob');
+    const res = await request(server.app).get('/api/v1/auth/me?username=bob');
     expect(res.statusCode).toBe(200);
     expect(res.body.data.user.username).toBe('bob');
     expect(res.body.data.user.password).toBeUndefined();
   });
 
   test('me without username returns 400', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/auth/me');
+    const res = await request(server.app).get('/api/v1/auth/me');
     expect(res.statusCode).toBe(400);
   });
 
   test('me with unknown username returns 404', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/auth/me?username=ghost');
+    const res = await request(server.app).get('/api/v1/auth/me?username=ghost');
     expect(res.statusCode).toBe(404);
   });
 });
 
 describe('GET /api/v1/auth/permissions', () => {
   test('permissions returns role and custom permissions', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/auth/permissions?username=bob');
+    const res = await request(server.app).get('/api/v1/auth/permissions?username=bob');
     expect(res.statusCode).toBe(200);
     expect(res.body.data.username).toBe('bob');
     expect(res.body.data.role).toBe('Cashier');
@@ -140,19 +140,19 @@ describe('GET /api/v1/auth/permissions', () => {
   });
 
   test('permissions without username returns 400', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/auth/permissions');
+    const res = await request(server.app).get('/api/v1/auth/permissions');
     expect(res.statusCode).toBe(400);
   });
 
   test('permissions for unknown user returns 404', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/auth/permissions?username=ghost');
+    const res = await request(server.app).get('/api/v1/auth/permissions?username=ghost');
     expect(res.statusCode).toBe(404);
   });
 });
 
 describe('GET /api/v1/auth/roles', () => {
   test('roles returns known roles plus roles present in the store', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/auth/roles');
+    const res = await request(server.app).get('/api/v1/auth/roles');
     expect(res.statusCode).toBe(200);
     expect(res.body.data.roles).toEqual(expect.arrayContaining(['Admin', 'Cashier', 'Owner']));
   });

@@ -1,8 +1,8 @@
 // Authentication helpers shared by test suites.
 const request = require('supertest');
 
-async function createUser(baseUrl, user) {
-  const res = await request(baseUrl)
+async function createUser(app, user) {
+  const res = await request(app)
     .post('/api/v1/users')
     .send({
       username: user.username,
@@ -17,8 +17,8 @@ async function createUser(baseUrl, user) {
   return res.body.data;
 }
 
-async function login(baseUrl, username, password) {
-  const res = await request(baseUrl)
+async function login(app, username, password) {
+  const res = await request(app)
     .post('/api/v1/auth/login')
     .send({ username, password });
   if (res.statusCode !== 200) {

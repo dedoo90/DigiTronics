@@ -68,7 +68,7 @@ MODULES.forEach(mod => {
     let createdId;
 
     test('POST creates a record (201) with id and timestamps', async () => {
-      const res = await request(server.baseUrl).post(mod.path).send(mod.create);
+      const res = await request(server.app).post(mod.path).send(mod.create);
       expect(res.statusCode).toBe(201);
       expect(res.body.success).toBe(true);
       expect(res.body.data.id).toBeTruthy();
@@ -78,13 +78,13 @@ MODULES.forEach(mod => {
     });
 
     test('POST with missing required field returns 400', async () => {
-      const res = await request(server.baseUrl).post(mod.path).send(mod.invalid);
+      const res = await request(server.app).post(mod.path).send(mod.invalid);
       expect(res.statusCode).toBe(400);
       expect(res.body.success).toBe(false);
     });
 
     test('GET list returns the created record', async () => {
-      const res = await request(server.baseUrl).get(mod.path);
+      const res = await request(server.app).get(mod.path);
       expect(res.statusCode).toBe(200);
       const items = res.body.data[mod.listKey];
       expect(Array.isArray(items)).toBe(true);
@@ -93,47 +93,47 @@ MODULES.forEach(mod => {
     });
 
     test('GET by id returns the record', async () => {
-      const res = await request(server.baseUrl).get(`${mod.path}/${createdId}`);
+      const res = await request(server.app).get(`${mod.path}/${createdId}`);
       expect(res.statusCode).toBe(200);
       expect(String(res.body.data.id)).toBe(String(createdId));
     });
 
     test('GET by unknown id returns 404', async () => {
-      const res = await request(server.baseUrl).get(`${mod.path}/does-not-exist-12345`);
+      const res = await request(server.app).get(`${mod.path}/does-not-exist-12345`);
       expect(res.statusCode).toBe(404);
     });
 
     test('PUT updates the record', async () => {
-      const res = await request(server.baseUrl).put(`${mod.path}/${createdId}`).send(mod.update);
+      const res = await request(server.app).put(`${mod.path}/${createdId}`).send(mod.update);
       expect(res.statusCode).toBe(200);
       const [field, value] = mod.updatedField;
       expect(res.body.data[field]).toBe(value);
     });
 
     test('PUT with unknown id returns 404', async () => {
-      const res = await request(server.baseUrl).put(`${mod.path}/does-not-exist-12345`).send(mod.update);
+      const res = await request(server.app).put(`${mod.path}/does-not-exist-12345`).send(mod.update);
       expect(res.statusCode).toBe(404);
     });
 
     test('GET stats returns success payload', async () => {
-      const res = await request(server.baseUrl).get(`${mod.path}/stats`);
+      const res = await request(server.app).get(`${mod.path}/stats`);
       expect(res.statusCode).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data).not.toBeNull();
     });
 
     test('DELETE removes the record', async () => {
-      const res = await request(server.baseUrl).delete(`${mod.path}/${createdId}`);
+      const res = await request(server.app).delete(`${mod.path}/${createdId}`);
       expect(res.statusCode).toBe(200);
     });
 
     test('GET after DELETE returns 404', async () => {
-      const res = await request(server.baseUrl).get(`${mod.path}/${createdId}`);
+      const res = await request(server.app).get(`${mod.path}/${createdId}`);
       expect(res.statusCode).toBe(404);
     });
 
     test('DELETE with unknown id returns 404', async () => {
-      const res = await request(server.baseUrl).delete(`${mod.path}/does-not-exist-12345`);
+      const res = await request(server.app).delete(`${mod.path}/does-not-exist-12345`);
       expect(res.statusCode).toBe(404);
     });
   });

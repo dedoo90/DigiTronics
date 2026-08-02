@@ -22,7 +22,7 @@ registerCleanup(
 beforeAll(async () => {
   dataDir = makeTempDataDir('sec');
   server = await startServer(dataDir);
-  await createUser(server.baseUrl, { username: 'sec-admin', password: 'Sec#12345', role: 'Admin' });
+  await createUser(server.app, { username: 'sec-admin', password: 'Sec#12345', role: 'Admin' });
 
   authDataDir = makeTempDataDir('sec-auth');
   const bcrypt = require('bcryptjs');
@@ -52,14 +52,14 @@ beforeAll(async () => {
 
 describe('JWT', () => {
   test('a valid access token authenticates the request', async () => {
-    const session = await login(server.baseUrl, 'sec-admin', 'Sec#12345');
-    const res = await request(server.baseUrl).get('/api/v1/auth/me').set(authHeader(session.accessToken));
+    const session = await login(server.app, 'sec-admin', 'Sec#12345');
+    const res = await request(server.app).get('/api/v1/auth/me').set(authHeader(session.accessToken));
     expect(res.statusCode).toBe(200);
     expect(res.body.data.user.username).toBe('sec-admin');
   });
 
   test('a garbage token is not authenticated', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .get('/api/v1/auth/me')
       .set(authHeader('garbage.token.value'));
     // falls through to the username-less branch → 400 (never 200)
@@ -68,7 +68,7 @@ describe('JWT', () => {
 
   test('a token signed with the wrong secret is rejected', async () => {
     const forged = jwt.sign({ sub: 'x', username: 'sec-admin', role: 'Admin' }, 'wrong-secret', { expiresIn: '5m' });
-    const res = await request(server.baseUrl).get('/api/v1/auth/me').set(authHeader(forged));
+    const res = await request(server.app).get('/api/v1/auth/me').set(authHeader(forged));
     expect(res.statusCode).toBe(400);
   });
 
@@ -78,13 +78,13 @@ describe('JWT', () => {
       TEST_JWT_SECRET,
       { expiresIn: '-10s' }
     );
-    const res = await request(server.baseUrl).get('/api/v1/auth/me').set(authHeader(expired));
+    const res = await request(server.app).get('/api/v1/auth/me').set(authHeader(expired));
     expect(res.statusCode).toBe(400);
   });
 
   test('a refresh token cannot be used as an access token', async () => {
-    const session = await login(server.baseUrl, 'sec-admin', 'Sec#12345');
-    const res = await request(server.baseUrl).get('/api/v1/auth/me').set(authHeader(session.refreshToken));
+    const session = await login(server.app, 'sec-admin', 'Sec#12345');
+    const res = await request(server.app).get('/api/v1/auth/me').set(authHeader(session.refreshToken));
     expect(res.statusCode).toBe(400);
   });
 });
@@ -98,14 +98,14 @@ describe('bcrypt password handling', () => {
   });
 
   test('password hashes never appear in any API response', async () => {
-    const list = await request(server.baseUrl).get('/api/v1/users');
+    const list = await request(server.app).get('/api/v1/users');
     expect(JSON.stringify(list.body)).not.toContain('$2');
-    const session = await login(server.baseUrl, 'sec-admin', 'Sec#12345');
+    const session = await login(server.app, 'sec-admin', 'Sec#12345');
     expect(JSON.stringify(session)).not.toContain('$2');
   });
 
   test('legacy plaintext credentials are migrated to bcrypt on login', async () => {
-    await request(server.baseUrl)
+    await request(server.app)
       .post('/api/v1/users')
       .send({ id: 'legacy-u', username: 'legacy-user', password: 'Plain#123', role: 'Cashier' });
     // simulate a legacy record by overwriting the hash with plaintext in the store
@@ -114,7 +114,7 @@ describe('bcrypt password handling', () => {
     store.users[idx].password = 'Plain#123';
     seed(dataDir, 'users', store);
 
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/auth/login')
       .send({ username: 'legacy-user', password: 'Plain#123' });
     expect(res.statusCode).toBe(200);
@@ -128,34 +128,34 @@ describe('rate limiting', () => {
   test('requests beyond the limit are rejected with 429', async () => {
     let last;
     for (let i = 0; i < 7; i++) {
-      last = await request(limitedServer.baseUrl).get('/api/v1/health');
+      last = await request(limitedServer.app).get('/api/v1/health');
     }
     expect(last.statusCode).toBe(429);
   });
 
   test('rate-limited responses carry standard rate limit headers', async () => {
-    const res = await request(limitedServer.baseUrl).get('/api/v1/health');
+    const res = await request(limitedServer.app).get('/api/v1/health');
     expect(res.headers['ratelimit-limit']).toBeDefined();
   });
 });
 
 describe('validation', () => {
   test('wrong field types are rejected with 400', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/treasury')
       .send({ type: 'in', amount: 'not-a-number' });
     expect(res.statusCode).toBe(400);
   });
 
   test('non-object JSON bodies are rejected with 400', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/customers')
       .send([1, 2, 3]);
     expect(res.statusCode).toBe(400);
   });
 
   test('invalid enum values are rejected with 400', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/treasury')
       .send({ type: 'sideways', amount: 5 });
     expect(res.statusCode).toBe(400);
@@ -164,7 +164,7 @@ describe('validation', () => {
 
 describe('prototype pollution and injection keys', () => {
   test('dangerous keys are stripped and Object.prototype stays clean', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/customers')
       .send({ name: 'Pollution Attempt', '__proto__': { polluted: true }, 'constructor': 'x', '$where': '1' });
     expect(res.statusCode).toBe(201);
@@ -179,7 +179,7 @@ describe('prototype pollution and injection keys', () => {
 
 describe('malformed JSON', () => {
   test('unparseable JSON bodies return the standard 400 envelope', async () => {
-    const res = await request(server.baseUrl)
+    const res = await request(server.app)
       .post('/api/v1/customers')
       .set('Content-Type', 'application/json')
       .send('{"name": broken');
@@ -191,21 +191,21 @@ describe('malformed JSON', () => {
 
 describe('authorization (AUTH_REQUIRED=true)', () => {
   test('requests without a token are rejected with 401', async () => {
-    const res = await request(authServer.baseUrl).get('/api/v1/customers');
+    const res = await request(authServer.app).get('/api/v1/customers');
     expect(res.statusCode).toBe(401);
   });
 
   test('requests with a valid token pass', async () => {
-    const session = await login(authServer.baseUrl, 'sec-owner', 'password');
-    const res = await request(authServer.baseUrl)
+    const session = await login(authServer.app, 'sec-owner', 'password');
+    const res = await request(authServer.app)
       .get('/api/v1/customers')
       .set(authHeader(session.accessToken));
     expect(res.statusCode).toBe(200);
   });
 
   test('writes from disallowed roles are rejected with 403', async () => {
-    const session = await login(authServer.baseUrl, 'sec-cashier', 'password');
-    const res = await request(authServer.baseUrl)
+    const session = await login(authServer.app, 'sec-cashier', 'password');
+    const res = await request(authServer.app)
       .post('/api/v1/customers')
       .set(authHeader(session.accessToken))
       .send({ name: 'Forbidden Customer' });
@@ -213,8 +213,8 @@ describe('authorization (AUTH_REQUIRED=true)', () => {
   });
 
   test('writes from allowed roles pass', async () => {
-    const session = await login(authServer.baseUrl, 'sec-owner', 'password');
-    const res = await request(authServer.baseUrl)
+    const session = await login(authServer.app, 'sec-owner', 'password');
+    const res = await request(authServer.app)
       .post('/api/v1/customers')
       .set(authHeader(session.accessToken))
       .send({ name: 'Allowed Customer' });

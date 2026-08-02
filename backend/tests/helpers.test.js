@@ -23,12 +23,12 @@ beforeAll(async () => {
 
 describe('test helpers', () => {
   test('server boots and answers health', async () => {
-    const res = await request(server.baseUrl).get('/api/v1/health');
+    const res = await request(server.app).get('/api/v1/health');
     expect(res.statusCode).toBe(200);
   });
 
   test('records are written to the isolated temp store', async () => {
-    await createUser(server.baseUrl, { username: 'helper-user', password: 'Pass#1234', role: 'Admin' });
+    await createUser(server.app, { username: 'helper-user', password: 'Pass#1234', role: 'Admin' });
     const store = readStore(dataDir, 'users');
     expect(store).not.toBeNull();
     expect(store.users).toHaveLength(1);
@@ -36,7 +36,7 @@ describe('test helpers', () => {
   });
 
   test('login works through authHelper', async () => {
-    const session = await login(server.baseUrl, 'helper-user', 'Pass#1234');
+    const session = await login(server.app, 'helper-user', 'Pass#1234');
     expect(session.accessToken).toBeTruthy();
     expect(session.user.username).toBe('helper-user');
   });
