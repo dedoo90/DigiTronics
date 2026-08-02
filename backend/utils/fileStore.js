@@ -2,7 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('./logger');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// Tests point DIGITRONICS_DATA_DIR at an isolated temp directory; when the
+// variable is unset the default location (and runtime behavior) is unchanged.
+const DATA_DIR = process.env.DIGITRONICS_DATA_DIR
+  ? path.resolve(process.env.DIGITRONICS_DATA_DIR)
+  : path.join(__dirname, '..', 'data');
 
 const fileStore = {
   _ensureDir() {
