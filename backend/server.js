@@ -8,16 +8,25 @@ const logger = require('./utils/logger');
 const { notFound, serverError } = require('./middleware/errorHandler');
 const { authMiddleware, requireAuth } = require('./middleware/auth');
 const { writeRoleGuard } = require('./middleware/authorize');
+const { sanitizeBody, jsonParseErrorHandler, apiRateLimiter } = require('./middleware/security');
 
 const app = express();
 
 // Global middleware
 app.use(helmet());
-app.use(cors());
+if (config.corsOrigins) {
+  // Restricted CORS: comma-separated allowlist via CORS_ORIGINS.
+  app.use(cors({ origin: config.corsOrigins.split(',').map(s => s.trim()), credentials: true }));
+} else {
+  // Default: open CORS (identical to previous behavior).
+  app.use(cors());
+}
 app.use(compression());
 app.use(morgan('dev'));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: config.bodyLimit }));
 app.use(express.urlencoded({ extended: true }));
+app.use(sanitizeBody);
+app.use('/api/v1', apiRateLimiter(config.rateLimitMax));
 app.use(authMiddleware);
 
 // API v1 routes
@@ -63,6 +72,7 @@ app.use('/api/v1/users', usersRoutes);
 
 // Error handling
 app.use(notFound);
+app.use(jsonParseErrorHandler);
 app.use(serverError);
 
 // Start server
