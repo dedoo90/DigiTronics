@@ -9,6 +9,7 @@ const { notFound, serverError } = require('./middleware/errorHandler');
 const { authMiddleware, requireAuth } = require('./middleware/auth');
 const { writeRoleGuard } = require('./middleware/authorize');
 const { sanitizeBody, jsonParseErrorHandler, apiRateLimiter } = require('./middleware/security');
+const { validateResource } = require('./middleware/validate');
 
 const app = express();
 
@@ -56,19 +57,19 @@ if (config.authRequired) {
   app.use('/api/v1', writeRoleGuard('Owner', 'Admin', 'Manager'));
 }
 
-app.use('/api/v1/sales', salesRoutes);
-app.use('/api/v1/purchases', purchaseRoutes);
-app.use('/api/v1/inventory', inventoryRoutes);
-app.use('/api/v1/inventory-transactions', inventoryTransactionsRoutes);
-app.use('/api/v1/customers', customersRoutes);
-app.use('/api/v1/suppliers', suppliersRoutes);
-app.use('/api/v1/treasury', treasuryRoutes);
-app.use('/api/v1/employees', employeesRoutes);
-app.use('/api/v1/partners', partnersRoutes);
-app.use('/api/v1/vouchers', voucherRoutes);
-app.use('/api/v1/dashboard', dashboardRoutes);
-app.use('/api/v1/reports', reportsRoutes);
-app.use('/api/v1/users', usersRoutes);
+app.use('/api/v1/sales', validateResource('sales'), salesRoutes);
+app.use('/api/v1/purchases', validateResource('purchases'), purchaseRoutes);
+app.use('/api/v1/inventory', validateResource('inventory'), inventoryRoutes);
+app.use('/api/v1/inventory-transactions', validateResource('inventory-transactions'), inventoryTransactionsRoutes);
+app.use('/api/v1/customers', validateResource('customers'), customersRoutes);
+app.use('/api/v1/suppliers', validateResource('suppliers'), suppliersRoutes);
+app.use('/api/v1/treasury', validateResource('treasury'), treasuryRoutes);
+app.use('/api/v1/employees', validateResource('employees'), employeesRoutes);
+app.use('/api/v1/partners', validateResource('partners'), partnersRoutes);
+app.use('/api/v1/vouchers', validateResource('vouchers'), voucherRoutes);
+app.use('/api/v1/dashboard', validateResource('dashboard'), dashboardRoutes);
+app.use('/api/v1/reports', validateResource('reports'), reportsRoutes);
+app.use('/api/v1/users', validateResource('users'), usersRoutes);
 
 // Error handling
 app.use(notFound);
