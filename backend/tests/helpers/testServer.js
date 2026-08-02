@@ -37,7 +37,7 @@ async function waitForReady(baseUrl, child, timeoutMs) {
 // extraEnv may override anything (AUTH_REQUIRED, RATE_LIMIT_MAX, ...).
 async function startServer(dataDir, extraEnv) {
   const port = nextPort();
-  const child = spawn(process.execPath, ['server.js'], {
+  const child = spawn(process.execPath, [path.join(__dirname, 'childEntry.js')], {
     cwd: BACKEND_DIR,
     env: {
       ...process.env,
@@ -48,7 +48,7 @@ async function startServer(dataDir, extraEnv) {
       LOG_FILE: '',
       ...(extraEnv || {})
     },
-    stdio: ['ignore', 'ignore', 'pipe']
+    stdio: ['ignore', 'ignore', 'pipe', 'ipc']
   });
   let stderrTail = '';
   child.stderr.on('data', d => {
@@ -62,7 +62,11 @@ async function startServer(dataDir, extraEnv) {
 
 async function stopServer(server) {
   if (!server || !server.child || server.child.exitCode !== null) return;
-  server.child.kill();
+  // Ask for a clean exit over IPC first (lets V8 coverage flush on
+  // Windows); fall back to a hard kill if the child does not respond.
+  try { server.child.send('shutdown'); } catch (_) {
+    server.child.kill();
+  }
   await new Promise(resolve => {
     const timer = setTimeout(() => {
       try { server.child.kill('SIGKILL'); } catch (_) {}
