@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const compression = require('compression');
 const config = require('./config');
 const logger = require('./utils/logger');
-const { notFound, serverError } = require('./middleware/errorHandler');
+const { notFound, serverError, requestPerfLogger } = require('./middleware/errorHandler');
 const { authMiddleware, requireAuth } = require('./middleware/auth');
 const { writeRoleGuard } = require('./middleware/authorize');
 const { sanitizeBody, jsonParseErrorHandler, apiRateLimiter } = require('./middleware/security');
@@ -23,7 +23,10 @@ if (config.corsOrigins) {
   app.use(cors());
 }
 app.use(compression());
-app.use(morgan('dev'));
+// Request logging is development-only (no console.log in production);
+// slow-request performance logging stays on in every environment.
+if (config.env === 'development') app.use(morgan('dev'));
+app.use(requestPerfLogger(1000));
 app.use(express.json({ limit: config.bodyLimit }));
 app.use(express.urlencoded({ extended: true }));
 app.use(sanitizeBody);
@@ -77,6 +80,14 @@ app.use(jsonParseErrorHandler);
 app.use(serverError);
 
 // Start server
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection:', reason && reason.message ? reason.message : reason);
+});
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught exception:', err.message, err.stack);
+  process.exit(1);
+});
+
 app.listen(config.port, () => {
   logger.info(`DigiTronics API v1.0 running on port ${config.port}`);
   logger.info(`Health check: http://localhost:${config.port}/api/v1/health`);

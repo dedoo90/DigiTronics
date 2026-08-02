@@ -1,10 +1,27 @@
+const fs = require('fs');
+const path = require('path');
+
 const isDev = (process.env.NODE_ENV || 'development') === 'development';
+const LOG_FILE = process.env.LOG_FILE || '';
+
+let _stream = null;
+function _fileLine(level, args) {
+  if (!LOG_FILE) return;
+  try {
+    if (!_stream) _stream = fs.createWriteStream(path.resolve(LOG_FILE), { flags: 'a' });
+    const line = new Date().toISOString() + ' [' + level + '] ' + args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ') + '\n';
+    _stream.write(line);
+  } catch (_) {}
+}
 
 const logger = {
-  info: (...args) => { if (isDev) console.log('[INFO]', ...args); },
-  warn: (...args) => console.warn('[WARN]', ...args),
-  error: (...args) => console.error('[ERROR]', ...args),
-  debug: (...args) => { if (isDev) console.log('[DEBUG]', ...args); }
+  // info/debug are development-only (no console.log in production)
+  info: (...args) => { if (isDev) console.log('[INFO]', ...args); _fileLine('INFO', args); },
+  warn: (...args) => { console.warn('[WARN]', ...args); _fileLine('WARN', args); },
+  error: (...args) => { console.error('[ERROR]', ...args); _fileLine('ERROR', args); },
+  debug: (...args) => { if (isDev) console.log('[DEBUG]', ...args); _fileLine('DEBUG', args); },
+  // performance logging — always structured, console only in development
+  perf: (...args) => { if (isDev) console.log('[PERF]', ...args); _fileLine('PERF', args); }
 };
 
 module.exports = logger;
