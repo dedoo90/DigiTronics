@@ -3,10 +3,6 @@
 // every instance gets its own config, data directory, rate limiter and
 // token store. Coverage instrumentation sees everything because the code
 // executes inside the test process.
-//
-// `baseUrl` is kept for one migration commit: it is backed by an
-// ephemeral in-process listener (app.listen(0)) and will be removed in
-// the cleanup commit once all suites use `app` directly.
 const { makeTempDataDir } = require('./testData');
 
 const TEST_JWT_SECRET = 'test-jwt-secret-for-jest-suites';
@@ -26,25 +22,11 @@ function startServer(dataDir, extraEnv) {
     else delete process.env[key];
   }
   const app = require('../../server.js');
-  const httpServer = app.listen(0);
-  const baseUrl = `http://127.0.0.1:${httpServer.address().port}`;
-  return { app, httpServer, baseUrl, dataDir: dir };
+  return { app, dataDir: dir };
 }
 
-async function stopServer(server) {
-  if (!server || !server.httpServer) return;
-  await new Promise(resolve => {
-    const timer = setTimeout(resolve, 2000);
-    try {
-      server.httpServer.close(() => {
-        clearTimeout(timer);
-        resolve();
-      });
-    } catch (_) {
-      clearTimeout(timer);
-      resolve();
-    }
-  });
-}
+// Kept for registerCleanup() signature compatibility: in-process app
+// instances need no teardown beyond temp-dir removal.
+async function stopServer() {}
 
 module.exports = { startServer, stopServer, TEST_JWT_SECRET };
