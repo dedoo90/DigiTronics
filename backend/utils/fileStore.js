@@ -24,7 +24,9 @@ const fileStore = {
       return JSON.parse(raw);
     } catch (err) {
       logger.error(`fileStore.read('${name}') failed:`, err.message);
-      if (err.message.includes('Unexpected token')) {
+      // JSON.parse throws SyntaxError on corruption; detect it by type,
+      // not by error-message text (which varies across Node versions).
+      if (err instanceof SyntaxError) {
         logger.warn(`Corrupted ${name}.json – resetting`);
         const empty = name === 'sales' ? { invoices: [] } : {};
         fileStore.write(name, empty);

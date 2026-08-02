@@ -8,7 +8,12 @@ function parseCookies(req) {
   if (!header) return out;
   header.split(';').forEach(part => {
     const idx = part.indexOf('=');
-    if (idx > -1) out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+    if (idx > -1) {
+      const key = part.slice(0, idx).trim();
+      const raw = part.slice(idx + 1).trim();
+      // Tolerate malformed percent-encoding instead of throwing URIError.
+      try { out[key] = decodeURIComponent(raw); } catch (_) { out[key] = raw; }
+    }
   });
   return out;
 }
