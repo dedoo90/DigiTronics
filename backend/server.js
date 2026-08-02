@@ -6,7 +6,8 @@ const compression = require('compression');
 const config = require('./config');
 const logger = require('./utils/logger');
 const { notFound, serverError } = require('./middleware/errorHandler');
-const { authMiddleware } = require('./middleware/auth');
+const { authMiddleware, requireAuth } = require('./middleware/auth');
+const { writeRoleGuard } = require('./middleware/authorize');
 
 const app = express();
 
@@ -37,6 +38,15 @@ const usersRoutes = require('./routes/users.routes');
 const authRoutes = require('./routes/auth.routes');
 
 app.use('/api/v1', apiRouter);
+app.use('/api/v1/auth', authRoutes);
+
+// Optional route protection (AUTH_REQUIRED=true).
+// Default is OFF: every route stays open exactly as before (legacy behavior).
+if (config.authRequired) {
+  app.use('/api/v1', requireAuth);
+  app.use('/api/v1', writeRoleGuard('Owner', 'Admin', 'Manager'));
+}
+
 app.use('/api/v1/sales', salesRoutes);
 app.use('/api/v1/purchases', purchaseRoutes);
 app.use('/api/v1/inventory', inventoryRoutes);
@@ -50,7 +60,6 @@ app.use('/api/v1/vouchers', voucherRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/reports', reportsRoutes);
 app.use('/api/v1/users', usersRoutes);
-app.use('/api/v1/auth', authRoutes);
 
 // Error handling
 app.use(notFound);
