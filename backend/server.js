@@ -26,7 +26,7 @@ app.use(compression());
 // Request logging is development-only (no console.log in production);
 // slow-request performance logging stays on in every environment.
 if (config.env === 'development') app.use(morgan('dev'));
-app.use(requestPerfLogger(1000));
+app.use(requestPerfLogger(config.slowRequestMs));
 app.use(express.json({ limit: config.bodyLimit }));
 app.use(express.urlencoded({ extended: true }));
 app.use(sanitizeBody);
@@ -89,6 +89,9 @@ process.on('uncaughtException', (err) => {
 });
 
 app.listen(config.port, () => {
+  if (config.isProduction && config.jwtSecret === 'dev-secret') {
+    logger.warn('JWT_SECRET is not set — using the development default. Set JWT_SECRET in production.');
+  }
   logger.info(`DigiTronics API v1.0 running on port ${config.port}`);
   logger.info(`Health check: http://localhost:${config.port}/api/v1/health`);
 });

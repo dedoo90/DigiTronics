@@ -1,9 +1,9 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
 
-const ACCESS_TTL = process.env.JWT_ACCESS_TTL || '15m';
-const REFRESH_TTL = process.env.JWT_REFRESH_TTL || '7d';
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || config.jwtSecret + ':refresh';
+const ACCESS_TTL = config.jwtAccessTtl;
+const REFRESH_TTL = config.jwtRefreshTtl;
+const REFRESH_SECRET = config.jwtRefreshSecret;
 
 function _claims(user) {
   return { sub: String(user.id), username: user.username, role: user.role || '' };

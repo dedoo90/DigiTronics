@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const config = require('../config');
 
-const isDev = (process.env.NODE_ENV || 'development') === 'development';
-const LOG_FILE = process.env.LOG_FILE || '';
+const isDev = config.env === 'development';
+const LOG_FILE = config.logFile;
 
 let _stream = null;
 function _fileLine(level, args) {
