@@ -1,0 +1,38 @@
+const jwt = require('jsonwebtoken');
+const config = require('../config');
+
+const ACCESS_TTL = process.env.JWT_ACCESS_TTL || '15m';
+const REFRESH_TTL = process.env.JWT_REFRESH_TTL || '7d';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || config.jwtSecret + ':refresh';
+
+function _claims(user) {
+  return { sub: String(user.id), username: user.username, role: user.role || '' };
+}
+
+function signAccessToken(user) {
+  return jwt.sign(_claims(user), config.jwtSecret, { expiresIn: ACCESS_TTL });
+}
+
+function signRefreshToken(user) {
+  return jwt.sign({ ..._claims(user), type: 'refresh' }, REFRESH_SECRET, { expiresIn: REFRESH_TTL });
+}
+
+function verifyAccessToken(token) {
+  try {
+    const payload = jwt.verify(token, config.jwtSecret);
+    return payload && payload.sub ? payload : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function verifyRefreshToken(token) {
+  try {
+    const payload = jwt.verify(token, REFRESH_SECRET);
+    return payload && payload.sub && payload.type === 'refresh' ? payload : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+module.exports = { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken };
