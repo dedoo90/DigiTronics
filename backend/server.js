@@ -79,21 +79,25 @@ app.use(notFound);
 app.use(jsonParseErrorHandler);
 app.use(serverError);
 
-// Start server
-process.on('unhandledRejection', (reason) => {
-  logger.error('Unhandled promise rejection:', reason && reason.message ? reason.message : reason);
-});
-process.on('uncaughtException', (err) => {
-  logger.error('Uncaught exception:', err.message, err.stack);
-  process.exit(1);
-});
+// Start server only when run directly (`node server.js`). When the app is
+// required as a module (tests), the caller controls listening and these
+// process-level handlers stay out of the host process.
+if (require.main === module) {
+  process.on('unhandledRejection', (reason) => {
+    logger.error('Unhandled promise rejection:', reason && reason.message ? reason.message : reason);
+  });
+  process.on('uncaughtException', (err) => {
+    logger.error('Uncaught exception:', err.message, err.stack);
+    process.exit(1);
+  });
 
-app.listen(config.port, () => {
-  if (config.isProduction && config.jwtSecret === 'dev-secret') {
-    logger.warn('JWT_SECRET is not set — using the development default. Set JWT_SECRET in production.');
-  }
-  logger.info(`DigiTronics API v1.0 running on port ${config.port}`);
-  logger.info(`Health check: http://localhost:${config.port}/api/v1/health`);
-});
+  app.listen(config.port, () => {
+    if (config.isProduction && config.jwtSecret === 'dev-secret') {
+      logger.warn('JWT_SECRET is not set — using the development default. Set JWT_SECRET in production.');
+    }
+    logger.info(`DigiTronics API v1.0 running on port ${config.port}`);
+    logger.info(`Health check: http://localhost:${config.port}/api/v1/health`);
+  });
+}
 
 module.exports = app;
