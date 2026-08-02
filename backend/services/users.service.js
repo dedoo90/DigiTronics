@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const fileStore = require('../utils/fileStore');
 const logger = require('../utils/logger');
+const { hashPassword, verifyPassword } = require('../utils/password');
 
 const STORE_NAME = 'users';
 
@@ -108,6 +109,7 @@ class UsersService {
       createdAt: data.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+    if (user.password !== undefined) user.password = hashPassword(user.password);
 
     const normalized = this._normalizeId(user.id);
     if ((db.users || []).some(u => this._normalizeId(u.id) === normalized)) {
@@ -137,7 +139,9 @@ class UsersService {
       if (clash) return { error: 'Duplicate username: ' + data.username };
     }
 
-    db.users[idx] = { ...db.users[idx], ...data, id: db.users[idx].id, updatedAt: new Date().toISOString() };
+    const merged = { ...db.users[idx], ...data, id: db.users[idx].id, updatedAt: new Date().toISOString() };
+    if (data.password !== undefined) merged.password = hashPassword(data.password);
+    db.users[idx] = merged;
     if (this._save(db)) return { user: db.users[idx] };
     return { error: 'Failed to persist update' };
   }
@@ -155,7 +159,25 @@ class UsersService {
   authenticate(username, password) {
     const user = this.getByUsername(username);
     if (!user) return null;
-    if (String(user.password || '') !== String(password || '')) return null;
+    const result = verifyPassword(password, user.password);
+    if (!result.match) return null;
+    if (result.needsRehash) {
+      // Password migration: legacy plaintext credential verified —
+      // rehash with bcrypt and persist so plaintext never survives a login.
+      try {
+        const db = this._load();
+        const normalized = this._normalizeId(user.id);
+        const idx = (db.users || []).findIndex(u => this._matchesId(u, normalized));
+        if (idx !== -1) {
+          db.users[idx].password = hashPassword(password);
+          db.users[idx].updatedAt = new Date().toISOString();
+          this._save(db);
+          user.password = db.users[idx].password;
+        }
+      } catch (err) {
+        logger.error('users.authenticate migration error:', err.message);
+      }
+    }
     return user;
   }
 }
