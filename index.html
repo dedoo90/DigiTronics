@@ -20144,7 +20144,7 @@ function renderDashboard() {
   setD6('ds-products', totalProducts);
   setD6('ds-maint', maintPending);
   
-  const activeUsers = new Set(getVisibleAuditEntries().filter(e => String(e.timestamp || '').slice(0,10) === today.toISOString().slice(0,10)).map(e => e.username || '-')).size;
+  const activeUsers = getTodayUserActivity().filter(u => u.lastAction !== 'logout').length;
   setD6('ds-audit-users', activeUsers);
   
   try {
@@ -33852,6 +33852,24 @@ function canViewAuditEntry(entry) {
 function getVisibleAuditEntries() {
   DB.auditLog = Array.isArray(DB.auditLog) ? DB.auditLog : [];
   return DB.auditLog.filter(canViewAuditEntry);
+}
+
+// Active Users: group today's visible audit entries by username.
+// Status semantics: a user is "Active Today" unless their LATEST entry
+// today is a logout — derived purely from existing audit data.
+function getTodayUserActivity() {
+  const today = localDateString();
+  const byUser = {};
+  getVisibleAuditEntries().forEach(e => {
+    const ts = String(e.timestamp || '');
+    if (ts.slice(0, 10) !== today) return;
+    const username = String(e.username || '').trim();
+    if (!username || username === 'system' || username === '-') return;
+    const cur = byUser[username] || (byUser[username] = { username, firstActivity: ts, lastActivity: ts, lastAction: '' });
+    if (ts < String(cur.firstActivity)) cur.firstActivity = ts;
+    if (ts >= String(cur.lastActivity)) { cur.lastActivity = ts; cur.lastAction = String(e.action || ''); }
+  });
+  return Object.values(byUser);
 }
 
 function getAuditFilters() {

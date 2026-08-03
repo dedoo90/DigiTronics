@@ -19860,9 +19860,9 @@ function renderDashboard() {
   setDash('ds-crm-repairs', crmRows.length ? Math.max(...crmRows.map(r => r.metrics.totalRepairs || 0)) : 0);
   setDash('ds-crm-loyalty', crmRows.filter(r => ['gold', 'platinum'].includes(r.reward.code)).length);
   const visibleAudit = getVisibleAuditEntries();
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = localDateString();
   setDash('ds-audit-today', visibleAudit.filter(e => String(e.timestamp || '').slice(0, 10) === todayIso).length);
-  setDash('ds-audit-users', new Set(visibleAudit.filter(e => String(e.timestamp || '').slice(0, 10) === todayIso).map(e => e.username || '-')).size);
+  setDash('ds-audit-users', getTodayUserActivity().filter(u => u.lastAction !== 'logout').length);
   setDash('ds-audit-latest', visibleAudit[0] ? `${visibleAudit[0].module || ''}/${visibleAudit[0].action || ''}`.slice(0, 18) : '-');
   ensureBranches();
   const currentBranch = getCurrentBranchMeta();
@@ -33541,6 +33541,24 @@ function canViewAuditEntry(entry) {
 function getVisibleAuditEntries() {
   DB.auditLog = Array.isArray(DB.auditLog) ? DB.auditLog : [];
   return DB.auditLog.filter(canViewAuditEntry);
+}
+
+// Active Users: group today's visible audit entries by username.
+// Status semantics: a user is "Active Today" unless their LATEST entry
+// today is a logout — derived purely from existing audit data.
+function getTodayUserActivity() {
+  const today = localDateString();
+  const byUser = {};
+  getVisibleAuditEntries().forEach(e => {
+    const ts = String(e.timestamp || '');
+    if (ts.slice(0, 10) !== today) return;
+    const username = String(e.username || '').trim();
+    if (!username || username === 'system' || username === '-') return;
+    const cur = byUser[username] || (byUser[username] = { username, firstActivity: ts, lastActivity: ts, lastAction: '' });
+    if (ts < String(cur.firstActivity)) cur.firstActivity = ts;
+    if (ts >= String(cur.lastActivity)) { cur.lastActivity = ts; cur.lastAction = String(e.action || ''); }
+  });
+  return Object.values(byUser);
 }
 
 function getAuditFilters() {
