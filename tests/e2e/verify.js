@@ -245,6 +245,26 @@ const server = http.createServer((req, res) => {
   await page.evaluate(() => showPage('users'));
   await page.waitForTimeout(500);
   check('All module pages render clean', errors.length === err0, errors.slice(err0).join(';'));
+
+  // Phase 20B — Active Users KPI + modal (audit-derived, localStorage only)
+  await page.evaluate(() => showPage('dashboard'));
+  await page.waitForTimeout(600);
+  const au = await page.evaluate(() => {
+    const rows = getTodayUserActivity();
+    const expectedKpi = rows.filter(u => u.lastAction !== 'logout').length;
+    const kpi = parseInt(document.getElementById('ds-audit-users').textContent, 10);
+    showActiveUsersModal();
+    const overlay = document.getElementById('activeUsersModal');
+    const wasOpen = overlay.classList.contains('show');
+    const modalRows = document.querySelectorAll('#activeUsersModalBody tbody tr').length;
+    const emptyShown = document.getElementById('activeUsersModalBody').textContent.includes('No user activity');
+    closeModal('activeUsersModal');
+    return { helperOk: typeof getTodayUserActivity === 'function', kpi, expectedKpi, wasOpen, rows: rows.length, modalRows, emptyShown };
+  });
+  check('getTodayUserActivity() groups today by username', au.helperOk);
+  check('Active Users KPI excludes logged-out users', au.kpi === au.expectedKpi, `kpi=${au.kpi} expected=${au.expectedKpi}`);
+  check('Active Users modal lists ALL today users', au.wasOpen && (au.modalRows === au.rows || (au.rows === 0 && au.emptyShown)), `rows=${au.rows} modalRows=${au.modalRows}`);
+
   check('No /api/v1 requests (flag off)', apiRequests.length === 0, apiRequests.slice(0, 2).join(','));
 
   console.log('---');

@@ -53,3 +53,21 @@ node backend/scripts/stressTest.js   # parallel CRUD/login/refresh/dup-push
 | Server won't start | Run `node scripts/checkEnv.js` — it lists blocking problems |
 | Corrupt store file | Restore from backup (DISASTER_RECOVERY.md); fileStore repairs invalid JSON on read by resetting that store |
 | High memory | Single instance only (fork mode) — never cluster: fileStore is per-process |
+
+## Dashboard "Active Users" card semantics
+
+The card and its click-through modal are derived **only from the local
+audit log** (`DB.auditLog` in localStorage) — no backend, no timers:
+
+- **KPI number** = distinct usernames with audit activity **today (local
+  date)** whose **latest** entry today is not a logout. Pseudo-users
+  `system` / `-` are excluded.
+- **Modal** (click the card) lists **all** users with activity today:
+  Username, Full Name, Role (joined from `DB.users`), First/Last
+  Activity Today, and Status — 🟢 Active Today / ⚪ Logged Out —
+  decided solely by each user's latest entry today.
+- **Known limitation**: if a user closes the browser/app without
+  clicking logout, no logout entry is written, so they remain
+  "Active Today" for the rest of the day. The day boundary resets at
+  local midnight.
+- `USE_BACKEND=false` behavior is unchanged: zero API requests.
