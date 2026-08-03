@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const compression = require('compression');
 const config = require('./config');
 const logger = require('./utils/logger');
+const fileStore = require('./utils/fileStore');
 const { notFound, serverError, requestPerfLogger } = require('./middleware/errorHandler');
 const { authMiddleware, requireAuth } = require('./middleware/auth');
 const { writeRoleGuard } = require('./middleware/authorize');
@@ -79,6 +80,25 @@ app.use(notFound);
 app.use(jsonParseErrorHandler);
 app.use(serverError);
 
+// Graceful shutdown: stop accepting connections, flush persistence, close
+// the logger, then exit. Writes are synchronous write-through, so there
+// is never pending data; flushAll is the stable hook regardless.
+function gracefulShutdown(server, exitCode) {
+  logger.info('Shutdown signal received — closing gracefully');
+  const finish = () => {
+    try { fileStore.flushAll(); } catch (_) {}
+    logger.close();
+    process.exit(exitCode || 0);
+  };
+  if (server && server.close) {
+    server.close(() => finish());
+    // Never hang on keep-alive connections.
+    setTimeout(finish, 3000).unref();
+  } else {
+    finish();
+  }
+}
+
 // Start server only when run directly (`node server.js`). When the app is
 // required as a module (tests), the caller controls listening and these
 // process-level handlers stay out of the host process.
@@ -91,13 +111,17 @@ if (require.main === module) {
     process.exit(1);
   });
 
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     if (config.isProduction && config.jwtSecret === 'dev-secret') {
       logger.warn('JWT_SECRET is not set — using the development default. Set JWT_SECRET in production.');
     }
     logger.info(`DigiTronics API v1.0 running on port ${config.port}`);
     logger.info(`Health check: http://localhost:${config.port}/api/v1/health`);
   });
+
+  process.on('SIGINT', () => gracefulShutdown(server, 0));
+  process.on('SIGTERM', () => gracefulShutdown(server, 0));
 }
 
 module.exports = app;
+module.exports.gracefulShutdown = gracefulShutdown;
