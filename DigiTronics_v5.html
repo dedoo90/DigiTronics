@@ -21915,9 +21915,23 @@ function renderPurchases(filter = '') {
     );
   }
 
-  const total = purchases.reduce((sum, p) => sum + (p.total || 0), 0);
-  const debt = purchases.filter(p => p.invoiceType === 'ajel').reduce((sum, p) => sum + (p.total || 0), 0);
-  const uniqueSuppliers = [...new Set(purchases.map(p => p.supplierId).filter(Boolean))].length;
+  // Single-pass aggregation for stats + supplier cards
+  let total = 0;
+  let debt = 0;
+  const supplierIdSet = new Set();
+  const suppAgg = new Map();
+  purchases.forEach(p => {
+    const pTotal = p.total || 0;
+    total += pTotal;
+    if (p.invoiceType === 'ajel') debt += pTotal;
+    if (p.supplierId) supplierIdSet.add(p.supplierId);
+    const key = p.supplierId == null ? '__none__' : String(p.supplierId);
+    const agg = suppAgg.get(key) || { total: 0, debt: 0 };
+    agg.total += pTotal;
+    if (p.invoiceType === 'ajel') agg.debt += pTotal;
+    suppAgg.set(key, agg);
+  });
+  const uniqueSuppliers = supplierIdSet.size;
 
   document.getElementById('pur-total').textContent = formatMoney(total);
   document.getElementById('pur-count').textContent = purchases.length;
@@ -21927,9 +21941,9 @@ function renderPurchases(filter = '') {
   // Supplier cards
   let cardsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:16px;">';
   DB.suppliers.forEach(s => {
-    const suppPurchases = purchases.filter(p => p.supplierId == s.id);
-    const suppTotal = suppPurchases.reduce((sum, p) => sum + (p.total || 0), 0);
-    const suppDebt = suppPurchases.filter(p => p.invoiceType === 'ajel').reduce((sum, p) => sum + (p.total || 0), 0);
+    const agg = suppAgg.get(String(s.id)) || { total: 0, debt: 0 };
+    const suppTotal = agg.total;
+    const suppDebt = agg.debt;
     cardsHtml += `<div class="stat-card" style="padding:12px">
       <div style="font-size:0.9rem;font-weight:700">${s.name}</div>
       <div style="font-size:0.75rem;color:var(--text2)">${s.phone || '-'}</div>
@@ -22784,7 +22798,7 @@ function renderCustomersTable(filter = '') {
   let customers = DB.customers;
   if (filter) customers = customers.filter(c => c.name.toLowerCase().includes(filter.toLowerCase()) || (c.phone && c.phone.includes(filter)));
   
-  tbody.innerHTML = customers.map((c, idx) => {
+  tbody.innerHTML = customers.slice(0, 100).map((c, idx) => {
     const debt = getCustomerBalance(c);
     const dualSupplier = findMatchingSupplierForCustomer(c);
     const dualNet = dualSupplier ? getDualNetSummary(c, dualSupplier) : null;
@@ -24752,7 +24766,7 @@ function renderTreasury() {
   const tbody = document.getElementById('cashFlowTbody');
   tbody.innerHTML = entries.slice(0, 100).map((c, idx) => {
     const row = normalizeTreasuryEntry(c);
-    const displayBalance = Number.isFinite(row.balance) ? row.balance : getTreasurySummary().total;
+    const displayBalance = Number.isFinite(row.balance) ? row.balance : treasury.total;
     return `<tr>
     <td>${entries.length - idx}</td>
     <td>${new Date(c.date).toLocaleString('ar-EG')}</td>
@@ -34259,12 +34273,20 @@ function renderPOSProducts(filter = '') {
   
   let products = DB.products;
   if (search) {
+    // Single pass over serials: group available serials by product (was O(products*serials) per render)
+    const serialsByProduct = new Map();
+    DB.serials.forEach(s => {
+      if (s.status !== 'available') return;
+      const list = serialsByProduct.get(s.productId) || [];
+      list.push(s.serial.toLowerCase());
+      serialsByProduct.set(s.productId, list);
+    });
     products = products.filter(p => {
       // Search by name
       if (p.name.toLowerCase().includes(search)) return true;
       // Search by serial number
       if (p.hasSerial !== false) {
-        const hasSerial = DB.serials.some(s => s.productId === p.id && s.status === 'available' && s.serial.toLowerCase().includes(search));
+        const hasSerial = (serialsByProduct.get(p.id) || []).some(serial => serial.includes(search));
         if (hasSerial) return true;
       }
       // Search by product ID
