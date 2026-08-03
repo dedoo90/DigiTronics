@@ -22725,14 +22725,40 @@ function saveSupplier() {
 
 function renderSuppliers() {
   const tbody = document.getElementById('suppliersTbody');
-  tbody.innerHTML = DB.suppliers.map((s, idx) => {
-    const purInvoices = DB.purchaseInvoices.filter(p => p.supplierId == s.id);
-    const ajelDebt = purInvoices.filter(p => p.invoiceType === 'ajel').reduce((sum, p) => sum + (p.total || 0), 0);
-    const payments = DB.supplierPayments.filter(sp => sp.supplierId == s.id && sp.type === 'payment').reduce((sum, sp) => sum + (sp.amount || 0), 0);
-    const vchPaid = (DB.vouchers || []).filter(v => v.partyId == s.id && v.partyType === 'supplier' && v.type === 'payment').reduce((sum, v) => sum + (v.amount || 0), 0);
-    const debt = (s.balance || 0) + ajelDebt - payments - vchPaid;
+  // Single-pass aggregation for supplier debt stats (was O(suppliers*(invoices+payments+vouchers)))
+  const suppAgg = new Map();
+  DB.purchaseInvoices.forEach(p => {
+    if (p.invoiceType !== 'ajel') return;
+    const key = String(p.supplierId);
+    const a = suppAgg.get(key) || { ajelDebt: 0, payments: 0, vchPaid: 0 };
+    a.ajelDebt += (p.total || 0);
+    suppAgg.set(key, a);
+  });
+  DB.supplierPayments.forEach(sp => {
+    if (sp.type !== 'payment') return;
+    const key = String(sp.supplierId);
+    const a = suppAgg.get(key) || { ajelDebt: 0, payments: 0, vchPaid: 0 };
+    a.payments += (sp.amount || 0);
+    suppAgg.set(key, a);
+  });
+  (DB.vouchers || []).forEach(v => {
+    if (v.partyType !== 'supplier' || v.type !== 'payment') return;
+    const key = String(v.partyId);
+    const a = suppAgg.get(key) || { ajelDebt: 0, payments: 0, vchPaid: 0 };
+    a.vchPaid += (v.amount || 0);
+    suppAgg.set(key, a);
+  });
+  // Precompute dual customer/net once per supplier (was per-row full-table scans)
+  const dualCache = new Map();
+  DB.suppliers.forEach(s => {
     const dualCustomer = findMatchingCustomerForSupplier(s);
-    const dualNet = dualCustomer ? getDualNetSummary(dualCustomer, s) : null;
+    dualCache.set(String(s.id), dualCustomer ? getDualNetSummary(dualCustomer, s) : null);
+  });
+
+  tbody.innerHTML = DB.suppliers.slice(0, 100).map((s, idx) => {
+    const a = suppAgg.get(String(s.id)) || { ajelDebt: 0, payments: 0, vchPaid: 0 };
+    const debt = (s.balance || 0) + a.ajelDebt - a.payments - a.vchPaid;
+    const dualNet = dualCache.get(String(s.id));
     return `<tr>
       <td>${idx + 1}</td>
       <td style="font-weight:700;cursor:pointer;color:var(--accent)" onclick="viewSupplierStatement(${s.id})">${escapeHtml(s.name)} 📋</td>
