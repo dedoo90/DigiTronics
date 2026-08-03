@@ -21,7 +21,7 @@ async function getRss() {
   }
 }
 
-async function round(totalRequests) {
+async function round(totalRequests, tag) {
   const latencies = [];
   let errors = 0;
   const rssBefore = await getRss();
@@ -38,12 +38,12 @@ async function round(totalRequests) {
           res = await fetch(`${BASE}/api/v1/customers`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: 'load-' + i, name: 'Load ' + i })
+            body: JSON.stringify({ id: `load-${tag}-` + i, name: 'Load ' + i })
           });
         } else {
           res = await fetch(`${BASE}/api/v1/customers?limit=50&page=${1 + (i % 5)}`);
         }
-        if (res.statusCode >= 400) errors++;
+        if (res.status >= 400) errors++;
         await res.text();
       } catch (_) {
         errors++;
@@ -100,7 +100,7 @@ async function main() {
 
     console.log('round | requests | wall ms | req/s | avg ms | p95 ms | max ms | errors | rss before->after (MB)');
     for (const n of [100, 500, 1000]) {
-      const r = await round(n);
+      const r = await round(n, n);
       console.log(`load  | ${r.requests} | ${r.wallMs} | ${r.throughput} | ${r.avgMs} | ${r.p95Ms} | ${r.maxMs} | ${r.errors} | ${r.rssBefore} -> ${r.rssAfter}`);
     }
     console.log('child alive after all rounds:', child.exitCode === null);
