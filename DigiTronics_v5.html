@@ -25484,9 +25484,15 @@ function saveExpense() {
 
 function renderExpenses() {
   const today = new Date();
-  const todayExpenses = DB.expenses.filter(e => isToday(e.date)).reduce((sum, e) => sum + (e.amount || 0), 0);
-  const monthExpenses = DB.expenses.filter(e => new Date(e.date).getMonth() === today.getMonth() && new Date(e.date).getFullYear() === today.getFullYear()).reduce((sum, e) => sum + (e.amount || 0), 0);
-  const totalExpenses = DB.expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+  let todayExpenses = 0;
+  let monthExpenses = 0;
+  let totalExpenses = 0;
+  for (const e of DB.expenses) {
+    const d = new Date(e.date);
+    if (isToday(e.date)) todayExpenses += (e.amount || 0);
+    if (d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()) monthExpenses += (e.amount || 0);
+    totalExpenses += (e.amount || 0);
+  }
   
   document.getElementById('exp-today').textContent = formatMoney(todayExpenses);
   document.getElementById('exp-month').textContent = formatMoney(monthExpenses);
