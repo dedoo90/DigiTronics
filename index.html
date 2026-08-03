@@ -18908,17 +18908,18 @@ function getMissingCashPurchaseEntries(productId = null) {
   DB.purchaseInvoices = Array.isArray(DB.purchaseInvoices) ? DB.purchaseInvoices : [];
   DB.cashFlow = Array.isArray(DB.cashFlow) ? DB.cashFlow : [];
 
-  return DB.purchaseInvoices.map(inv => {
+  const allRows = getCachedComputation('missingCashPurchaseEntries', getDataVersionKey('missing-cash'), () => DB.purchaseInvoices.map(inv => {
     const invoiceId = String(inv.id || '').trim();
     if (!invoiceId || !isCashPurchaseInvoice(inv)) return null;
-    if (productId != null && !getInvoiceProductItems(inv, productId).length) return null;
     const invTotal = roundMoney(toSafeFloat(inv.total, 0));
     if (!(invTotal > 0)) return null;
     const paidOut = roundMoney(getPurchaseCashOutTotal(invoiceId));
     const missing = roundMoney(invTotal - paidOut);
     if (missing <= 0.01) return null;
     return { inv, invoiceId, invTotal, paidOut, missing };
-  }).filter(Boolean);
+  }).filter(Boolean));
+  if (productId == null) return allRows;
+  return allRows.filter(r => getInvoiceProductItems(r.inv, productId).length);
 }
 
 function reconcileMissingCashPurchaseEntries(options = {}) {
@@ -25584,10 +25585,10 @@ function openUnifiedLedgerModal() {
   openModal('unifiedLedgerModal');
 }
 
-function getFilteredUnifiedLedgerRows() {
+function getFilteredUnifiedLedgerRows(allRows) {
   const q = String(document.getElementById('unifiedLedgerSearch')?.value || '').trim().toLowerCase();
   const filter = document.getElementById('unifiedLedgerFilter')?.value || 'all';
-  let rows = buildUnifiedLedgerRows();
+  let rows = allRows || buildUnifiedLedgerRows();
   if (filter === 'cash') rows = rows.filter(r => r.book === 'الخزنة');
   if (filter === 'stock') rows = rows.filter(r => r.book === 'المخزون');
   if (filter === 'issues') rows = rows.filter(r => r.issue);
@@ -25600,7 +25601,7 @@ function renderUnifiedLedgerTable() {
   const tbody = document.getElementById('unifiedLedgerTbody');
   if (!summary || !tbody) return;
   const allRows = buildUnifiedLedgerRows();
-  const rows = getFilteredUnifiedLedgerRows();
+  const rows = getFilteredUnifiedLedgerRows(allRows);
   const postedRows = allRows.filter(r => !r.issue);
   const cashIn = postedRows.reduce((s, r) => s + r.cashIn, 0);
   const cashOut = postedRows.reduce((s, r) => s + r.cashOut, 0);
