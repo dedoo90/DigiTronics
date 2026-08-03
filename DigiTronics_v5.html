@@ -2624,7 +2624,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       <div class="pos-layout">
         <div class="pos-items">
           <div class="pos-header" style="display:flex;gap:6px;align-items:center">
-            <input class="pos-search" id="posSearch" type="text" placeholder="🔍 ابحث بالاسم أو السيريال..." style="flex:1" oninput="renderPOSProducts()">
+            <input class="pos-search" id="posSearch" type="text" placeholder="🔍 ابحث بالاسم أو السيريال..." style="flex:1" oninput="debounceUiSearch('pos', this.value, renderPOSProducts)">
             <button onclick="openBarcodeScanner('pos')" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 12px;cursor:pointer;font-size:1.1rem;white-space:nowrap" title="مسح باركود">📷</button>
           </div>
           <div class="pos-product-grid" id="posProductGrid"></div>
@@ -2763,7 +2763,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       <div class="page-header">
         <div class="page-title">🧾 أرشيف الفواتير</div>
         <div class="table-actions">
-          <input class="search-input" type="text" placeholder="بحث..." oninput="renderInvoices(this.value)">
+          <input class="search-input" type="text" placeholder="بحث..." oninput="debounceUiSearch('invoices', this.value, () => renderInvoices(getActiveSearch('invoices')))">
           <button class="btn btn-accent btn-sm" onclick="openNewSaleInvoiceModal()">➕ New invoice</button>
           <button class="btn btn-outline btn-sm" onclick="exportInvoicesCSV()">📥 CSV</button>
         </div>
@@ -2879,7 +2879,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       <div class="page-header">
         <div class="page-title">🛍️ فواتير المشتريات</div>
         <div class="table-actions">
-          <input class="search-input" type="text" placeholder="بحث بالمورد/المنتج..." oninput="renderPurchases(this.value)">
+          <input class="search-input" type="text" placeholder="بحث بالمورد/المنتج..." oninput="debounceUiSearch('purchases', this.value, () => renderPurchases(getActiveSearch('purchases')))">
           <button class="btn btn-accent btn-sm" onclick="openPurchaseModal()">➕ فاتورة شراء</button>
         </div>
       </div>
@@ -2922,7 +2922,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       <div class="page-header">
         <div class="page-title">👥 العملاء</div>
         <div class="table-actions">
-          <input class="search-input" type="text" placeholder="بحث..." oninput="renderCustomersTable(this.value)">
+          <input class="search-input" type="text" placeholder="بحث..." oninput="debounceUiSearch('customers', this.value, () => renderCustomersTable(getActiveSearch('customers')))">
           <button class="btn btn-accent btn-sm" onclick="openCustomerModal()">➕ إضافة عميل</button>
         </div>
       </div>
@@ -2940,8 +2940,8 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center">
-        <input class="search-input" id="amanatFilterCustomer" type="text" placeholder="بحث عميل..." style="width:180px" oninput="renderAmanatPage()">
-        <input class="search-input" id="amanatFilterProduct" type="text" placeholder="بحث صنف..." style="width:180px" oninput="renderAmanatPage()">
+        <input class="search-input" id="amanatFilterCustomer" type="text" placeholder="بحث عميل..." style="width:180px" oninput="debounceUiSearch('amanatCustomer', this.value, renderAmanatPage)">
+        <input class="search-input" id="amanatFilterProduct" type="text" placeholder="بحث صنف..." style="width:180px" oninput="debounceUiSearch('amanatProduct', this.value, renderAmanatPage)">
         <input class="search-input" id="amanatFilterFrom" type="date" style="width:150px" onchange="renderAmanatPage()">
         <input class="search-input" id="amanatFilterTo" type="date" style="width:150px" onchange="renderAmanatPage()">
         <select class="discount-input" id="amanatFilterStatus" style="width:160px" onchange="renderAmanatPage()">
@@ -3108,7 +3108,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
         <div class="table-header">
           <div class="table-title">📒 حركات الخزنة</div>
           <div class="table-actions">
-            <input class="search-input" type="text" placeholder="بحث..." oninput="renderCashFlow()" id="cashSearchFilter">
+            <input class="search-input" type="text" placeholder="بحث..." oninput="debounceUiSearch('cashflow', this.value, renderCashFlow)" id="cashSearchFilter">
             <input class="search-input" type="date" id="cashDateFilter" onchange="renderCashFlow()" style="width:150px">
             <button class="btn btn-outline btn-sm" onclick="openUnifiedLedgerModal()">📚 دفتر القيود</button>
             <button class="btn btn-outline btn-sm" onclick="openTreasuryAuditModal()">🧮 فحص فرق الخزنة</button>
@@ -3132,7 +3132,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       <div class="alert alert-info" style="font-size:0.78rem;margin-bottom:10px">دفتر مراجعة آمن للقراءة فقط: يجمع حركات الخزنة والمخزون ويكشف الفواتير التي تحتاج قيد مالي أو مخزني بدون تعديل البيانات.</div>
       <div id="unifiedLedgerSummary" style="margin-bottom:10px"></div>
       <div class="table-actions" style="margin-bottom:10px">
-        <input class="search-input" id="unifiedLedgerSearch" type="text" placeholder="بحث بالبيان / الفاتورة / الصنف..." oninput="renderUnifiedLedgerTable()">
+        <input class="search-input" id="unifiedLedgerSearch" type="text" placeholder="بحث بالبيان / الفاتورة / الصنف..." oninput="debounceUiSearch('unifiedLedger', this.value, renderUnifiedLedgerTable)">
         <select class="discount-input" id="unifiedLedgerFilter" style="width:170px" onchange="renderUnifiedLedgerTable()">
           <option value="all">كل القيود</option>
           <option value="cash">الخزنة فقط</option>
@@ -3699,7 +3699,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
           <div class="table-header">
             <div class="table-title">🔎 فلاتر تقرير دورة حياة الأجهزة</div>
             <div class="table-actions" style="flex:1">
-              <input class="search-input" id="deviceReportSearch" placeholder="Serial / IMEI / Service Tag / العميل / الهاتف / الفاتورة" oninput="renderDeviceLifecycleReports()" style="min-width:240px;flex:1">
+              <input class="search-input" id="deviceReportSearch" placeholder="Serial / IMEI / Service Tag / العميل / الهاتف / الفاتورة" oninput="debounceUiSearch('deviceReports', this.value, renderDeviceLifecycleReports)" style="min-width:240px;flex:1">
               <select class="search-input" id="deviceReportStatus" onchange="renderDeviceLifecycleReports()" style="max-width:160px">
                 <option value="">كل الحالات</option><option value="available">متاح</option><option value="sold">مباع</option><option value="returned">مرتجع</option><option value="resold">مباع مرة أخرى</option><option value="repair">صيانة</option><option value="scrapped">هالك</option><option value="unavailable">غير متاح</option>
               </select>
@@ -3803,7 +3803,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
             <button class="btn btn-outline btn-sm" onclick="selectAllBroadcast(false)">☐ إلغاء الكل</button>
           </div>
         </div>
-        <input type="text" id="broadcastSearch" placeholder="🔎 ابحث باسم أو رقم..." class="search-input" style="width:100%;margin-bottom:10px" oninput="renderBroadcastList()">
+        <input type="text" id="broadcastSearch" placeholder="🔎 ابحث باسم أو رقم..." class="search-input" style="width:100%;margin-bottom:10px" oninput="debounceUiSearch('broadcast', this.value, renderBroadcastList)">
         <div id="broadcastList" style="max-height:350px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px"></div>
       </div>
 
@@ -5796,7 +5796,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
 <div class="modal-overlay" id="viewSerialsModal"><div class="modal modal-xl">
   <div class="modal-title">📋 تفاصيل الصنف والفواتير<button class="modal-close" onclick="closeModal('viewSerialsModal')">&times;</button></div>
   <input type="hidden" id="viewSerialsProdId">
-  <div class="form-group"><input type="text" class="search-input" id="serialsSearchInput" placeholder="بحث في السيريالات..." oninput="renderSerialsTable()"></div>
+  <div class="form-group"><input type="text" class="search-input" id="serialsSearchInput" placeholder="بحث في السيريالات..." oninput="debounceUiSearch('serials', this.value, renderSerialsTable)"></div>
   <div id="serialsTableContainer" style="max-height:400px;overflow-y:auto;"></div>
   <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('viewSerialsModal')">إغلاق</button></div>
 </div></div>
@@ -5807,7 +5807,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
   <div class="alert alert-info" style="font-size:0.78rem;margin-bottom:10px">يفحص الأصناف التي تم بيعها أو لها مخزون وتكلفة الشراء عندها ناقصة. لو فيه فواتير شراء قديمة، البرنامج يستنتج التكلفة تلقائياً من متوسط الشراء.</div>
   <div id="costAuditSummary" style="margin-bottom:10px"></div>
   <div class="table-actions" style="margin-bottom:10px">
-    <input class="search-input" id="costAuditSearch" type="text" placeholder="بحث باسم الصنف..." oninput="renderCostAuditTable()">
+    <input class="search-input" id="costAuditSearch" type="text" placeholder="بحث باسم الصنف..." oninput="debounceUiSearch('costAudit', this.value, renderCostAuditTable)">
     <select class="discount-input" id="costAuditFilter" style="width:190px" onchange="renderCostAuditTable()">
       <option value="issues">محتاج تدخل فقط</option>
       <option value="covered">اتظبط تلقائياً</option>
