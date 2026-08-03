@@ -26114,23 +26114,27 @@ function renderReports() {
     <td>${maskMoneyIfRestricted(p.profit)}</td>
   </tr>`).join('') || '<tr><td colspan="5" style="text-align:center">لا توجد مبيعات</td></tr>';
   
-  // Slow movers
+  // Slow movers (single pass over sale invoices: last sale date per product)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  const slowMovers = DB.products.filter(p => {
-    const lastSale = DB.saleInvoices
-      .filter(inv => inv.items && inv.items.some(i => i.productId === p.id))
-      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-    return !lastSale || new Date(lastSale.date) < thirtyDaysAgo;
-  }).map(p => {
-    const lastSale = DB.saleInvoices
-      .filter(inv => inv.items && inv.items.some(i => i.productId === p.id))
-      .sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-    const days = lastSale ? Math.floor((new Date() - new Date(lastSale.date)) / (1000 * 60 * 60 * 24)) : 'لم يُباع';
-    const stock = getProductStock(p.id);
-    return { ...p, lastSale: lastSale ? new Date(lastSale.date).toLocaleDateString('ar-EG') : '-', days, stock };
+  const lastSaleByProduct = new Map();
+  DB.saleInvoices.forEach(inv => {
+    if (!inv.items) return;
+    const invDate = new Date(inv.date);
+    inv.items.forEach(i => {
+      if (i.productId == null) return;
+      const prev = lastSaleByProduct.get(i.productId);
+      if (!prev || invDate > prev) lastSaleByProduct.set(i.productId, invDate);
+    });
   });
+  
+  const slowMovers = DB.products.map(p => {
+    const lastSale = lastSaleByProduct.get(p.id) || null;
+    if (lastSale && !(lastSale < thirtyDaysAgo)) return null;
+    const days = lastSale ? Math.floor((new Date() - lastSale) / (1000 * 60 * 60 * 24)) : 'لم يُباع';
+    const stock = getProductStock(p.id);
+    return { ...p, lastSale: lastSale ? lastSale.toLocaleDateString('ar-EG') : '-', days, stock };
+  }).filter(Boolean);
   
   const slowTbody = document.getElementById('slowMoversTbody');
   slowTbody.innerHTML = slowMovers.map(p => `<tr>
