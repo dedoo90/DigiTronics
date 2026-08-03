@@ -24634,26 +24634,29 @@ function renderWarranty() {
   const thirtyDays = new Date();
   thirtyDays.setDate(thirtyDays.getDate() + 30);
   
-  const active = DB.warranty.filter(w => new Date(w.expiryDate) > now).length;
-  const expired = DB.warranty.filter(w => new Date(w.expiryDate) <= now).length;
-  const expiring = DB.warranty.filter(w => {
-    const exp = new Date(w.expiryDate);
-    return exp > now && exp <= thirtyDays;
-  }).length;
+  let active = 0;
+  let expired = 0;
+  let expiring = 0;
+  const rows = [];
+  for (const w of DB.warranty) {
+    const expiry = new Date(w.expiryDate);
+    const isExpired = expiry <= now;
+    const isExpiring = expiry > now && expiry <= thirtyDays;
+    if (isExpired) expired += 1;
+    else active += 1;
+    if (isExpiring) expiring += 1;
+    let statusBadge = '<span class="badge badge-green">ساري</span>';
+    if (isExpired) statusBadge = '<span class="badge badge-red">منتهي</span>';
+    else if (isExpiring) statusBadge = '<span class="badge badge-yellow">ينتهي قريباً</span>';
+    rows.push({ w, expiry, statusBadge });
+  }
   
   document.getElementById('war-active').textContent = active;
   document.getElementById('war-expired').textContent = expired;
   document.getElementById('war-expiring').textContent = expiring;
   
   const tbody = document.getElementById('warrantyTbody');
-  tbody.innerHTML = DB.warranty.map(w => {
-    const expiry = new Date(w.expiryDate);
-    const isExpired = expiry <= now;
-    const isExpiring = expiry > now && expiry <= thirtyDays;
-    let statusBadge = '<span class="badge badge-green">ساري</span>';
-    if (isExpired) statusBadge = '<span class="badge badge-red">منتهي</span>';
-    else if (isExpiring) statusBadge = '<span class="badge badge-yellow">ينتهي قريباً</span>';
-    
+  tbody.innerHTML = rows.slice(0, 500).map(({ w, expiry, statusBadge }) => {
     return `<tr>
       <td>${w.id}</td>
       <td>${escapeHtml(w.customer)}</td>
@@ -25146,10 +25149,16 @@ function renderMaintenance(filter = '') {
     ].some(v => String(v || '').toLowerCase().includes(q)));
   }
   
-  const pending = items.filter(m => m.status === 'pending').length;
-  const inProgress = items.filter(m => m.status === 'inprogress').length;
-  const done = items.filter(m => m.status === 'done').length;
-  const revenue = items.filter(m => m.payment === 'paid').reduce((sum, m) => sum + (m.total || 0), 0);
+  let pending = 0;
+  let inProgress = 0;
+  let done = 0;
+  let revenue = 0;
+  for (const m of items) {
+    if (m.status === 'pending') pending += 1;
+    else if (m.status === 'inprogress') inProgress += 1;
+    else if (m.status === 'done') done += 1;
+    if (m.payment === 'paid') revenue += (m.total || 0);
+  }
   
   document.getElementById('maintPending').textContent = pending;
   document.getElementById('maintInProgress').textContent = inProgress;
@@ -25157,7 +25166,7 @@ function renderMaintenance(filter = '') {
   document.getElementById('maintRevenue').textContent = formatMoney(revenue);
   
   const tbody = document.getElementById('maintenanceTbody');
-  tbody.innerHTML = items.map(m => {
+  tbody.innerHTML = items.slice(0, 500).map(m => {
     let statusBadge = '';
     if (m.status === 'pending') statusBadge = '<span class="badge badge-yellow">انتظار</span>';
     else if (m.status === 'inprogress') statusBadge = '<span class="badge badge-blue">جاري</span>';
