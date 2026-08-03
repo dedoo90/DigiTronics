@@ -21467,10 +21467,19 @@ function renderSerialsTable() {
   const purchaseLinks = getProductPurchaseLinks(productId);
   const saleLinks = getProductSaleLinks(productId);
   const productSerials = DB.serials.filter(s => s.productId === productId && (!search || s.serial.toLowerCase().includes(search)));
-  const availableSerialsCount = productSerials.filter(s => s.status === 'available').length;
-  const soldSerialsCount = productSerials.filter(s => s.status === 'sold').length;
-  const totalPurchasedSerials = productSerials.filter(s => !!s.purchaseInvoiceId).length;
+  let availableSerialsCount = 0;
+  let soldSerialsCount = 0;
+  let totalPurchasedSerials = 0;
+  for (const s of productSerials) {
+    if (s.status === 'available') availableSerialsCount++;
+    else if (s.status === 'sold') soldSerialsCount++;
+    if (s.purchaseInvoiceId) totalPurchasedSerials++;
+  }
   const stockBreakdown = getProductStockBreakdown(productId);
+  const purchaseInvById = new Map();
+  (DB.purchaseInvoices || []).forEach(inv => purchaseInvById.set(String(inv.id), inv));
+  const saleInvById = new Map();
+  (DB.saleInvoices || []).forEach(inv => saleInvById.set(String(inv.id), inv));
 
   const header = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:12px">
     <div style="border:1px solid var(--border);border-radius:8px;padding:10px;background:var(--surface2)"><div style="font-size:0.75rem;color:var(--text2)">الصنف</div><strong>${escapeHtml(product?.name || '-')}</strong></div>
@@ -21495,13 +21504,13 @@ function renderSerialsTable() {
   }
 
   html += '<div class="table-container"><div class="table-header"><div class="table-title">🔢 تتبع السيريالات</div></div><div class="overflow-x"><table class="data-table"><thead><tr><th>السيريال</th><th>الحالة</th><th>فاتورة الشراء</th><th>فاتورة البيع</th><th>سعر الشراء</th><th>سعر البيع</th></tr></thead><tbody>';
-  html += productSerials.map(s => {
+  html += productSerials.slice(0, 500).map(s => {
     let statusBadge = '';
     if (s.status === 'available') statusBadge = '<span class="badge badge-green">متاح</span>';
     else if (s.status === 'sold') statusBadge = '<span class="badge badge-red">مباع</span>';
     else if (s.status === 'returned') statusBadge = '<span class="badge badge-yellow">مرتجع</span>';
-    const purInv = s.purchaseInvoiceId ? DB.purchaseInvoices.find(inv => inv.id === s.purchaseInvoiceId) : null;
-    const saleInv = s.saleInvoiceId ? DB.saleInvoices.find(inv => inv.id === s.saleInvoiceId) : null;
+    const purInv = s.purchaseInvoiceId ? purchaseInvById.get(String(s.purchaseInvoiceId)) : null;
+    const saleInv = s.saleInvoiceId ? saleInvById.get(String(s.saleInvoiceId)) : null;
     const purItem = purInv ? findSerialInvoiceItem(purInv, s.serial) : null;
     const saleItem = saleInv ? findSerialInvoiceItem(saleInv, s.serial) : null;
     const purCell = purInv
