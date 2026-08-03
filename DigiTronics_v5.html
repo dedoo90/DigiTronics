@@ -13379,6 +13379,10 @@ const GH_GIST_DESC = 'DigiTronics Database';
 let ghPendingSave  = false;
 let ghSyncing      = false;
 let ghLastSaved    = null;
+// Hotfix: fingerprint of the last gist content we merged/pushed.
+// Identical pulled content means "nothing changed" — skip the merge so
+// the auto-sync loop does not redraw the page and reset scroll/focus.
+let ghLastPullContent = '';
 let changeLog = [];
 
 function ghToken()  { return localStorage.getItem(GH_TOKEN_KEY) || ''; }
@@ -13494,6 +13498,9 @@ async function ghPull(silent=false) {
     const data = await r.json();
     const content = data.files?.[GH_FILENAME]?.content;
     if (content) {
+      // Hotfix: no-op pull — identical remote content means nothing
+      // changed; merging would trigger a full page redraw (scroll jump).
+      if (silent && content === ghLastPullContent) return false;
       const parsed = JSON.parse(content);
       const localVersion = (DB.settings && Number(DB.settings.localVersion)) || 0;
       const remoteVersion = (parsed.settings && Number(parsed.settings.localVersion)) || 0;
@@ -13528,6 +13535,7 @@ async function ghPull(silent=false) {
       ensureDBIntegrity();
       applyBusinessBranding();
       localStorage.setItem(DB_KEY, JSON.stringify(DB));
+      ghLastPullContent = content;
       if (!silent) { showPill('✅ تم الاستعادة من GitHub',3000); showToast('✅ تم الاستعادة من GitHub'); }
       return true;
     }
@@ -13545,6 +13553,9 @@ async function ghPush(silent=false, retries=2) {
     });
     if (!r.ok) throw new Error('HTTP '+r.status);
     ghLastSaved=new Date();
+    // Hotfix: our own push is not a remote change — the next auto pull
+    // will fetch exactly this content and must not redraw for it.
+    ghLastPullContent = JSON.stringify(DB);
     const sub=document.getElementById('ghStatusSub');
     if(sub) sub.textContent='آخر حفظ: '+ghLastSaved.toLocaleTimeString('ar-EG');
     if(!silent) showPill('✅ تم الحفظ على GitHub',2500);
