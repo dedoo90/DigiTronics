@@ -23190,30 +23190,35 @@ function renderInstallments() {
   const today = localDateString();
   const search = String(document.getElementById('installmentSearchInput')?.value || '').trim().toLowerCase();
   const statusFilter = String(document.getElementById('installmentStatusFilter')?.value || '').trim();
-  const rows = DB.installments.filter(inst => {
+  const rows = [];
+  let active = 0;
+  let remaining = 0;
+  let collected = 0;
+  let dueToday = 0;
+  let overdue = 0;
+  for (const inst of DB.installments) {
     const stats = getInstallmentDueStats(inst, today);
+    if (inst.status === 'active') { active += 1; remaining += (inst.remaining || 0); }
+    collected += toSafeFloat(inst.downPayment, 0) + (inst.payments || []).reduce((s, p) => s + toSafeFloat(p.amount, 0), 0);
+    dueToday += stats.dueToday;
+    overdue += stats.overdue;
     const haystack = [inst.id, inst.customer, inst.phone, inst.invoiceId, inst.invoiceRef, inst.branchName].join(' ').toLowerCase();
-    if (search && !haystack.includes(search)) return false;
-    if (statusFilter === 'overdue' && !stats.overdue) return false;
-    if (statusFilter === 'due_today' && !stats.dueToday) return false;
-    if (statusFilter && !['overdue', 'due_today'].includes(statusFilter) && inst.status !== statusFilter) return false;
-    return can('all') || canSeeBranch(inst.branchId || 'MAIN');
-  });
-  const active = DB.installments.filter(i => i.status === 'active');
-  const remaining = active.reduce((sum, i) => sum + (i.remaining || 0), 0);
-  const collected = DB.installments.reduce((sum, i) => sum + toSafeFloat(i.downPayment, 0) + (i.payments || []).reduce((s, p) => s + toSafeFloat(p.amount, 0), 0), 0);
-  const dueToday = DB.installments.reduce((sum, i) => sum + getInstallmentDueStats(i, today).dueToday, 0);
-  const overdue = DB.installments.reduce((sum, i) => sum + getInstallmentDueStats(i, today).overdue, 0);
+    if (search && !haystack.includes(search)) continue;
+    if (statusFilter === 'overdue' && !stats.overdue) continue;
+    if (statusFilter === 'due_today' && !stats.dueToday) continue;
+    if (statusFilter && !['overdue', 'due_today'].includes(statusFilter) && inst.status !== statusFilter) continue;
+    if (!(can('all') || canSeeBranch(inst.branchId || 'MAIN'))) continue;
+    rows.push({ inst, stats });
+  }
   
   document.getElementById('inst-remaining').textContent = formatMoney(remaining);
   document.getElementById('inst-collected').textContent = formatMoney(collected);
-  document.getElementById('inst-count').textContent = active.length;
+  document.getElementById('inst-count').textContent = active;
   const dueEl = document.getElementById('inst-due-today'); if (dueEl) dueEl.textContent = dueToday;
   const overEl = document.getElementById('inst-overdue'); if (overEl) overEl.textContent = overdue;
   
   const tbody = document.getElementById('installmentsTbody');
-  tbody.innerHTML = rows.map(inst => {
-    const stats = getInstallmentDueStats(inst, today);
+  tbody.innerHTML = rows.slice(0, 500).map(({ inst, stats }) => {
     const statusBadge = inst.status === 'active'
       ? (stats.overdue ? '<span class="badge badge-red">متأخر</span>' : '<span class="badge badge-green">نشط</span>')
       : '<span class="badge badge-blue">مكتمل</span>';
