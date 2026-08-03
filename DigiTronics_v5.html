@@ -18138,6 +18138,7 @@ function renderAmanatPage() {
       if (fProduct && !itemName.toLowerCase().includes(fProduct)) return;
       if (fFrom && invDateKey && invDateKey < fFrom) return;
       if (fTo && invDateKey && invDateKey > fTo) return;
+      const sns = (item.amanatSettledSerials || []).slice(-3);
       rows.push({
         invoiceId: inv.id,
         date: inv.date,
@@ -18146,7 +18147,8 @@ function renderAmanatPage() {
         qty: Math.max(0, parseInt(item.qty, 10) || 0),
         settled: Math.max(0, parseInt(item.amanatSettledQty, 10) || 0),
         open,
-        itemIdx: idx
+        itemIdx: idx,
+        snsDisplay: sns.length ? `<div style="font-size:0.65rem;color:var(--text2);margin-top:4px">SN: ${sns.join(', ')}</div>` : ''
       });
     });
   });
@@ -18155,19 +18157,14 @@ function renderAmanatPage() {
   document.getElementById('amanat-open-count').textContent = rows.length;
   document.getElementById('amanat-open-units').textContent = rows.reduce((s, r) => s + r.open, 0);
 
-  tbody.innerHTML = rows.map(r => `<tr>
+  tbody.innerHTML = rows.slice(0, 500).map(r => `<tr>
     <td>${r.invoiceId}</td>
     <td>${new Date(r.date).toLocaleDateString('ar-EG')}</td>
     <td>${r.customer}</td>
     <td>${r.itemName}</td>
     <td>${r.qty}</td>
     <td>${r.settled}</td>
-    <td><span class="badge badge-yellow">${r.open}</span>${(() => {
-      const inv = DB.saleInvoices.find(x => x.id === r.invoiceId);
-      const item = inv?.items?.[r.itemIdx];
-      const sns = (item?.amanatSettledSerials || []).slice(-3);
-      return sns.length ? `<div style="font-size:0.65rem;color:var(--text2);margin-top:4px">SN: ${sns.join(', ')}</div>` : '';
-    })()}</td>
+    <td><span class="badge badge-yellow">${r.open}</span>${r.snsDisplay}</td>
     <td><button class="btn btn-sm btn-accent" onclick="settleAmanatManual('${r.invoiceId}', ${r.itemIdx})">تسوية</button></td>
   </tr>`).join('') || '<tr><td colspan="8" style="text-align:center">لا توجد أمانات مفتوحة</td></tr>';
 
