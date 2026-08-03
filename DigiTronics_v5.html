@@ -1995,7 +1995,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
           <div class="stat-value" id="ds-products">0</div>
           <div class="stat-label">Inventory</div>
         </div>
-        <div class="stat-card orange" style="cursor:pointer" onclick="showPage('audit')">
+        <div class="stat-card orange" style="cursor:pointer" onclick="showActiveUsersModal()">
           <div class="stat-icon">👤</div>
           <div class="stat-value" id="ds-audit-users">0</div>
           <div class="stat-label">Active Users</div>
@@ -6259,6 +6259,11 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
 </div></div>
 
 <!-- Return Modal -->
+<div class="modal-overlay" id="activeUsersModal"><div class="modal modal-xl">
+  <div class="modal-title">👤 Active Users Today<button class="modal-close" onclick="closeModal('activeUsersModal')">&times;</button></div>
+  <div id="activeUsersModalBody"></div>
+</div></div>
+
 <div class="modal-overlay" id="returnModal"><div class="modal modal-xl">
   <div class="modal-title" id="retModalTitle">↩️ تسجيل مرتجع<button class="modal-close" onclick="closeModal('returnModal')">&times;</button></div>
 
@@ -33559,6 +33564,34 @@ function getTodayUserActivity() {
     if (ts >= String(cur.lastActivity)) { cur.lastActivity = ts; cur.lastAction = String(e.action || ''); }
   });
   return Object.values(byUser);
+}
+
+// Active Users modal: lists ALL users with activity today (logged-out
+// users included, marked by status). Rendered once on open — no timers,
+// no polling, data comes only from the existing local audit log.
+function showActiveUsersModal() {
+  renderActiveUsersModal();
+  openModal('activeUsersModal');
+}
+
+function renderActiveUsersModal() {
+  const body = document.getElementById('activeUsersModalBody');
+  if (!body) return;
+  const fmt = ts => {
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? (ts || '-') : d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+  };
+  const rows = getTodayUserActivity().map(u => {
+    const user = (DB.users || []).find(x => String(x.username) === u.username) || {};
+    return { username: u.username, fullName: user.fullName || '-', role: user.role || '-', firstActivity: u.firstActivity, lastActivity: u.lastActivity, active: u.lastAction !== 'logout' };
+  }).sort((a, b) => (a.active === b.active ? String(b.lastActivity).localeCompare(String(a.lastActivity)) : a.active ? -1 : 1));
+  if (!rows.length) {
+    body.innerHTML = '<div style="text-align:center;padding:24px">No user activity today</div>';
+    return;
+  }
+  body.innerHTML = '<div class="overflow-x"><table class="data-table"><thead><tr><th>Username</th><th>Full Name</th><th>Role</th><th>First Activity Today</th><th>Last Activity Today</th><th>Status</th></tr></thead><tbody>' +
+    rows.map(u => '<tr><td>' + escapeHtml(u.username) + '</td><td>' + escapeHtml(u.fullName) + '</td><td>' + escapeHtml(u.role) + '</td><td>' + fmt(u.firstActivity) + '</td><td>' + fmt(u.lastActivity) + '</td><td>' + (u.active ? '🟢 Active Today' : '⚪ Logged Out') + '</td></tr>').join('') +
+    '</tbody></table></div>';
 }
 
 function getAuditFilters() {
