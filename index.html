@@ -11032,6 +11032,97 @@ const backendApi = {
   }
 };
 
+// ===== Backend Op Queue: retrying delete/update ops (bug 3.2) =====
+const BACKEND_OP_QUEUE_KEY = 'digitronics_backend_op_queue_v1';
+const BACKEND_OP_TOMBSTONE_KEY = 'digitronics_backend_op_tombstones_v1';
+const backendOpQueue = {
+  load() {
+    try { const q = JSON.parse(localStorage.getItem(BACKEND_OP_QUEUE_KEY) || '[]'); return Array.isArray(q) ? q : []; } catch (e) { return []; }
+  },
+  save(q) {
+    try { localStorage.setItem(BACKEND_OP_QUEUE_KEY, JSON.stringify(q)); } catch (e) {}
+  },
+  loadTombstones() {
+    try { const t = JSON.parse(localStorage.getItem(BACKEND_OP_TOMBSTONE_KEY) || '[]'); return Array.isArray(t) ? t : []; } catch (e) { return []; }
+  },
+  saveTombstones(t) {
+    try { localStorage.setItem(BACKEND_OP_TOMBSTONE_KEY, JSON.stringify(t)); } catch (e) {}
+  },
+  isTombstoned(id) {
+    return this.loadTombstones().indexOf(String(id)) !== -1;
+  },
+  pending() {
+    return this.load().filter(o => !o.done).length;
+  },
+  _timer: null,
+  _processing: false,
+  enqueue(op) {
+    if (!USE_BACKEND) return;
+    const q = this.load();
+    const existing = q.find(o => o.type === op.type && String(o.id) === String(op.id) && !o.done);
+    if (existing) {
+      existing.payload = op.payload || existing.payload;
+      existing._backendId = op._backendId || existing._backendId;
+    } else {
+      q.push({ ...op, attempts: 0, done: false, createdAt: Date.now() });
+    }
+    if (op.type === 'delete') {
+      const t = this.loadTombstones();
+      if (t.indexOf(String(op.id)) === -1) { t.push(String(op.id)); this.saveTombstones(t); }
+    }
+    this.save(q);
+    this.touch();
+    this.schedule(1000);
+  },
+  schedule(ms) {
+    if (this._timer) clearTimeout(this._timer);
+    this._timer = setTimeout(() => { this.process(); }, ms);
+  },
+  async process() {
+    if (!USE_BACKEND || this._processing) return;
+    this._processing = true;
+    try {
+      const q = this.load();
+      let changed = false;
+      for (const op of q) {
+        if (op.done) continue;
+        let ok = false;
+        try {
+          if (op.type === 'delete') {
+            const r = await backendApi.sales.delete(op._backendId || op.id);
+            ok = !!(r && r.success);
+          } else if (op.type === 'update') {
+            const r = await backendApi.sales.update(op._backendId || op.id, JSON.parse(JSON.stringify(op.payload)));
+            ok = !!(r && r.success);
+            if (ok) {
+              const inv = (DB.saleInvoices || []).find(i => String(i._backendId || i.id) === String(op._backendId || op.id));
+              if (inv) { inv._syncedToBackend = true; changed = true; }
+            }
+          }
+        } catch (e) { ok = false; }
+        if (ok) { op.done = true; changed = true; }
+        else op.attempts = (op.attempts || 0) + 1;
+      }
+      if (changed) this.save(q.filter(o => !o.done));
+      const remaining = this.load().filter(o => !o.done).length;
+      if (remaining > 0) this.schedule(10000 + Math.min(60000, remaining * 5000));
+      this.touch();
+    } finally {
+      this._processing = false;
+    }
+  },
+  retryAll() {
+    this.schedule(100);
+  },
+  clearAll() {
+    this.save([]);
+    this.touch();
+  },
+  touch() {
+    try { if (typeof renderLiveStatusPanel === 'function') renderLiveStatusPanel(); } catch (e) {}
+  }
+};
+
 const digitronicsDataAdapter = {
   mode() {
     return isSupabaseEnabled() ? 'supabase' : 'legacy';
@@ -11231,7 +11322,7 @@ const digitronicsDataAdapter = {
         const key = bs._backendId || bs.id;
         if (!key) continue;
         const existing = localById[key];
-        if (!existing && !unsyncedKeys[bs.id]) {
+        if (!existing && !unsyncedKeys[bs.id] && !backendOpQueue.isTombstoned(bs.id)) {
           bs._syncedToBackend = true;
           bs._backendId = bs._backendId || bs.id;
           bs._importedFromBackend = true;
@@ -14814,7 +14905,8 @@ function renderLiveStatusPanel() {
     <div class="live-sync-mini">Current Device: <span style="direction:ltr;display:inline-block">${escapeHtml(device.id)}</span></div>
     <div class="live-sync-mini">Branch: ${escapeHtml(branch.branchName || 'Main Branch')}</div>
     <div class="live-sync-mini">User: ${escapeHtml(currentUser?.username || '-')} / ${escapeHtml(currentUser?.role || '-')}</div>
-    <div class="live-sync-mini">App: ${escapeHtml(APP_VERSION_LABEL)} | PWA: ${escapeHtml(stats.pwaStatus)}</div>`;
+    <div class="live-sync-mini">App: ${escapeHtml(APP_VERSION_LABEL)} | PWA: ${escapeHtml(stats.pwaStatus)}</div>
+    <div class="live-sync-mini">Backend Ops: <strong>${backendOpQueue.pending()}</strong> pending${backendOpQueue.pending() > 0 ? ` <button class="btn btn-outline btn-sm" onclick="backendOpQueue.retryAll()">Retry</button> <button class="btn btn-outline btn-sm" onclick="backendOpQueue.clearAll()">Clear</button>` : ''}</div>`;
 }
 
 function renderLiveUsersPanel() {
@@ -36241,7 +36333,7 @@ function deleteSaleInvoice(id) {
   // Remove the invoice
   DB.saleInvoices = DB.saleInvoices.filter(i => i.id !== id);
   if (USE_BACKEND) {
-    backendApi.sales.delete(id).catch(() => {});
+    backendOpQueue.enqueue({ type: 'delete', id: id, _backendId: inv._backendId || null });
   }
   logActivity('حذف فاتورة بيع', `#${id} - ${inv.customer} - ${formatMoney(inv.total)}`);
   saveDB();
@@ -36447,7 +36539,7 @@ function saveEditSaleInvoice() {
   logActivity('تعديل فاتورة بيع', `#${id} - ${inv.customer} - ${formatMoney(newTotal)}${treasuryMsg}`);
   saveDB();
   if (USE_BACKEND) {
-    backendApi.sales.update(id, JSON.parse(JSON.stringify(inv))).catch(() => {});
+    backendOpQueue.enqueue({ type: 'update', id: id, _backendId: inv._backendId || null, payload: JSON.parse(JSON.stringify(inv)) });
   }
   closeModal('editSaleInvoiceModal');
   renderInvoices();

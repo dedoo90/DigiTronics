@@ -228,6 +228,19 @@ const server = http.createServer((req, res) => {
   });
   check('Sales pull uses getAll() (no sales.list call sites)', !/backendApi\.sales\.list\(/.test(srcCheck));
 
+  const q = await page.evaluate(() => {
+    const hasModule = typeof backendOpQueue === 'object' && typeof backendOpQueue.enqueue === 'function' && typeof backendOpQueue.process === 'function' && typeof backendOpQueue.pending === 'function' && typeof backendOpQueue.clearAll === 'function' && typeof backendOpQueue.retryAll === 'function';
+    backendOpQueue.clearAll();
+    const empty = backendOpQueue.pending() === 0;
+    backendOpQueue.enqueue({ type: 'delete', id: 'e2e-delete-gate', _backendId: null });
+    const gated = backendOpQueue.pending() === 0;
+    return { hasModule, empty, gated };
+  });
+  check('backendOpQueue module registered with enqueue/process/pending/clearAll/retryAll', q.hasModule);
+  check('backendOpQueue starts empty after clearAll', q.empty);
+  check('backendOpQueue enqueue no-ops under flag off', q.gated);
+  check('Delete path enqueues backend op (no fire-and-forget sales.delete)', /backendOpQueue\.enqueue\(\{ type: 'delete'/.test(srcCheck) && !/backendApi\.sales\.delete\([^)]*\)\.catch\(\(\) => \{\}\)/.test(srcCheck));
+
   const err0 = errors.length;
   await page.evaluate(() => showPage('products'));
   await page.waitForTimeout(800);
