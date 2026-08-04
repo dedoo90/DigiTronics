@@ -22076,8 +22076,12 @@ async function savePurchaseImpl() {
   if (!invoice) showToast('تعذر حفظ فاتورة الشراء', 'error');
 }
 
-function renderPurchases(filter = '') {
+async function renderPurchases(filter = '') {
+  // Phase 23B: fetch from backend when enabled
   let purchases = DB.purchaseInvoices;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { purchases = await digitronicsDataAdapter.listPurchases(); } catch (_) {}
+  }
   if (filter) {
     purchases = purchases.filter(p =>
       (p.supplier && p.supplier.toLowerCase().includes(filter.toLowerCase())) ||
@@ -22248,7 +22252,7 @@ function editPurchaseInvoice(id) {
   openModal('purchaseModal');
 }
 
-function updatePurchaseInvoice(id) {
+async function updatePurchaseInvoice(id) {
   if (!addPendingPurchaseItemBeforeFinalSave()) return;
   if (purCart.length === 0) { showToast('أضف صنفاً واحداً على الأقل.', 'error'); return; }
   const inv = DB.purchaseInvoices.find(p => p.id === id);
@@ -22362,6 +22366,10 @@ function updatePurchaseInvoice(id) {
     description: `تعديل فاتورة شراء #${id} بتاريخ ${selectedPurchaseDate}`
   }, { save: false });
   logActivity('تعديل فاتورة شراء', `#${id}${purTMsg}`);
+  // Phase 23B: update in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.purchases && inv._backendId) {
+    try { await backendApi.purchases.update(inv._backendId, inv); } catch (_) {}
+  }
   saveDB();
   auditAndSyncFinanceStock('updatePurchaseInvoice');
   closeModal('purchaseModal');
@@ -36139,7 +36147,7 @@ async function deleteSaleInvoice(id) {
 }
 
 // ===== DELETE PURCHASE INVOICE (with full inventory + treasury sync) =====
-function deletePurchaseInvoice(id) {
+async function deletePurchaseInvoice(id) {
   if (!requirePermission('deleteData')) return;
   const inv = DB.purchaseInvoices.find(p => p.id === id);
   if (!inv) return;
@@ -36166,6 +36174,10 @@ function deletePurchaseInvoice(id) {
 
   // Remove the invoice
   DB.purchaseInvoices = DB.purchaseInvoices.filter(p => p.id !== id);
+  // Phase 23B: delete in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.purchases) {
+    try { await backendApi.purchases.delete(inv._backendId || id); } catch (_) {}
+  }
   logActivity('حذف فاتورة شراء', `#${id} - ${inv.supplier || ''} - ${formatMoney(inv.total)}`);
   saveDB();
   renderPurchases();
