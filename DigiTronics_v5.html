@@ -5613,6 +5613,7 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       <div class="live-sync-grid" style="margin-top:12px">
         <div class="live-sync-card"><h3>🏬 Branch Live Status</h3><div id="liveBranchPanel"></div></div>
         <div class="live-sync-card"><h3>⚠️ Conflict Detector</h3><div id="liveConflictsPanel"></div></div>
+        <div class="live-sync-card"><h3>🔄 Store Reconciliation</h3><div id="liveReconcilePanel"></div></div>
         <div class="live-sync-card"><h3>🔔 Live Notifications</h3><div id="liveNotificationsPanel"></div></div>
         <div class="live-sync-card"><h3>⚙️ Settings</h3><div id="liveSyncSettingsPanel"></div></div>
       </div>
@@ -14612,6 +14613,7 @@ function renderEnterpriseLiveSyncPage() {
   renderLiveQueuePanel();
   renderLiveBranchPanel();
   renderLiveConflictsPanel();
+  renderLiveReconcilePanel();
   renderLiveNotificationsPanel();
   renderLiveSettingsPanel();
 }
@@ -14712,6 +14714,50 @@ function renderLiveConflictsPanel() {
   if (!host) return;
   const conflicts = scanLiveSyncConflicts();
   host.innerHTML = conflicts.slice(0, 20).map(c => `<div class="plugin-card"><strong>${escapeHtml(c.module)} / ${escapeHtml(c.recordId || c.key)}</strong><div class="live-sync-mini">Newest: ${escapeHtml(c.newest || '-')} | Status: ${escapeHtml(c.status)}</div>${canManageLiveSync() && c.status !== 'resolved' ? `<div class="live-sync-actions"><button class="btn btn-outline btn-sm" onclick="resolveLiveConflict('${c.id}','keep_local')">Keep local</button><button class="btn btn-outline btn-sm" onclick="resolveLiveConflict('${c.id}','keep_remote')">Keep remote</button><button class="btn btn-outline btn-sm" onclick="resolveLiveConflict('${c.id}','manual_merge')">Manual merge</button></div>` : ''}</div>`).join('') || '<div class="empty-state">لا توجد صراعات محتملة</div>';
+}
+
+// Phase 21B: read-only store divergence report across DB ↔ REST ↔ Gist ↔ Supabase.
+function reconcileAllStores() {
+  const conflicts = scanLiveSyncConflicts();
+  const queue = Array.isArray(getLiveSyncState().queue) ? getLiveSyncState().queue : [];
+  const gistIds = new Set(queue.map(q => q.payload?.recordId || q.payload?.id || q.payload?.invoice || q.payload?.serial || '').filter(Boolean));
+  const specs = [
+    { name: 'sales', rows: () => DB.saleInvoices || [] },
+    { name: 'purchases', rows: () => DB.purchaseInvoices || [] },
+    { name: 'products', rows: () => DB.products || [] },
+    { name: 'customers', rows: () => DB.customers || [] },
+    { name: 'suppliers', rows: () => DB.suppliers || [] }
+  ];
+  const stores = specs.map(spec => {
+    const rows = spec.rows();
+    const stats = { total: rows.length, rest: 0, supabase: 0, gist: 0, localOnly: 0 };
+    rows.forEach(r => {
+      const key = r._backendId || r.supabaseSaleId || r.id;
+      const inRest = !!(r._backendId || r._syncedToBackend || r._importedFromBackend);
+      const inSupabase = !!r.supabaseSaleId;
+      const inGist = gistIds.has(String(key));
+      if (inRest) stats.rest++;
+      if (inSupabase) stats.supabase++;
+      if (inGist) stats.gist++;
+      if (!inRest && !inSupabase && !inGist) stats.localOnly++;
+    });
+    stats.conflicts = conflicts.filter(c => c.module === spec.name).length;
+    return { name: spec.name, ...stats };
+  });
+  return {
+    generatedAt: new Date().toISOString(),
+    stores,
+    conflictsTotal: conflicts.length,
+    divergence: stores.reduce((s, x) => s + x.localOnly, 0)
+  };
+}
+
+function renderLiveReconcilePanel() {
+  const host = document.getElementById('liveReconcilePanel');
+  if (!host) return;
+  const report = reconcileAllStores();
+  const rows = report.stores.map(s => `<div class="live-sync-mini"><strong>${escapeHtml(s.name)}</strong>: local ${s.total} | REST ${s.rest} | Supabase ${s.supabase} | Gist ${s.gist} | <span class="${s.localOnly ? 'live-sync-badge offline' : 'live-sync-badge online'}">local-only ${s.localOnly}</span> | conflicts ${s.conflicts}</div>`).join('');
+  host.innerHTML = rows + `<div class="live-sync-mini" style="margin-top:8px">Total divergence: <strong>${report.divergence}</strong> | Conflicts (${report.conflictsTotal}) · <em>read-only report</em></div>`;
 }
 
 function renderLiveNotificationsPanel() {

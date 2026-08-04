@@ -251,6 +251,22 @@ const server = http.createServer((req, res) => {
   }));
   check('backendStatus initializes offline under flag off', bs.state === 'offline', 'state=' + bs.state);
 
+  check('reconcileAllStores() defined and reuses scanLiveSyncConflicts', /function reconcileAllStores\(\)/.test(srcCheck) && /const conflicts = scanLiveSyncConflicts\(\);/.test(srcCheck));
+  const rec = await page.evaluate(() => {
+    const r = reconcileAllStores();
+    const hasPanelEl = !!document.getElementById('liveReconcilePanel');
+    renderLiveReconcilePanel();
+    const panelFilled = (document.getElementById('liveReconcilePanel')?.textContent || '').length > 0;
+    return {
+      stores: Array.isArray(r.stores) ? r.stores.length : -1,
+      divergence: typeof r.divergence === 'number' ? r.divergence : -1,
+      hasPanelEl, panelFilled
+    };
+  });
+  check('reconcileAllStores() reports all 5 backend stores', rec.stores === 5, 'stores=' + rec.stores);
+  check('reconcileAllStores() divergence is numeric (read-only)', rec.divergence >= 0, 'divergence=' + rec.divergence);
+  check('Live Reconciliation panel renders on Live Sync page', rec.hasPanelEl && rec.panelFilled);
+
   const err0 = errors.length;
   await page.evaluate(() => showPage('products'));
   await page.waitForTimeout(800);
