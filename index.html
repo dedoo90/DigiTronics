@@ -35942,8 +35942,12 @@ function printInvoice(invoice) {
 }
 
 // ================= INVOICES =================
-function renderInvoices(filter = '') {
+async function renderInvoices(filter = '') {
+  // Phase 23B: fetch from backend when enabled
   let invoices = DB.saleInvoices;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { invoices = await digitronicsDataAdapter.listSales(); } catch (_) {}
+  }
   if (filter) {
     invoices = invoices.filter(inv => 
       (inv.customer && inv.customer.toLowerCase().includes(filter.toLowerCase())) ||
@@ -36397,7 +36401,7 @@ function editSerialsChanged(idx) {
 }
 
 // ===== DELETE SALE INVOICE (with full inventory + treasury sync) =====
-function deleteSaleInvoice(id) {
+async function deleteSaleInvoice(id) {
   if (!requirePermission('deleteData')) return;
   const inv = DB.saleInvoices.find(i => i.id === id);
   if (!inv) return;
@@ -36424,6 +36428,10 @@ function deleteSaleInvoice(id) {
 
   // Remove the invoice
   DB.saleInvoices = DB.saleInvoices.filter(i => i.id !== id);
+  // Phase 23B: delete in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.sales) {
+    try { await backendApi.sales.delete(inv._backendId || id); } catch (_) {}
+  }
   if (USE_BACKEND) {
     backendOpQueue.enqueue({ type: 'delete', id: id, _backendId: inv._backendId || null });
   }
