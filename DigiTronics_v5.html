@@ -22417,39 +22417,57 @@ function openSupplierModal() {
   openModal('supplierModal');
 }
 
-function saveSupplier() {
-  const name = document.getElementById('suppName').value.trim();
-  const phone = document.getElementById('suppPhone').value.trim();
-  const phone2 = (document.getElementById('suppPhone2')?.value || '').trim();
-  const address = document.getElementById('suppAddress').value.trim();
-  const balance = parseFloat(document.getElementById('suppBalance').value) || 0;
-  
-  if (!name) { showToast('أدخل اسم المورد', 'error'); return; }
+async function saveSupplier() {
+   const name = document.getElementById('suppName').value.trim();
+   const phone = document.getElementById('suppPhone').value.trim();
+   const phone2 = (document.getElementById('suppPhone2')?.value || '').trim();
+   const address = document.getElementById('suppAddress').value.trim();
+   const balance = parseFloat(document.getElementById('suppBalance').value) || 0;
+   
+   if (!name) { showToast('أدخل اسم المورد', 'error'); return; }
 
-  DB.suppliers = Array.isArray(DB.suppliers) ? DB.suppliers : [];
-  const exists = DB.suppliers.find(s =>
-    (s.name || '').trim().toLowerCase() === name.toLowerCase() ||
-    (phone && s.phone && String(s.phone).trim() === phone)
-  );
-  if (exists) {
-    exists.name = name;
-    exists.phone = phone;
-    exists.phone2 = phone2;
-    exists.address = address;
-    exists.balance = Number.isFinite(balance) ? balance : 0;
-  } else {
-    DB.suppliers.push({ id: Date.now(), name, phone, phone2, address, balance });
-  }
-  saveDB();
-  auditAndSyncFinanceStock('saveSupplier');
-  closeModal('supplierModal');
-  renderSuppliers();
-  updateCartCustomerSelect();
-  showToast('تم إضافة المورد');
-}
+   DB.suppliers = Array.isArray(DB.suppliers) ? DB.suppliers : [];
+   const exists = DB.suppliers.find(s =>
+     (s.name || '').trim().toLowerCase() === name.toLowerCase() ||
+     (phone && s.phone && String(s.phone).trim() === phone)
+   );
+   if (exists) {
+     exists.name = name;
+     exists.phone = phone;
+     exists.phone2 = phone2;
+     exists.address = address;
+     exists.balance = Number.isFinite(balance) ? balance : 0;
+     // Phase 23B: update in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.suppliers && exists._backendId) {
+       try { await backendApi.suppliers.update(exists._backendId, exists); } catch (_) {}
+     }
+   } else {
+     const now = new Date().toISOString();
+     const newSupplier = { id: Date.now(), name, phone, phone2, address, balance, createdAt: now, updatedAt: now };
+     // Phase 23B: create in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.suppliers) {
+       try {
+         const res = await backendApi.suppliers.create(newSupplier);
+         if (res && res.success && res.data) { newSupplier._backendId = res.data.id || null; newSupplier._syncedToBackend = true; }
+       } catch (_) {}
+     }
+     DB.suppliers.push(newSupplier);
+   }
+   saveDB();
+   auditAndSyncFinanceStock('saveSupplier');
+   closeModal('supplierModal');
+   renderSuppliers();
+   updateCartCustomerSelect();
+   showToast('تم إضافة المورد');
+ }
 
-function renderSuppliers() {
-  const tbody = document.getElementById('suppliersTbody');
+async function renderSuppliers() {
+   const tbody = document.getElementById('suppliersTbody');
+   // Phase 23B: fetch from backend when enabled
+   let suppliers = DB.suppliers;
+   if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+     try { suppliers = await digitronicsDataAdapter.listSuppliers(); } catch (_) {}
+   }
   // Single-pass aggregation for supplier debt stats (was O(suppliers*(invoices+payments+vouchers)))
   const suppAgg = new Map();
   DB.purchaseInvoices.forEach(p => {
@@ -22473,14 +22491,14 @@ function renderSuppliers() {
     a.vchPaid += (v.amount || 0);
     suppAgg.set(key, a);
   });
-  // Precompute dual customer/net once per supplier (was per-row full-table scans)
-  const dualCache = new Map();
-  DB.suppliers.forEach(s => {
-    const dualCustomer = findMatchingCustomerForSupplier(s);
-    dualCache.set(String(s.id), dualCustomer ? getDualNetSummary(dualCustomer, s) : null);
-  });
+// Precompute dual customer/net once per supplier (was per-row full-table scans)
+   const dualCache = new Map();
+   suppliers.forEach(s => {
+     const dualCustomer = findMatchingCustomerForSupplier(s);
+     dualCache.set(String(s.id), dualCustomer ? getDualNetSummary(dualCustomer, s) : null);
+   });
 
-  tbody.innerHTML = DB.suppliers.slice(0, 100).map((s, idx) => {
+   tbody.innerHTML = suppliers.slice(0, 100).map((s, idx) => {
     const a = suppAgg.get(String(s.id)) || { ajelDebt: 0, payments: 0, vchPaid: 0 };
     const debt = (s.balance || 0) + a.ajelDebt - a.payments - a.vchPaid;
     const dualNet = dualCache.get(String(s.id));
@@ -22503,10 +22521,10 @@ function renderSuppliers() {
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center">لا يوجد موردين</td></tr>';
 
-  // Supplier payments log
-  const payTbody = document.getElementById('supplierPaymentsTbody');
-  payTbody.innerHTML = DB.supplierPayments.slice(0, 50).map(p => {
-    const supp = DB.suppliers.find(s => s.id === p.supplierId);
+// Supplier payments log
+   const payTbody = document.getElementById('supplierPaymentsTbody');
+   payTbody.innerHTML = DB.supplierPayments.slice(0, 50).map(p => {
+     const supp = suppliers.find(s => s.id === p.supplierId);
     return `<tr>
       <td>${new Date(p.date).toLocaleDateString('ar-EG')}</td>
       <td>${supp ? supp.name : '-'}</td>
@@ -22790,14 +22808,19 @@ function saveSupplierPayment() {
   showToast(type === 'payment' ? 'تم تسجيل الدفعة' : 'تم تسجيل التوريد');
 }
 
-function deleteSupplier(idx) {
-  if (!requirePermission('deleteData')) return;
-  if (!confirm('هل تريد حذف هذا المورد؟')) return;
-  DB.suppliers.splice(idx, 1);
-  saveDB();
-  renderSuppliers();
-  showToast('تم الحذف');
-}
+async function deleteSupplier(idx) {
+   if (!requirePermission('deleteData')) return;
+   if (!confirm('هل تريد حذف هذا المورد؟')) return;
+   const s = DB.suppliers[idx];
+   DB.suppliers.splice(idx, 1);
+   // Phase 23B: delete in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.suppliers && s && s._backendId) {
+     try { await backendApi.suppliers.delete(s._backendId); } catch (_) {}
+   }
+   saveDB();
+   renderSuppliers();
+   showToast('تم الحذف');
+ }
 
 function convertSupplierToOtherParty(supplierId) {
   const s = DB.suppliers.find(x => x.id === supplierId);
