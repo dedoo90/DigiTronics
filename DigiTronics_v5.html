@@ -10735,8 +10735,27 @@ function clearHealthErrorLog() {
   renderHealthMonitor();
 }
 
-const USE_BACKEND = false; // Feature flag: set true to route Sales CRUD through backend API
-const API_BASE_URL = ''; // Backend API base URL – set when backend is ready
+// ================= Phase 22A: Runtime backend enrollment =================
+const BACKEND_CONFIG_KEY = 'esoBackendRuntimeConfig';
+const BACKEND_STATUS_KEY = 'esoBackendStatusPersistence';
+function getBackendConfig() {
+  try {
+    const raw = localStorage.getItem(BACKEND_CONFIG_KEY);
+    if (!raw) return { enabled: false, apiBaseUrl: '' };
+    const c = JSON.parse(raw);
+    return { enabled: !!c.enabled, apiBaseUrl: String(c.apiBaseUrl || '') };
+  } catch (e) { return { enabled: false, apiBaseUrl: '' }; }
+}
+function setBackendConfig(next) {
+  const cfg = { enabled: !!next.enabled, apiBaseUrl: String(next.apiBaseUrl || '').replace(/\/+$/, '') };
+  try { localStorage.setItem(BACKEND_CONFIG_KEY, JSON.stringify(cfg)); } catch (e) {}
+  USE_BACKEND = cfg.enabled;
+  API_BASE_URL = cfg.apiBaseUrl;
+  backendApi._baseUrl = cfg.apiBaseUrl;
+  return cfg;
+}
+let USE_BACKEND = getBackendConfig().enabled; // Runtime feature flag (Phase 22A): route Sales CRUD through backend API
+let API_BASE_URL = getBackendConfig().apiBaseUrl; // Runtime backend API base URL (Phase 22A)
 
 // ================= BACKEND API CLIENT (Phase 2: Sales only) =================
 // Backend connectivity taxonomy (Phase 21B): online | offline (network) | error (4xx/5xx).
@@ -10747,6 +10766,109 @@ const backendStatus = {
   lastOk: null,
   updatedAt: null
 };
+function persistBackendStatus() {
+  try {
+    localStorage.setItem(BACKEND_STATUS_KEY, JSON.stringify({
+      state: backendStatus.state,
+      lastStatus: backendStatus.lastStatus,
+      lastError: backendStatus.lastError,
+      lastOk: backendStatus.lastOk,
+      updatedAt: backendStatus.updatedAt
+    }));
+  } catch (e) {}
+}
+function restoreBackendStatus() {
+  try {
+    const raw = localStorage.getItem(BACKEND_STATUS_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    if (s && s.state) {
+      backendStatus.state = s.state;
+      backendStatus.lastStatus = s.lastStatus || null;
+      backendStatus.lastError = s.lastError || null;
+      backendStatus.lastOk = s.lastOk || null;
+      backendStatus.updatedAt = s.updatedAt || null;
+    }
+  } catch (e) {}
+}
+async function probeBackendHealth() {
+  if (!USE_BACKEND || !API_BASE_URL) {
+    backendStatus.state = 'offline';
+    persistBackendStatus();
+    renderBackendConnectionStatus();
+    return backendStatus;
+  }
+  try {
+    const res = await fetch(API_BASE_URL + '/api/v1/health', { method: 'GET', headers: { 'Content-Type': 'application/json' } });
+    backendStatus.lastStatus = res.status;
+    backendStatus.updatedAt = Date.now();
+    if (res.ok) {
+      backendStatus.state = 'online';
+      backendStatus.lastOk = Date.now();
+      backendStatus.lastError = null;
+    } else {
+      backendStatus.state = 'error';
+      backendStatus.lastError = 'HTTP ' + res.status;
+    }
+  } catch (e) {
+    backendStatus.state = 'offline';
+    backendStatus.lastError = (e && e.message) || 'Network error';
+    backendStatus.updatedAt = Date.now();
+  }
+  persistBackendStatus();
+  renderBackendConnectionStatus();
+  try { if (typeof renderLiveStatusPanel === 'function') renderLiveStatusPanel(); } catch (e2) {}
+  return backendStatus;
+}
+function renderBackendConnectionStatus() {
+  try {
+    const el = document.getElementById('d6ConnectionStatus');
+    if (!el) return;
+    let label, cls;
+    if (!USE_BACKEND) { label = 'معطل'; cls = 'offline'; }
+    else if (backendStatus.state === 'online') { label = 'متصل'; cls = 'online'; }
+    else if (backendStatus.state === 'error') { label = 'خطأ'; cls = 'error'; }
+    else { label = 'غير متصل'; cls = 'offline'; }
+    el.innerHTML = '<span>●</span> ' + label;
+    el.className = 'd6-connection ' + cls;
+  } catch (e) {}
+}
+function canManageBackendConfig() {
+  return !!(currentUser && can('all'));
+}
+function renderBackendConfigToggle() {
+  try {
+    const host = document.getElementById('configuration-configuration-center');
+    if (!host) return;
+    if (!canManageBackendConfig()) return;
+    const cfg = getBackendConfig();
+    const stateLabel = !USE_BACKEND ? 'معطل' : (backendStatus.state === 'online' ? 'متصل' : backendStatus.state === 'error' ? 'خطأ' : 'غير متصل');
+    const stateDetails = (!USE_BACKEND ? 'يعمل التطبيق محلياً بدون خادم' : (backendStatus.lastStatus ? 'HTTP ' + backendStatus.lastStatus : '') + (backendStatus.lastError ? ' — ' + escapeHtml(backendStatus.lastError) : ''));
+    let card = document.getElementById('esoBackendConfigCard');
+    if (!card) { card = document.createElement('div'); card.id = 'esoBackendConfigCard'; host.appendChild(card); }
+    card.innerHTML = `<div class="report-card" style="margin-top:14px">
+      <div class="table-title">Backend Sync (Phase 22A)</div>
+      <div class="config-preview-grid" style="grid-template-columns:1fr 1fr">
+        <div class="form-group"><label><input type="checkbox" id="esoBackendEnabled" ${cfg.enabled ? 'checked' : ''}> تفعيل المزامنة مع الخادم</label></div>
+        <div class="form-group"><label>API Base URL</label><input type="text" id="esoBackendApiUrl" value="${escapeHtml(cfg.apiBaseUrl)}" placeholder="http://localhost:3001" style="direction:ltr"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-primary btn-sm" onclick="saveBackendConfig()">حفظ إعدادات الخادم</button>
+        <button class="btn btn-outline btn-sm" onclick="probeBackendHealth()">إعادة فحص الاتصال</button>
+        <span class="live-sync-badge ${USE_BACKEND && backendStatus.state === 'online' ? 'online' : 'offline'}">${stateLabel}</span><span style="font-size:.78rem;color:var(--text2)">${stateDetails}</span>
+      </div>
+      <div id="esoBackendConfigStatus" style="font-size:.78rem;color:var(--text2);margin-top:6px"></div>
+    </div>`;
+  } catch (e) {}
+}
+function saveBackendConfig() {
+  const enabled = !!(document.getElementById('esoBackendEnabled') && document.getElementById('esoBackendEnabled').checked);
+  const url = (document.getElementById('esoBackendApiUrl') && document.getElementById('esoBackendApiUrl').value || '').trim();
+  setBackendConfig({ enabled, apiBaseUrl: url });
+  showToast('تم حفظ إعدادات الخادم');
+  if (USE_BACKEND) probeBackendHealth().then(() => { renderBackendConnectionStatus(); renderBackendConfigToggle(); });
+  else { backendStatus.state = 'offline'; persistBackendStatus(); renderBackendConnectionStatus(); renderBackendConfigToggle(); }
+}
 
 const backendApi = {
   _baseUrl: API_BASE_URL || '',
@@ -10761,6 +10883,7 @@ const backendApi = {
       if (!res.ok) {
         backendStatus.state = 'error';
         backendStatus.lastError = (data && data.message) || 'HTTP ' + res.status;
+        persistBackendStatus();
         // 5xx (and network-dropped) calls return null; 4xx return the parsed
         // error envelope so duplicate-create idempotency (21A.3) still works.
         if (res.status >= 500) return null;
@@ -10769,11 +10892,13 @@ const backendApi = {
       backendStatus.state = 'online';
       backendStatus.lastOk = Date.now();
       backendStatus.lastError = null;
+      persistBackendStatus();
       return data;
     } catch (e) {
       backendStatus.state = 'offline';
       backendStatus.lastError = (e && e.message) || 'Network error';
       backendStatus.updatedAt = Date.now();
+      persistBackendStatus();
       return null;
     }
   },
@@ -16429,7 +16554,7 @@ function showPage(page, options = {}) {
   if (page === 'customer-copy-checklist') renderReleaseManagerPage('customer-copy-checklist');
   if (page === 'new-customer-setup-guide') renderReleaseManagerPage('new-customer-setup-guide');
   if (page === 'release-health') renderReleaseManagerPage('release-health');
-  if (page === 'configuration-center') renderConfigurationPage('configuration-center');
+  if (page === 'configuration-center') { renderConfigurationPage('configuration-center'); renderBackendConfigToggle(); }
   if (page === 'config-business-profile') renderConfigurationPage('config-business-profile');
   if (page === 'config-pos') renderConfigurationPage('config-pos');
   if (page === 'config-inventory') renderConfigurationPage('config-inventory');
@@ -39458,6 +39583,10 @@ applyBusinessBranding();
 const sessionRestored = restoreSessionOnLoad();
 if (sessionRestored) showPage(getDefaultPageForCurrentRole());
 registerDigiTronicsPWA();
+// Phase 22A: restore last-known backend connectivity, render real status, and probe when enabled.
+restoreBackendStatus();
+renderBackendConnectionStatus();
+if (USE_BACKEND) setTimeout(probeBackendHealth, 0);
 setTimeout(updateGhStatusCard, 0);
 // أول تشغيل: لو مافيش Token محفوظ → اعرض modal الربط
 setTimeout(checkFirstRun, 300);
