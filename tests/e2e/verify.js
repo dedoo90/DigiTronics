@@ -244,6 +244,13 @@ const server = http.createServer((req, res) => {
   const mergeCount = (srcCheck.match(/existing\.updatedAt \|\| ''\) < String\(/g) || []).length;
   check('Two-way merge on refresh across 5 entities (sales/purchases/products/customers/suppliers)', mergeCount === 5, 'merge branches=' + mergeCount);
 
+  check('_fetch error taxonomy present (backendStatus + lastStatus/lastError)', /const backendStatus = \{/.test(srcCheck) && /backendStatus\.lastStatus = res\.status/.test(srcCheck) && /backendStatus\.lastError/.test(srcCheck));
+  const bs = await page.evaluate(() => ({
+    state: backendStatus && backendStatus.state,
+    enabled: USE_BACKEND
+  }));
+  check('backendStatus initializes offline under flag off', bs.state === 'offline', 'state=' + bs.state);
+
   const err0 = errors.length;
   await page.evaluate(() => showPage('products'));
   await page.waitForTimeout(800);

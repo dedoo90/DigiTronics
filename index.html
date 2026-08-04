@@ -914,6 +914,7 @@ body.accent-orange{--accent:#ea580c;--accent2:#c2410c;--accent-color:#ea580c;}
 .live-sync-badge.online{background:rgba(34,197,94,.14);color:var(--green)}
 .live-sync-badge.idle{background:rgba(245,158,11,.16);color:#b45309}
 .live-sync-badge.offline{background:rgba(239,68,68,.14);color:var(--red)}
+.live-sync-badge.error{background:rgba(249,115,22,.16);color:#c2410c}
 .live-sync-badge.unknown{background:rgba(100,116,139,.14);color:var(--text2)}
 .live-sync-mini{font-size:.76rem;color:var(--text2);line-height:1.6}
 .live-sync-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
@@ -10905,6 +10906,15 @@ const USE_BACKEND = false; // Feature flag: set true to route Sales CRUD through
 const API_BASE_URL = ''; // Backend API base URL – set when backend is ready
 
 // ================= BACKEND API CLIENT (Phase 2: Sales only) =================
+// Backend connectivity taxonomy (Phase 21B): online | offline (network) | error (4xx/5xx).
+const backendStatus = {
+  state: 'offline',
+  lastStatus: null,
+  lastError: null,
+  lastOk: null,
+  updatedAt: null
+};
+
 const backendApi = {
   _baseUrl: API_BASE_URL || '',
   async _fetch(method, path, body) {
@@ -10912,10 +10922,25 @@ const backendApi = {
       const opts = { method, headers: { 'Content-Type': 'application/json' } };
       if (body && method !== 'GET') opts.body = JSON.stringify(body);
       const res = await fetch(this._baseUrl + '/api/v1' + path, opts);
-      if (!res.ok && res.status >= 500) throw new Error('Server error ' + res.status);
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      backendStatus.lastStatus = res.status;
+      backendStatus.updatedAt = Date.now();
+      if (!res.ok) {
+        backendStatus.state = 'error';
+        backendStatus.lastError = (data && data.message) || 'HTTP ' + res.status;
+        // 5xx (and network-dropped) calls return null; 4xx return the parsed
+        // error envelope so duplicate-create idempotency (21A.3) still works.
+        if (res.status >= 500) return null;
+        return data;
+      }
+      backendStatus.state = 'online';
+      backendStatus.lastOk = Date.now();
+      backendStatus.lastError = null;
       return data;
     } catch (e) {
+      backendStatus.state = 'offline';
+      backendStatus.lastError = (e && e.message) || 'Network error';
+      backendStatus.updatedAt = Date.now();
       return null;
     }
   },
@@ -14952,7 +14977,8 @@ function renderLiveStatusPanel() {
     <div class="live-sync-mini">Branch: ${escapeHtml(branch.branchName || 'Main Branch')}</div>
     <div class="live-sync-mini">User: ${escapeHtml(currentUser?.username || '-')} / ${escapeHtml(currentUser?.role || '-')}</div>
     <div class="live-sync-mini">App: ${escapeHtml(APP_VERSION_LABEL)} | PWA: ${escapeHtml(stats.pwaStatus)}</div>
-    <div class="live-sync-mini">Backend Ops: <strong>${backendOpQueue.pending()}</strong> pending${backendOpQueue.pending() > 0 ? ` <button class="btn btn-outline btn-sm" onclick="backendOpQueue.retryAll()">Retry</button> <button class="btn btn-outline btn-sm" onclick="backendOpQueue.clearAll()">Clear</button>` : ''}</div>`;
+    <div class="live-sync-mini">Backend Ops: <strong>${backendOpQueue.pending()}</strong> pending${backendOpQueue.pending() > 0 ? ` <button class="btn btn-outline btn-sm" onclick="backendOpQueue.retryAll()">Retry</button> <button class="btn btn-outline btn-sm" onclick="backendOpQueue.clearAll()">Clear</button>` : ''}</div>
+    <div class="live-sync-mini">Backend API: <span class="live-sync-badge ${backendStatus.state === 'online' ? 'online' : backendStatus.state === 'error' ? 'error' : 'offline'}">${USE_BACKEND ? escapeHtml(backendStatus.state) : 'disabled'}</span>${backendStatus.lastStatus ? ` (HTTP ${backendStatus.lastStatus})` : ''}${backendStatus.lastError ? ` — ${escapeHtml(backendStatus.lastError)}` : ''}</div>`;
 }
 
 function renderLiveUsersPanel() {
