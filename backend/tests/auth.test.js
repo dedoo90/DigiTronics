@@ -112,11 +112,27 @@ describe('GET /api/v1/auth/me', () => {
     expect(res.body.data.user.password).toBeUndefined();
   });
 
-  test('me with username query returns that user (legacy flow)', async () => {
+  test('me with username query requires authentication (no more anonymous lookup)', async () => {
     const res = await request(server.app).get('/api/v1/auth/me?username=bob');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('me with username query returns that user for an authenticated admin', async () => {
+    const session = await login(server.app, 'alice', 'Alice#123');
+    const res = await request(server.app)
+      .get('/api/v1/auth/me?username=bob')
+      .set(authHeader(session.accessToken));
     expect(res.statusCode).toBe(200);
     expect(res.body.data.user.username).toBe('bob');
     expect(res.body.data.user.password).toBeUndefined();
+  });
+
+  test('me with username query denies a non-admin querying another user', async () => {
+    const session = await login(server.app, 'bob', 'Bob#12345');
+    const res = await request(server.app)
+      .get('/api/v1/auth/me?username=alice')
+      .set(authHeader(session.accessToken));
+    expect(res.statusCode).toBe(403);
   });
 
   test('me without username returns 400', async () => {
@@ -124,19 +140,38 @@ describe('GET /api/v1/auth/me', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  test('me with unknown username returns 404', async () => {
-    const res = await request(server.app).get('/api/v1/auth/me?username=ghost');
+  test('me with unknown username returns 404 for an authenticated admin', async () => {
+    const session = await login(server.app, 'alice', 'Alice#123');
+    const res = await request(server.app)
+      .get('/api/v1/auth/me?username=ghost')
+      .set(authHeader(session.accessToken));
     expect(res.statusCode).toBe(404);
   });
 });
 
 describe('GET /api/v1/auth/permissions', () => {
-  test('permissions returns role and custom permissions', async () => {
+  test('permissions requires authentication (no more anonymous lookup)', async () => {
     const res = await request(server.app).get('/api/v1/auth/permissions?username=bob');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('permissions returns role and custom permissions for an authenticated admin', async () => {
+    const session = await login(server.app, 'alice', 'Alice#123');
+    const res = await request(server.app)
+      .get('/api/v1/auth/permissions?username=bob')
+      .set(authHeader(session.accessToken));
     expect(res.statusCode).toBe(200);
     expect(res.body.data.username).toBe('bob');
     expect(res.body.data.role).toBe('Cashier');
     expect(res.body.data.permissions).toEqual(['sales.read', 'sales.create']);
+  });
+
+  test('permissions for a non-admin querying another user is denied', async () => {
+    const session = await login(server.app, 'bob', 'Bob#12345');
+    const res = await request(server.app)
+      .get('/api/v1/auth/permissions?username=alice')
+      .set(authHeader(session.accessToken));
+    expect(res.statusCode).toBe(403);
   });
 
   test('permissions without username returns 400', async () => {
@@ -144,8 +179,11 @@ describe('GET /api/v1/auth/permissions', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  test('permissions for unknown user returns 404', async () => {
-    const res = await request(server.app).get('/api/v1/auth/permissions?username=ghost');
+  test('permissions for unknown user returns 404 for an authenticated admin', async () => {
+    const session = await login(server.app, 'alice', 'Alice#123');
+    const res = await request(server.app)
+      .get('/api/v1/auth/permissions?username=ghost')
+      .set(authHeader(session.accessToken));
     expect(res.statusCode).toBe(404);
   });
 });

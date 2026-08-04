@@ -8,6 +8,15 @@ const { extractToken, parseCookies } = require('../middleware/auth');
 const KNOWN_ROLES = ['Owner', 'Admin', 'Manager', 'Cashier', 'Technician', 'WarehouseSales'];
 const IS_PROD = (process.env.NODE_ENV || 'development') === 'production';
 
+// Phase 22B: only the account owner, or Owner/Admin users, may view a
+// specific user's record through the username-lookup endpoints. This closes
+// the unauthenticated enumeration path that returned 200-vs-404 by username.
+function _canViewUser(requester, username) {
+  if (!requester) return false;
+  if (String(username) === String(requester.username)) return true;
+  return requester.role === 'Owner' || requester.role === 'Admin';
+}
+
 function _setAuthCookies(res, accessToken, refreshToken) {
   const base = { httpOnly: true, sameSite: 'lax', secure: IS_PROD, path: '/' };
   res.cookie('access_token', accessToken, { ...base, maxAge: 15 * 60 * 1000 });
@@ -70,15 +79,18 @@ function logout(req, res) {
 function me(req, res) {
   try {
     if (req.user) {
-      const user = usersService.getById(req.user.id);
+      const username = req.query.username;
+      if (username && String(username) !== String(req.user.username) && req.user.role !== 'Owner' && req.user.role !== 'Admin') {
+        return error(res, 'Insufficient permission', 403);
+      }
+      const user = username ? usersService.getByUsername(username) : usersService.getById(req.user.id);
       if (!user) return error(res, 'User not found', 404);
       return success(res, { user: usersService.sanitizeUser(user) }, 'Current user retrieved');
     }
     const username = req.query.username;
     if (!username) return error(res, 'username is required', 400);
-    const user = usersService.getByUsername(username);
-    if (!user) return error(res, 'User not found', 404);
-    success(res, { user: usersService.sanitizeUser(user) }, 'Current user retrieved');
+    // Phase 22B: username lookup requires authentication (closes enumeration).
+    return error(res, 'Authentication required', 401);
   } catch (err) {
     logger.error('auth.me error:', err.message);
     error(res, 'Failed to retrieve current user', 500);
@@ -101,6 +113,10 @@ function permissions(req, res) {
   try {
     const username = req.query.username;
     if (!username) return error(res, 'username is required', 400);
+    if (!req.user) return error(res, 'Authentication required', 401);
+    if (!_canViewUser(req.user, username)) {
+      return error(res, 'Insufficient permission', 403);
+    }
     const user = usersService.getByUsername(username);
     if (!user) return error(res, 'User not found', 404);
     success(res, { username: user.username, role: user.role || '', permissions: Array.isArray(user.permissions) ? user.permissions : [] }, 'Permissions retrieved');
