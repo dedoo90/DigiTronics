@@ -10872,9 +10872,14 @@ function saveBackendConfig() {
 
 const backendApi = {
   _baseUrl: API_BASE_URL || '',
+  _getAuthToken() {
+    try { return localStorage.getItem('access_token') || ''; } catch (e) { return ''; }
+  },
   async _fetch(method, path, body) {
     try {
       const opts = { method, headers: { 'Content-Type': 'application/json' } };
+      const token = this._getAuthToken();
+      if (token) opts.headers['Authorization'] = 'Bearer ' + token;
       if (body && method !== 'GET') opts.body = JSON.stringify(body);
       const res = await fetch(this._baseUrl + '/api/v1' + path, opts);
       const data = await res.json().catch(() => null);
@@ -39292,13 +39297,18 @@ function renderSyncPage() {
   const tInput = document.getElementById('syncTokenInput');
   const gInput = document.getElementById('syncGistInput');
 
+  let backendInfo = '';
+  if (USE_BACKEND) {
+    const bs = backendStatus.state === 'online' ? '🟢 الخادم متصل' : backendStatus.state === 'error' ? '🔴 خطأ في الخادم' : '⚪ الخادم غير متصل';
+    backendInfo = ' • ' + bs;
+  }
   if(icon)  icon.textContent  = connected ? (isOnline ? '✅' : '📴') : hasToken ? '⚠️' : '☁️';
   if(title) title.textContent = connected
     ? (isOnline ? 'متصل بـ GitHub — مزامنة كل 3 ثواني 🟢' : 'وضع Offline — سيتم الرفع تلقائياً عند رجوع الإنترنت')
     : hasToken ? 'Token مُدخل — جاري تجهيز المزامنة' : 'غير مفعّل';
   if(sub)   sub.textContent   = connected
-    ? ((ghLastSaved ? 'آخر حفظ: '+ghLastSaved.toLocaleTimeString('ar-EG') : 'بانتظار أول تغيير...') + (pending > 0 ? ` • تغييرات محلية معلقة: ${pending}` : ''))
-    : 'أدخل بيانات GitHub للمزامنة بين أجهزتك';
+    ? ((ghLastSaved ? 'آخر حفظ: '+ghLastSaved.toLocaleTimeString('ar-EG') : 'بانتظار أول تغيير...') + (pending > 0 ? ` • تغييرات محلية معلقة: ${pending}` : '') + backendInfo)
+    : 'أدخل بيانات GitHub للمزامنة بين أجهزتك' + backendInfo;
   if(dot)   dot.style.display = connected ? 'block' : 'none';
   if(gDisp) gDisp.style.display = connected ? 'block' : 'none';
   if(gId)   gId.textContent   = ghGistId();
@@ -39586,7 +39596,10 @@ registerDigiTronicsPWA();
 // Phase 22A: restore last-known backend connectivity, render real status, and probe when enabled.
 restoreBackendStatus();
 renderBackendConnectionStatus();
-if (USE_BACKEND) setTimeout(probeBackendHealth, 0);
+if (USE_BACKEND) {
+  setTimeout(probeBackendHealth, 0);
+  setInterval(function() { probeBackendHealth(); }, 30000);
+}
 setTimeout(updateGhStatusCard, 0);
 // أول تشغيل: لو مافيش Token محفوظ → اعرض modal الربط
 setTimeout(checkFirstRun, 300);
