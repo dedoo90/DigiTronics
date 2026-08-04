@@ -48,4 +48,22 @@ function apiRateLimiter(max) {
   });
 }
 
-module.exports = { sanitizeBody, jsonParseErrorHandler, apiRateLimiter };
+// Phase 22B: strict login limiter to slow credential-stuffing/brute force
+// without affecting normal business routes. Keyed per IP + username so many
+// users are never locked out by one another.
+function loginRateLimiter() {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator(req) {
+      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      const username = (req.body && req.body.username) ? String(req.body.username).toLowerCase() : '';
+      return `${ip}:${username}`;
+    },
+    message: { success: false, message: 'Too many login attempts, please try again later', data: null }
+  });
+}
+
+module.exports = { sanitizeBody, jsonParseErrorHandler, apiRateLimiter, loginRateLimiter };
