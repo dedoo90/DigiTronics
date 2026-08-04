@@ -11235,6 +11235,12 @@ const digitronicsDataAdapter = {
           if (res && res.success) {
             inv._syncedToBackend = true;
             inv._backendId = res.data?.id || null;
+          } else if (res && !res.success) {
+            const probe = await backendApi.sales.getById(inv._backendId || inv.id);
+            if (probe && probe.success && probe.data) {
+              inv._syncedToBackend = true;
+              inv._backendId = probe.data.id || inv._backendId || inv.id;
+            }
           }
         } catch (_) {}
       }

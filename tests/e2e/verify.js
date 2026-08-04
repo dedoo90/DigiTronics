@@ -240,6 +240,7 @@ const server = http.createServer((req, res) => {
   check('backendOpQueue starts empty after clearAll', q.empty);
   check('backendOpQueue enqueue no-ops under flag off', q.gated);
   check('Delete path enqueues backend op (no fire-and-forget sales.delete)', /backendOpQueue\.enqueue\(\{ type: 'delete'/.test(srcCheck) && !/backendApi\.sales\.delete\([^)]*\)\.catch\(\(\) => \{\}\)/.test(srcCheck));
+  check('Create-sync is idempotent (duplicate verified via getById on rejected create)', /backendApi\.sales\.create\(inv\)/.test(srcCheck) && /backendApi\.sales\.getById\(inv\._backendId \|\| inv\.id\)/.test(srcCheck));
 
   const err0 = errors.length;
   await page.evaluate(() => showPage('products'));
