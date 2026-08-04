@@ -18931,16 +18931,24 @@ function addCashEntry(type, amount, method, desc, entryDate, meta = {}) {
   return true;
 }
 
-function addTreasuryOutRequired(amount, method, desc, entryDate, meta = {}) {
-  const before = getTreasurySummary().total;
-  const ok = addCashEntry('out', amount, method || 'cash', desc, entryDate, meta);
-  if (!ok) return false;
-  const after = roundMoney(before - roundMoney(toSafeFloat(amount, 0)));
-  if (after < 0) {
-    showToast(`⚠️ تم الخصم والخزنة أصبحت بالسالب: ${formatMoney(after)}`, 'error');
-  }
-  return true;
-}
+async function addTreasuryOutRequired(amount, method, desc, entryDate, meta = {}) {
+   const before = getTreasurySummary().total;
+   const safeAmount = roundMoney(toSafeFloat(amount, 0));
+   const safeMethod = method || 'cash';
+   const safeDesc = String(desc || '').trim() || 'حركة خزنة';
+   const entryDateValue = entryDate ? localDateTimeString(entryDate) : localDateTimeString();
+   // Phase 23B: create in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.treasury) {
+     try { await backendApi.treasury.create({ type: 'out', amount: safeAmount, method: safeMethod, desc: safeDesc, date: entryDateValue, ...meta }); } catch (_) {}
+   }
+   const ok = addCashEntry('out', amount, method || 'cash', desc, entryDate, meta);
+   if (!ok) return false;
+   const after = roundMoney(before - roundMoney(toSafeFloat(amount, 0)));
+   if (after < 0) {
+     showToast(`⚠️ تم الخصم والخزنة أصبحت بالسالب: ${formatMoney(after)}`, 'error');
+   }
+   return true;
+ }
 
 function getReturnCashType(invoiceType, action) {
   const invType = String(invoiceType || 'sale').toLowerCase();
@@ -25545,61 +25553,66 @@ function saveCashEntry() {
   showToast('تم تسجيل القيد');
 }
 
-function renderTreasury() {
-  const treasury = getTreasurySummary();
-  const cash = treasury.byMethod.cash || 0;
-  const instapay = treasury.byMethod.instapay || 0;
-  const vodafone = treasury.byMethod.vodafone || 0;
-  const fawry = treasury.byMethod.fawry || 0;
-  const total = treasury.total;
-  
-  const totalIn = treasury.totalIn;
-  const totalOut = treasury.totalOut;
-  const setMoney = (id, value) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = formatMoney(value);
-    el.style.color = value < 0 ? 'var(--red)' : '';
-  };
-  
-  setMoney('treas-total', total);
-  setMoney('treas-total-in', totalIn);
-  setMoney('treas-total-out', totalOut);
-  setMoney('treas-cash', cash);
-  setMoney('treas-instapay', instapay);
-  setMoney('treas-vodafone', vodafone);
-  setMoney('treas-fawry', fawry);
-  
-  // Cash flow table
-  const dateFilter = document.getElementById('cashDateFilter').value;
-  const searchFilter = document.getElementById('cashSearchFilter').value.toLowerCase();
-  
-  let entries = getTreasuryEntries();
-  if (dateFilter) {
-    entries = entries.filter(c => new Date(c.date).toISOString().slice(0, 10) === dateFilter);
-  }
-  if (searchFilter) {
-    entries = entries.filter(c => (c.desc && c.desc.toLowerCase().includes(searchFilter)) || (c.user && c.user.toLowerCase().includes(searchFilter)));
-  }
-  
-  const tbody = document.getElementById('cashFlowTbody');
-  tbody.innerHTML = entries.slice(0, 100).map((c, idx) => {
-    const row = normalizeTreasuryEntry(c);
-    const displayBalance = Number.isFinite(row.balance) ? row.balance : treasury.total;
-    return `<tr>
-    <td>${entries.length - idx}</td>
-    <td>${new Date(c.date).toLocaleString('ar-EG')}</td>
-    <td>${row.type === 'in' ? '<span class="badge badge-green">وارد</span>' : '<span class="badge badge-red">صادر</span>'}</td>
-    <td>${c.desc || '-'}</td>
-    <td>${getPaymentLabel(row.method)}</td>
-    <td style="color:var(--green)">${row.type === 'in' ? formatMoney(row.amount) : '-'}</td>
-    <td style="color:var(--red)">${row.type === 'out' ? formatMoney(row.amount) : '-'}</td>
-    <td style="color:${toSafeFloat(displayBalance, 0) < 0 ? 'var(--red)' : 'inherit'};font-weight:${toSafeFloat(displayBalance, 0) < 0 ? '800' : '400'}">${formatMoney(displayBalance)}</td>
-    <td>${c.user || '-'}</td>
-    <td>${renderTreasuryReverseAction(c)}</td>
-  </tr>`;
-  }).join('') || '<tr><td colspan="10" style="text-align:center">لا توجد حركات</td></tr>';
-}
+async function renderTreasury() {
+   const treasury = getTreasurySummary();
+   const cash = treasury.byMethod.cash || 0;
+   const instapay = treasury.byMethod.instapay || 0;
+   const vodafone = treasury.byMethod.vodafone || 0;
+   const fawry = treasury.byMethod.fawry || 0;
+   const total = treasury.total;
+   
+   const totalIn = treasury.totalIn;
+   const totalOut = treasury.totalOut;
+   const setMoney = (id, value) => {
+     const el = document.getElementById(id);
+     if (!el) return;
+     el.textContent = formatMoney(value);
+     el.style.color = value < 0 ? 'var(--red)' : '';
+   };
+   
+   setMoney('treas-total', total);
+   setMoney('treas-total-in', totalIn);
+   setMoney('treas-total-out', totalOut);
+   setMoney('treas-cash', cash);
+   setMoney('treas-instapay', instapay);
+   setMoney('treas-vodafone', vodafone);
+   setMoney('treas-fawry', fawry);
+   
+   // Phase 23B: fetch from backend when enabled
+   let entries = getTreasuryEntries();
+   if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+     try { entries = await digitronicsDataAdapter.listTreasury(); } catch (_) {}
+   }
+   
+   // Cash flow table
+   const dateFilter = document.getElementById('cashDateFilter').value;
+   const searchFilter = document.getElementById('cashSearchFilter').value.toLowerCase();
+   
+   if (dateFilter) {
+     entries = entries.filter(c => new Date(c.date).toISOString().slice(0, 10) === dateFilter);
+   }
+   if (searchFilter) {
+     entries = entries.filter(c => (c.desc && c.desc.toLowerCase().includes(searchFilter)) || (c.user && c.user.toLowerCase().includes(searchFilter)));
+   }
+   
+   const tbody = document.getElementById('cashFlowTbody');
+   tbody.innerHTML = entries.slice(0, 100).map((c, idx) => {
+     const row = normalizeTreasuryEntry(c);
+     const displayBalance = Number.isFinite(row.balance) ? row.balance : treasury.total;
+     return `<tr>
+     <td>${entries.length - idx}</td>
+     <td>${new Date(c.date).toLocaleString('ar-EG')}</td>
+     <td>${row.type === 'in' ? '<span class="badge badge-green">وارد</span>' : '<span class="badge badge-red">صادر</span>'}</td>
+     <td>${c.desc || '-'}</td>
+     <td>${getPaymentLabel(row.method)}</td>
+     <td style="color:var(--green)">${row.type === 'in' ? formatMoney(row.amount) : '-'}</td>
+     <td style="color:var(--red)">${row.type === 'out' ? formatMoney(row.amount) : '-'}</td>
+     <td style="color:${toSafeFloat(displayBalance, 0) < 0 ? 'var(--red)' : 'inherit'};font-weight:${toSafeFloat(displayBalance, 0) < 0 ? '800' : '400'}">${formatMoney(displayBalance)}</td>
+     <td>${c.user || '-'}</td>
+     <td>${renderTreasuryReverseAction(c)}</td>
+   </tr>`;
+   }).join('') || '<tr><td colspan="10" style="text-align:center">لا توجد حركات</td></tr>';
+ }
 
 function renderTreasuryReverseAction(c) {
   const role = currentUser && currentUser.role ? String(currentUser.role) : '';
@@ -25610,111 +25623,121 @@ function renderTreasuryReverseAction(c) {
   return `<button class="btn btn-outline btn-sm" onclick="reverseTreasuryEntry(${Number(c.id) || 0})">↩️ استرجاع</button>`;
 }
 
-function reverseTreasuryEntry(entryId) {
-  if (!ensureSensitiveOpsAllowed()) return;
-  DB.settings = DB.settings || {};
-  if (!DB.settings.ownerOverridePin) DB.settings.ownerOverridePin = '1948654';
-  if (!DB.settings.reversePinThreshold) DB.settings.reversePinThreshold = 3000;
-  DB.settings.reversePinFailCount = toSafeInt(DB.settings.reversePinFailCount, 0);
-  DB.settings.reversePinLockUntil = DB.settings.reversePinLockUntil || '';
-  DB.reversePinAttempts = Array.isArray(DB.reversePinAttempts) ? DB.reversePinAttempts : [];
+async function reverseTreasuryEntry(entryId) {
+   if (!ensureSensitiveOpsAllowed()) return;
+   DB.settings = DB.settings || {};
+   if (!DB.settings.ownerOverridePin) DB.settings.ownerOverridePin = '1948654';
+   if (!DB.settings.reversePinThreshold) DB.settings.reversePinThreshold = 3000;
+   DB.settings.reversePinFailCount = toSafeInt(DB.settings.reversePinFailCount, 0);
+   DB.settings.reversePinLockUntil = DB.settings.reversePinLockUntil || '';
+   DB.reversePinAttempts = Array.isArray(DB.reversePinAttempts) ? DB.reversePinAttempts : [];
 
-  const nowMs = Date.now();
-  const lockUntilMs = DB.settings.reversePinLockUntil ? new Date(DB.settings.reversePinLockUntil).getTime() : 0;
-  if (lockUntilMs && nowMs < lockUntilMs) {
-    const leftMin = Math.max(1, Math.ceil((lockUntilMs - nowMs) / 60000));
-    return showToast(`🔒 تم قفل الاسترجاع مؤقتًا. حاول بعد ${leftMin} دقيقة`, 'error');
-  }
-  if (lockUntilMs && nowMs >= lockUntilMs) {
-    DB.settings.reversePinLockUntil = '';
-    DB.settings.reversePinFailCount = 0;
-    saveDB();
-  }
+   const nowMs = Date.now();
+   const lockUntilMs = DB.settings.reversePinLockUntil ? new Date(DB.settings.reversePinLockUntil).getTime() : 0;
+   if (lockUntilMs && nowMs < lockUntilMs) {
+     const leftMin = Math.max(1, Math.ceil((lockUntilMs - nowMs) / 60000));
+     return showToast(`🔒 تم قفل الاسترجاع مؤقتًا. حاول بعد ${leftMin} دقيقة`, 'error');
+   }
+   if (lockUntilMs && nowMs >= lockUntilMs) {
+     DB.settings.reversePinLockUntil = '';
+     DB.settings.reversePinFailCount = 0;
+     saveDB();
+   }
 
-  DB.cashFlow = Array.isArray(DB.cashFlow) ? DB.cashFlow : [];
-  const row = DB.cashFlow.find(c => Number(c.id) === Number(entryId));
-  if (!row) return showToast('الحركة غير موجودة', 'error');
-  if (row.reversalOf) return showToast('هذه حركة عكسية بالفعل', 'info');
-  if (row.reversedBy) return showToast('تم استرجاع هذه الحركة مسبقًا', 'info');
+   DB.cashFlow = Array.isArray(DB.cashFlow) ? DB.cashFlow : [];
+   const row = DB.cashFlow.find(c => Number(c.id) === Number(entryId));
+   if (!row) return showToast('الحركة غير موجودة', 'error');
+   if (row.reversalOf) return showToast('هذه حركة عكسية بالفعل', 'info');
+   if (row.reversedBy) return showToast('تم استرجاع هذه الحركة مسبقًا', 'info');
 
-  const reason = prompt('سبب الاسترجاع (إلزامي):', '');
-  if (reason === null) return;
-  const reasonText = String(reason || '').trim();
-  if (!reasonText) return showToast('لازم تكتب سبب الاسترجاع', 'error');
+   const reason = prompt('سبب الاسترجاع (إلزامي):', '');
+   if (reason === null) return;
+   const reasonText = String(reason || '').trim();
+   if (!reasonText) return showToast('لازم تكتب سبب الاسترجاع', 'error');
 
-  const amount = toSafeFloat(row.amount, 0);
-  const needOwnerPin = amount >= toSafeFloat(DB.settings.reversePinThreshold, 3000)
-    || !(currentUser && currentUser.role === 'Owner');
-  if (needOwnerPin) {
-    const pin = prompt('أدخل PIN المالك لتأكيد الاسترجاع:', '');
-    if (pin === null) return;
-    if (String(pin || '').trim() !== String(DB.settings.ownerOverridePin || '')) {
-      DB.settings.reversePinFailCount = toSafeInt(DB.settings.reversePinFailCount, 0) + 1;
-      DB.reversePinAttempts.unshift({
-        id: Date.now(),
-        date: new Date().toISOString(),
-        ok: false,
-        entryId: row.id,
-        amount: amount,
-        user: currentUser ? currentUser.username : 'system'
-      });
-      if (DB.settings.reversePinFailCount >= 3) {
-        DB.settings.reversePinLockUntil = new Date(Date.now() + 10 * 60000).toISOString();
-        DB.settings.reversePinFailCount = 0;
-        saveDB();
-        return showToast('⛔ 3 محاولات PIN خاطئة: تم قفل الاسترجاع 10 دقائق', 'error');
-      }
-      saveDB();
-      return showToast('PIN المالك غير صحيح', 'error');
-    }
-    DB.settings.reversePinFailCount = 0;
-    DB.settings.reversePinLockUntil = '';
-    DB.reversePinAttempts.unshift({
-      id: Date.now(),
-      date: new Date().toISOString(),
-      ok: true,
-      entryId: row.id,
-      amount: amount,
-      user: currentUser ? currentUser.username : 'system'
-    });
-    saveDB();
-  }
+   const amount = toSafeFloat(row.amount, 0);
+   const needOwnerPin = amount >= toSafeFloat(DB.settings.reversePinThreshold, 3000)
+     || !(currentUser && currentUser.role === 'Owner');
+   if (needOwnerPin) {
+     const pin = prompt('أدخل PIN المالك لتأكيد الاسترجاع:', '');
+     if (pin === null) return;
+     if (String(pin || '').trim() !== String(DB.settings.ownerOverridePin || '')) {
+       DB.settings.reversePinFailCount = toSafeInt(DB.settings.reversePinFailCount, 0) + 1;
+       DB.reversePinAttempts.unshift({
+         id: Date.now(),
+         date: new Date().toISOString(),
+         ok: false,
+         entryId: row.id,
+         amount: amount,
+         user: currentUser ? currentUser.username : 'system'
+       });
+       if (DB.settings.reversePinFailCount >= 3) {
+         DB.settings.reversePinLockUntil = new Date(Date.now() + 10 * 60000).toISOString();
+         DB.settings.reversePinFailCount = 0;
+         saveDB();
+         return showToast('⛔ 3 محاولات PIN خاطئة: تم قفل الاسترجاع 10 دقائق', 'error');
+       }
+       saveDB();
+       return showToast('PIN المالك غير صحيح', 'error');
+     }
+     DB.settings.reversePinFailCount = 0;
+     DB.settings.reversePinLockUntil = '';
+     DB.reversePinAttempts.unshift({
+       id: Date.now(),
+       date: new Date().toISOString(),
+       ok: true,
+       entryId: row.id,
+       amount: amount,
+       user: currentUser ? currentUser.username : 'system'
+     });
+     saveDB();
+   }
 
-  const movementType = row.type === 'in' ? 'وارد' : 'صادر';
-  const when = row.date ? new Date(row.date).toLocaleString('ar-EG') : '-';
-  const summary = [
-    'تأكيد استرجاع الحركة:',
-    `#${row.id}`,
-    `النوع: ${movementType}`,
-    `المبلغ: ${formatMoney(toSafeFloat(row.amount, 0))}`,
-    `الطريقة: ${getPaymentLabel(row.method || 'cash')}`,
-    `التاريخ: ${when}`,
-    `البيان: ${row.desc || '-'}`,
-    `السبب: ${reasonText}`,
-    '',
-    'سيتم إنشاء قيد عكسي مطابق. هل تريد المتابعة؟'
-  ].join('\n');
-  if (!confirm(summary)) return;
+   // Phase 23B: delete original from backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.treasury && row._backendId) {
+     try { await backendApi.treasury.delete(row._backendId); } catch (_) {}
+   }
 
-  const oppositeType = row.type === 'in' ? 'out' : 'in';
-  const ok = addCashEntry(
-    oppositeType,
-    toSafeFloat(row.amount, 0),
-    row.method || 'cash',
-    `↩️ عكس حركة خزنة #${row.id} - ${reasonText}`
-  );
-  if (!ok) return;
+   const movementType = row.type === 'in' ? 'وارد' : 'صادر';
+   const when = row.date ? new Date(row.date).toLocaleString('ar-EG') : '-';
+   const summary = [
+     'تأكيد استرجاع الحركة:',
+     `#${row.id}`,
+     `النوع: ${movementType}`,
+     `المبلغ: ${formatMoney(toSafeFloat(row.amount, 0))}`,
+     `الطريقة: ${getPaymentLabel(row.method || 'cash')}`,
+     `التاريخ: ${when}`,
+     `البيان: ${row.desc || '-'}`,
+     `السبب: ${reasonText}`,
+     '',
+     'سيتم إنشاء قيد عكسي مطابق. هل تريد المتابعة؟'
+   ].join('\n');
+   if (!confirm(summary)) return;
 
-  const reversal = DB.cashFlow[0];
-  if (reversal) {
-    reversal.reversalOf = row.id;
-    reversal.reversalReason = reasonText;
-  }
-  row.reversedBy = reversal ? reversal.id : Date.now();
-  row.reversedAt = new Date().toISOString();
-  row.reverseReason = reasonText;
-  saveDB();
-  logActivity('استرجاع حركة خزنة', `عكس الحركة #${row.id} بقيمة ${formatMoney(row.amount || 0)} | السبب: ${reasonText}`);
+   const oppositeType = row.type === 'in' ? 'out' : 'in';
+   const newEntry = {
+     id: Date.now(),
+     date: localDateTimeString(),
+     type: oppositeType,
+     amount: toSafeFloat(row.amount, 0),
+     method: row.method || 'cash',
+     desc: `↩️ عكس حركة خزنة #${row.id} - ${reasonText}`,
+     balance: 0,
+     user: currentUser ? currentUser.username : 'system',
+     reversalOf: row.id,
+     reversalReason: reasonText
+   };
+   // Phase 23B: create opposite entry in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.treasury) {
+     try { await backendApi.treasury.create(newEntry); } catch (_) {}
+   }
+   DB.cashFlow.unshift(newEntry);
+
+   row.reversedBy = newEntry.id;
+   row.reversedAt = new Date().toISOString();
+   row.reverseReason = reasonText;
+   saveDB();
+   logActivity('استرجاع حركة خزنة', `عكس الحركة #${row.id} بقيمة ${formatMoney(row.amount || 0)} | السبب: ${reasonText}`);
   renderTreasury();
   showToast('تم استرجاع الحركة بنجاح');
 }
@@ -26158,20 +26181,24 @@ function createSettlementFromManualBalance() {
   createTreasurySettlement(type, amount, note);
 }
 
-function createTreasurySettlement(type, amount, note, method = 'cash') {
-  const safeType = type === 'in' ? 'in' : 'out';
-  const safeAmount = roundMoney(toSafeFloat(amount, 0));
-  if (!(safeAmount > 0)) { showToast('قيمة غير صحيحة', 'error'); return; }
-  const safeNote = String(note || '').trim() || `تسوية فرق دفتر يدوي حتى ${localDateString()}`;
-  const label = safeType === 'in' ? 'وارد' : 'صادر';
-  if (!confirm(`تأكيد إنشاء قيد تسوية؟\\n\\nالنوع: ${label}\\nالقيمة: ${formatMoney(safeAmount)}\\nالوسيلة: ${getPaymentLabel(method)}\\nالوصف: ${safeNote}`)) return;
+async function createTreasurySettlement(type, amount, note, method = 'cash') {
+   const safeType = type === 'in' ? 'in' : 'out';
+   const safeAmount = roundMoney(toSafeFloat(amount, 0));
+   if (!(safeAmount > 0)) { showToast('قيمة غير صحيحة', 'error'); return; }
+   const safeNote = String(note || '').trim() || `تسوية فرق دفتر يدوي حتى ${localDateString()}`;
+   const label = safeType === 'in' ? 'وارد' : 'صادر';
+   if (!confirm(`تأكيد إنشاء قيد تسوية؟\\n\\nالنوع: ${label}\\nالقيمة: ${formatMoney(safeAmount)}\\nالوسيلة: ${getPaymentLabel(method)}\\nالوصف: ${safeNote}`)) return;
 
-  addCashEntry(safeType, safeAmount, method, safeNote);
-  logActivity('قيد تسوية خزنة', `${label} - ${formatMoney(safeAmount)} - ${safeNote}`);
-  renderTreasury();
-  openTreasuryAuditModal();
-  showToast(`✅ تم إنشاء قيد تسوية ${label} بقيمة ${formatMoney(safeAmount)}`);
-}
+   // Phase 23B: create in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.treasury) {
+     try { await backendApi.treasury.create({ type: safeType, amount: safeAmount, method, desc: safeNote, date: new Date().toISOString() }); } catch (_) {}
+   }
+   addCashEntry(safeType, safeAmount, method, safeNote);
+   logActivity('قيد تسوية خزنة', `${label} - ${formatMoney(safeAmount)} - ${safeNote}`);
+   renderTreasury();
+   openTreasuryAuditModal();
+   showToast(`✅ تم إنشاء قيد تسوية ${label} بقيمة ${formatMoney(safeAmount)}`);
+ }
 
 function createSettlementFromAudit(defaultAmount) {
   const type = prompt('نوع قيد التسوية: اكتب وارد أو صادر', 'صادر');
