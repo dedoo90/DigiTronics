@@ -18623,13 +18623,13 @@ function reverseCashType(type) {
   return type === 'in' ? 'out' : 'in';
 }
 
-function addStockMovement(productId, type, qty, reason, user, meta = {}) {
+async function addStockMovement(productId, type, qty, reason, user, meta = {}) {
   const safeQty = Math.max(0, toSafeFloat(qty, 0));
   if (!(safeQty > 0)) return;
   const product = DB.products.find(p => Number(p.id) === Number(productId));
   const branchMeta = { ...getCurrentBranchMeta(), ...meta };
   const stockAfter = getProductStock(productId) + (type === 'in' ? safeQty : -safeQty);
-  DB.stockMovement.unshift({
+  const movement = {
     id: Date.now(),
     date: meta.transactionDate ? localDateTimeString(meta.transactionDate) : localDateTimeString(),
     productId,
@@ -18640,7 +18640,12 @@ function addStockMovement(productId, type, qty, reason, user, meta = {}) {
     reason,
     user: user || (currentUser ? currentUser.username : 'system'),
     ...normalizeLedgerMeta(branchMeta)
-  });
+  };
+  // Phase 23B: create in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.inventoryTransactions) {
+    try { await backendApi.inventoryTransactions.create(movement); } catch (_) {}
+  }
+  DB.stockMovement.unshift(movement);
   if (DB.stockMovement.length > 500) DB.stockMovement = DB.stockMovement.slice(0, 500);
   saveDB();
 }
@@ -21481,9 +21486,14 @@ function clearProductLog() {
 }
 
 // ================= STOCK MOVEMENT =================
-function renderStockMovement() {
+async function renderStockMovement() {
   const tbody = document.getElementById('stockMovTbody');
-  tbody.innerHTML = DB.stockMovement.slice(0, 100).map(m => {
+  // Phase 23B: fetch from backend when enabled
+  let movements = DB.stockMovement;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { movements = await digitronicsDataAdapter.listInventoryTransactions(); } catch (_) {}
+  }
+  tbody.innerHTML = movements.slice(0, 100).map(m => {
     const typeBadge = m.type === 'in' ? '<span class="badge badge-green">وارد</span>' : '<span class="badge badge-red">صادر</span>';
     return `<tr>
       <td>${new Date(m.date).toLocaleString('ar-EG')}</td>
