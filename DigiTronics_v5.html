@@ -1234,20 +1234,6 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
 <script src="./services/configuration/ConfigurationImporter.js"></script>
 <script src="./services/configuration/ConfigurationEngine.js"></script>
 <script src="./services/configuration/configurationUi.js"></script>
-<script src="./services/dataLayer/DataProvider.js"></script>
-<script src="./services/dataLayer/StorageAdapter.js"></script>
-<script src="./services/dataLayer/SupabaseAdapterPreview.js"></script>
-<script src="./services/dataLayer/SQLiteAdapterPreview.js"></script>
-<script src="./services/dataLayer/IndexedDBAdapterPreview.js"></script>
-<script src="./services/dataLayer/MemoryAdapter.js"></script>
-<script src="./services/dataLayer/DataLayerValidator.js"></script>
-<script src="./services/dataLayer/DataRepository.js"></script>
-<script src="./services/dataLayer/TransactionManager.js"></script>
-<script src="./services/dataLayer/SyncManagerPreview.js"></script>
-<script src="./services/dataLayer/ConnectionHealthChecker.js"></script>
-<script src="./services/dataLayer/OfflineQueuePreview.js"></script>
-<script src="./services/dataLayer/ConflictResolverPreview.js"></script>
-<script src="./services/dataLayer/dataLayerUi.js"></script>
 <script src="./services/auth/RoleManager.js"></script>
 <script src="./services/auth/PermissionEngine.js"></script>
 <script src="./services/auth/UserManager.js"></script>
@@ -1752,13 +1738,6 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
         <div class="nav-dropdown-item" data-page="config-backup"><span class="icon">🗄️</span> Backup Configuration</div>
         <div class="nav-dropdown-item" data-page="config-export"><span class="icon">⬇️</span> Export Configuration</div>
         <div class="nav-dropdown-item" data-page="config-import"><span class="icon">⬆️</span> Import Configuration</div>
-        <div class="nav-dropdown-item" data-page="data-layer"><span class="icon">🧱</span> Data Layer</div>
-        <div class="nav-dropdown-item" data-page="connection-status"><span class="icon">🔌</span> Connection Status</div>
-        <div class="nav-dropdown-item" data-page="storage-providers"><span class="icon">🗃️</span> Storage Providers</div>
-        <div class="nav-dropdown-item" data-page="offline-queue"><span class="icon">📥</span> Offline Queue</div>
-        <div class="nav-dropdown-item" data-page="sync-preview"><span class="icon">🔄</span> Sync Preview</div>
-        <div class="nav-dropdown-item" data-page="repository-status"><span class="icon">📚</span> Repository Status</div>
-        <div class="nav-dropdown-item" data-page="transaction-preview"><span class="icon">🧪</span> Transaction Preview</div>
         <div class="nav-dropdown-item" data-page="authentication-center"><span class="icon">🛡️</span> Authentication Center</div>
         <div class="nav-dropdown-item" data-page="auth-preview-users"><span class="icon">👤</span> Users Preview</div>
         <div class="nav-dropdown-item" data-page="auth-preview-roles"><span class="icon">🎭</span> Roles Preview</div>
@@ -3372,15 +3351,6 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
     <div class="page" id="page-config-backup"><div class="page-header"><div><div class="page-title">🗄️ Backup Configuration</div><div style="font-size:.78rem;color:var(--text2)">خيارات تصدير ونسخ احتياطي مقترحة فقط</div></div></div><div id="configuration-config-backup"></div></div>
     <div class="page" id="page-config-export"><div class="page-header"><div><div class="page-title">⬇️ Export Configuration</div><div style="font-size:.78rem;color:var(--text2)">تصدير JSON Preview دون حفظ دائم</div></div></div><div id="configuration-config-export"></div></div>
     <div class="page" id="page-config-import"><div class="page-header"><div><div class="page-title">⬆️ Import Configuration</div><div style="font-size:.78rem;color:var(--text2)">تحليل JSON وعرض الفروق دون تطبيق</div></div></div><div id="configuration-config-import"></div></div>
-
-    <!-- PHASE 22 DATA ABSTRACTION — PREVIEW ONLY -->
-    <div class="page" id="page-data-layer"><div class="page-header"><div><div class="page-title">🧱 Data Layer</div><div style="font-size:.78rem;color:var(--text2)">طبقة موحدة للمزودين والمستودعات — Preview Only</div></div></div><div id="data-layer-data-layer"></div></div>
-    <div class="page" id="page-connection-status"><div class="page-header"><div><div class="page-title">🔌 Connection Status</div><div style="font-size:.78rem;color:var(--text2)">حالة واجهات الاتصال دون فتح اتصالات فعلية</div></div></div><div id="data-layer-connection-status"></div></div>
-    <div class="page" id="page-storage-providers"><div class="page-header"><div><div class="page-title">🗃️ Storage Providers</div><div style="font-size:.78rem;color:var(--text2)">المزودون المتاحون وقدراتهم المعطلة بأمان</div></div></div><div id="data-layer-storage-providers"></div></div>
-    <div class="page" id="page-offline-queue"><div class="page-header"><div><div class="page-title">📥 Offline Queue</div><div style="font-size:.78rem;color:var(--text2)">معاينة قائمة الانتظار دون تخزين أو معالجة</div></div></div><div id="data-layer-offline-queue"></div></div>
-    <div class="page" id="page-sync-preview"><div class="page-header"><div><div class="page-title">🔄 Sync Preview</div><div style="font-size:.78rem;color:var(--text2)">خطة مزامنة دون رفع أو تنزيل أو اتصال</div></div></div><div id="data-layer-sync-preview"></div></div>
-    <div class="page" id="page-repository-status"><div class="page-header"><div><div class="page-title">📚 Repository Status</div><div style="font-size:.78rem;color:var(--text2)">التحقق من عقد Repository وSnapshot القراءة</div></div></div><div id="data-layer-repository-status"></div></div>
-    <div class="page" id="page-transaction-preview"><div class="page-header"><div><div class="page-title">🧪 Transaction Preview</div><div style="font-size:.78rem;color:var(--text2)">معاينة العمليات دون Begin أو Commit أو تعديل بيانات</div></div></div><div id="data-layer-transaction-preview"></div></div>
 
     <!-- PHASE 23 AUTHENTICATION ARCHITECTURE — MOCK ONLY -->
     <div class="page" id="page-authentication-center"><div class="page-header"><div><div class="page-title">🛡️ Authentication Center</div><div style="font-size:.78rem;color:var(--text2)">معمارية دخول وصلاحيات Mock دون Backend</div></div></div><div id="auth-preview-authentication-center"></div></div>
@@ -5575,47 +5545,22 @@ window.DIGITRONICS_SUPABASE = window.DIGITRONICS_SUPABASE || {
       </div>
     </div>
 
-    <!-- ENTERPRISE LIVE SYNC -->
+    <!-- LIVE SYNC STATUS -->
     <div class="page" id="page-live-sync">
       <div class="page-header">
-        <div class="page-title">🌐🔄 المزامنة <span>الحية والأجهزة</span></div>
+        <div class="page-title">🌐🔄 حالة <span>المزامنة</span></div>
         <div class="table-actions">
-          <select id="liveSyncIntervalSelect" class="search-input" onchange="saveLiveSyncSettingsFromPage()" style="width:130px">
-            <option value="manual">Manual</option>
-            <option value="30">30s</option>
-            <option value="60">60s</option>
-            <option value="120">120s</option>
-          </select>
           <button class="btn btn-outline btn-sm" onclick="runLiveSyncRefresh(true)">تحديث الآن</button>
-          <button class="btn btn-outline btn-sm" onclick="exportLiveSyncReport('json')">JSON</button>
-          <button class="btn btn-accent btn-sm" onclick="exportLiveSyncReport('csv')">CSV</button>
         </div>
       </div>
-      <div id="liveSyncPermissionNote"></div>
       <div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
         <div class="stat-card blue"><div class="stat-icon">🌐</div><div class="stat-value" id="lsOnlineCard">-</div><div class="stat-label">Online / Offline</div></div>
         <div class="stat-card green"><div class="stat-icon">🟢</div><div class="stat-value" id="lsSupabaseCard">-</div><div class="stat-label">Supabase</div></div>
         <div class="stat-card yellow"><div class="stat-icon">⏳</div><div class="stat-value" id="lsPendingCard">0</div><div class="stat-label">Pending Sync</div></div>
-        <div class="stat-card purple"><div class="stat-icon">📲</div><div class="stat-value" id="lsDevicesCard">0</div><div class="stat-label">Devices</div></div>
-        <div class="stat-card orange"><div class="stat-icon">⚠️</div><div class="stat-value" id="lsConflictCard">0</div><div class="stat-label">Conflicts</div></div>
-        <div class="stat-card red"><div class="stat-icon">❌</div><div class="stat-value" id="lsFailedCard">0</div><div class="stat-label">Failed Sync</div></div>
       </div>
       <div class="live-sync-grid" style="margin-top:12px">
-        <div class="live-sync-card"><h3>📡 Live Sync Status</h3><div id="liveSyncStatusPanel"></div></div>
-        <div class="live-sync-card"><h3>👥 Live Users</h3><div id="liveUsersPanel"></div></div>
-        <div class="live-sync-card"><h3>📱 Device Manager</h3><div id="liveDevicesPanel"></div></div>
-        <div class="live-sync-card"><h3>🔐 Active Sessions</h3><div id="liveSessionsPanel"></div></div>
-      </div>
-      <div class="table-container" style="margin-top:12px">
-        <div class="table-header"><div class="table-title">⏳ Sync Queue</div><div class="table-actions"><button class="btn btn-outline btn-sm" onclick="retryFailedLiveSyncQueue()">Retry Failed</button><button class="btn btn-outline btn-sm" onclick="clearCompletedLiveSyncQueue()">Clear Completed</button><button class="btn btn-outline btn-sm" onclick="exportLiveSyncQueue()">Export Queue</button></div></div>
-        <div class="overflow-x"><table class="data-table"><thead><tr><th>ID</th><th>Module</th><th>Action</th><th>User</th><th>Branch</th><th>Status</th><th>Retry</th><th>Error</th></tr></thead><tbody id="liveSyncQueueTbody"></tbody></table></div>
-      </div>
-      <div class="live-sync-grid" style="margin-top:12px">
-        <div class="live-sync-card"><h3>🏬 Branch Live Status</h3><div id="liveBranchPanel"></div></div>
-        <div class="live-sync-card"><h3>⚠️ Conflict Detector</h3><div id="liveConflictsPanel"></div></div>
+        <div class="live-sync-card"><h3>📡 Backend Sync Status</h3><div id="liveSyncStatusPanel"></div></div>
         <div class="live-sync-card"><h3>🔄 Store Reconciliation</h3><div id="liveReconcilePanel"></div></div>
-        <div class="live-sync-card"><h3>🔔 Live Notifications</h3><div id="liveNotificationsPanel"></div></div>
-        <div class="live-sync-card"><h3>⚙️ Settings</h3><div id="liveSyncSettingsPanel"></div></div>
       </div>
     </div>
 
@@ -13344,13 +13289,6 @@ function canAccessPage(page) {
     'config-backup': 'viewReports',
     'config-export': 'viewReports',
     'config-import': 'viewReports',
-    'data-layer': 'viewReports',
-    'connection-status': 'viewReports',
-    'storage-providers': 'viewReports',
-    'offline-queue': 'viewReports',
-    'sync-preview': 'viewReports',
-    'repository-status': 'viewReports',
-    'transaction-preview': 'viewReports',
     'authentication-center': 'viewReports',
     'auth-preview-users': 'viewReports',
     'auth-preview-roles': 'viewReports',
@@ -14596,125 +14534,23 @@ function updateLiveSyncCards() {
   setText('lsOnlineCard', stats.online ? 'Online' : 'Offline');
   setText('lsSupabaseCard', stats.supabase);
   setText('lsPendingCard', stats.pending);
-  setText('lsDevicesCard', stats.devices);
-  setText('lsConflictCard', stats.conflicts);
-  setText('lsFailedCard', stats.failed);
 }
 
 function renderEnterpriseLiveSyncPage() {
-  updateLiveDeviceHeartbeat('silent');
-  scanLiveSyncConflicts();
-  syncLiveIntervalControl();
-  renderLivePermissionNote();
   updateLiveSyncCards();
   renderLiveStatusPanel();
-  renderLiveUsersPanel();
-  renderLiveDevicesPanel();
-  renderLiveSessionsPanel();
-  renderLiveQueuePanel();
-  renderLiveBranchPanel();
-  renderLiveConflictsPanel();
   renderLiveReconcilePanel();
-  renderLiveNotificationsPanel();
-  renderLiveSettingsPanel();
-}
-
-function renderLivePermissionNote() {
-  const host = document.getElementById('liveSyncPermissionNote');
-  if (!host) return;
-  const scope = getLiveSyncScopeMode();
-  host.innerHTML = scope === 'full'
-    ? '<div class="alert alert-info">وضع Admin/Owner: عرض كامل للأجهزة والفروع والصفوف. لا يتم تعديل بيانات تجارية.</div>'
-    : scope === 'branch'
-      ? '<div class="alert alert-info">Manager view: عرض حالة الفرع والأجهزة المرتبطة بالفرع فقط.</div>'
-      : '<div class="alert alert-warning">عرض محدود: يمكنك رؤية حالة جهازك وصف المزامنة الخاص بك فقط.</div>';
 }
 
 function renderLiveStatusPanel() {
   const host = document.getElementById('liveSyncStatusPanel');
   if (!host) return;
   const stats = getLiveSyncStats();
-  const branch = getLiveBranchMeta();
-  const device = getCurrentLiveDeviceSnapshot();
   host.innerHTML = `
-    <div class="live-sync-mini">Status: <span class="live-sync-badge ${stats.online ? 'online' : 'offline'}">${stats.online ? 'Online' : 'Offline'}</span></div>
-    <div class="live-sync-mini">Supabase: <strong>${escapeHtml(stats.supabase)}</strong></div>
-    <div class="live-sync-mini">Connection Quality: <strong>${escapeHtml(stats.quality)}</strong></div>
-    <div class="live-sync-mini">Last Sync: ${escapeHtml(stats.lastSync || '-')}</div>
-    <div class="live-sync-mini">Current Device: <span style="direction:ltr;display:inline-block">${escapeHtml(device.id)}</span></div>
-    <div class="live-sync-mini">Branch: ${escapeHtml(branch.branchName || 'Main Branch')}</div>
-    <div class="live-sync-mini">User: ${escapeHtml(currentUser?.username || '-')} / ${escapeHtml(currentUser?.role || '-')}</div>
-    <div class="live-sync-mini">App: ${escapeHtml(APP_VERSION_LABEL)} | PWA: ${escapeHtml(stats.pwaStatus)}</div>
-    <div class="live-sync-mini">Backend Ops: <strong>${backendOpQueue.pending()}</strong> pending${backendOpQueue.pending() > 0 ? ` <button class="btn btn-outline btn-sm" onclick="backendOpQueue.retryAll()">Retry</button> <button class="btn btn-outline btn-sm" onclick="backendOpQueue.clearAll()">Clear</button>` : ''}</div>
-    <div class="live-sync-mini">Backend API: <span class="live-sync-badge ${backendStatus.state === 'online' ? 'online' : backendStatus.state === 'error' ? 'error' : 'offline'}">${USE_BACKEND ? escapeHtml(backendStatus.state) : 'disabled'}</span>${backendStatus.lastStatus ? ` (HTTP ${backendStatus.lastStatus})` : ''}${backendStatus.lastError ? ` — ${escapeHtml(backendStatus.lastError)}` : ''}</div>`;
-}
-
-function renderLiveUsersPanel() {
-  const host = document.getElementById('liveUsersPanel');
-  if (!host) return;
-  const sessions = filterLiveRowsByScope(getLiveSyncState().sessions || []);
-  host.innerHTML = sessions.slice(0, 10).map(s => `<div class="plugin-card">
-    <strong>${escapeHtml(s.user)}</strong> <span class="live-sync-badge ${escapeHtml(s.status || 'unknown')}">${escapeHtml(s.status || 'unknown')}</span>
-    <div class="live-sync-mini">${escapeHtml(s.role)} · ${escapeHtml(s.branchName || '-')} · ${escapeHtml(s.device || '-')}</div>
-    <div class="live-sync-mini">Page: ${escapeHtml(s.currentPage || '-')} | Last activity: ${new Date(s.lastActivity).toLocaleString('ar-EG')}</div>
-  </div>`).join('') || '<div class="empty-state">لا توجد جلسات نشطة</div>';
-}
-
-function renderLiveDevicesPanel() {
-  const host = document.getElementById('liveDevicesPanel');
-  if (!host) return;
-  const devices = filterLiveRowsByScope(getLiveSyncState().devices || []);
-  host.innerHTML = devices.slice(0, 20).map(d => `<div class="plugin-card">
-    <strong>${escapeHtml(d.name || d.id)}</strong> <span class="live-sync-badge ${d.syncStatus === 'online' ? 'online' : 'offline'}">${escapeHtml(d.syncStatus || 'unknown')}</span>
-    <div class="live-sync-mini">${escapeHtml(d.type)} · ${escapeHtml(d.browser)} · ${escapeHtml(d.os)} · ${escapeHtml(d.branchName || '-')}</div>
-    <div class="live-sync-mini">User: ${escapeHtml(d.user || '-')} | Trusted: ${d.trusted === false ? 'No' : 'Yes'} | PWA: ${d.pwaInstalled ? 'Installed' : 'Browser'}</div>
-    <div class="live-sync-actions">
-      ${canManageLiveSync() ? `<button class="btn btn-outline btn-sm" onclick="renameLiveDevice('${d.id}')">Rename</button><button class="btn btn-outline btn-sm" onclick="toggleLiveDeviceTrust('${d.id}')">${d.trusted === false ? 'Trust' : 'Untrust'}</button>` : ''}
-      <button class="btn btn-outline btn-sm" onclick="viewLiveDeviceLogs('${d.id}')">Logs</button>
-    </div>
-  </div>`).join('') || '<div class="empty-state">لا توجد أجهزة مسجلة</div>';
-  if (canManageLiveSync()) host.innerHTML += '<div class="live-sync-actions"><button class="btn btn-danger btn-sm" onclick="clearOldLiveDevices()">Clear Old Devices</button></div>';
-}
-
-function renderLiveSessionsPanel() {
-  const host = document.getElementById('liveSessionsPanel');
-  if (!host) return;
-  const sessions = filterLiveRowsByScope(getLiveSyncState().sessions || []);
-  host.innerHTML = sessions.slice(0, 15).map(s => `<div class="plugin-card">
-    <strong>${escapeHtml(s.user)}</strong> <span class="live-sync-badge ${escapeHtml(s.status || 'unknown')}">${escapeHtml(s.status || 'unknown')}</span>
-    <div class="live-sync-mini">Login: ${new Date(s.loginTime).toLocaleString('ar-EG')} | Last: ${new Date(s.lastActivity).toLocaleString('ar-EG')}</div>
-    <div class="live-sync-actions"><button class="btn btn-outline btn-sm" onclick="markLiveSessionSuspicious('${s.id}')">Mark suspicious</button>${s.deviceId === getLiveDeviceId() ? `<button class="btn btn-outline btn-sm" onclick="logout()">End local session</button>` : ''}</div>
-  </div>`).join('') || '<div class="empty-state">لا توجد جلسات</div>';
-}
-
-function renderLiveQueuePanel() {
-  const tbody = document.getElementById('liveSyncQueueTbody');
-  if (!tbody) return;
-  const queue = filterLiveRowsByScope(getLiveSyncState().queue || []);
-  tbody.innerHTML = queue.slice(0, 200).map(q => `<tr><td>${escapeHtml(q.id)}</td><td>${escapeHtml(q.module)}</td><td>${escapeHtml(q.action)}</td><td>${escapeHtml(q.user)}</td><td>${escapeHtml(q.branch)}</td><td><span class="badge ${q.status === 'failed' ? 'badge-red' : q.status === 'completed' ? 'badge-green' : 'badge-yellow'}">${escapeHtml(q.status)}</span></td><td>${q.retry_count || 0}</td><td>${escapeHtml(q.error || '')}</td></tr>`).join('') || '<tr><td colspan="8" style="text-align:center">لا توجد عناصر في صف المزامنة</td></tr>';
-}
-
-function renderLiveBranchPanel() {
-  const host = document.getElementById('liveBranchPanel');
-  if (!host) return;
-  ensureBranches();
-  const state = getLiveSyncState();
-  const branches = filterLiveRowsByScope(DB.branches || [], 'id', 'manager');
-  const scopedBranches = getLiveSyncScopeMode() === 'own' ? (DB.branches || []).filter(b => String(b.id) === String(getLiveBranchMeta().branchId || 'MAIN')) : branches;
-  host.innerHTML = scopedBranches.map(b => {
-    const users = (state.sessions || []).filter(s => String(s.branchId || 'MAIN') === String(b.id) && s.status !== 'offline');
-    const todaySales = (DB.saleInvoices || []).filter(inv => isToday(inv.date) && String(inv.branchId || 'MAIN') === String(b.id)).length;
-    const repairs = (DB.maintenance || []).filter(r => isToday(r.date || r.createdAt) && String(r.branchId || 'MAIN') === String(b.id)).length;
-    const pending = (state.queue || []).filter(q => String(q.branchId || 'MAIN') === String(b.id) && q.status !== 'completed').length;
-    return `<div class="plugin-card"><strong>${escapeHtml(b.name)}</strong> <span class="live-sync-badge ${users.length ? 'online' : 'unknown'}">${users.length ? 'online' : 'unknown'}</span><div class="live-sync-mini">Users: ${users.length} | Sales today: ${todaySales} | Repairs today: ${repairs} | Pending: ${pending}</div></div>`;
-  }).join('') || '<div class="empty-state">لا توجد فروع</div>';
-}
-
-function renderLiveConflictsPanel() {
-  const host = document.getElementById('liveConflictsPanel');
-  if (!host) return;
-  const conflicts = scanLiveSyncConflicts();
-  host.innerHTML = conflicts.slice(0, 20).map(c => `<div class="plugin-card"><strong>${escapeHtml(c.module)} / ${escapeHtml(c.recordId || c.key)}</strong><div class="live-sync-mini">Newest: ${escapeHtml(c.newest || '-')} | Status: ${escapeHtml(c.status)}</div>${canManageLiveSync() && c.status !== 'resolved' ? `<div class="live-sync-actions"><button class="btn btn-outline btn-sm" onclick="resolveLiveConflict('${c.id}','keep_local')">Keep local</button><button class="btn btn-outline btn-sm" onclick="resolveLiveConflict('${c.id}','keep_remote')">Keep remote</button><button class="btn btn-outline btn-sm" onclick="resolveLiveConflict('${c.id}','manual_merge')">Manual merge</button></div>` : ''}</div>`).join('') || '<div class="empty-state">لا توجد صراعات محتملة</div>';
+    <div class="live-sync-mini">Connection: <span class="live-sync-badge ${stats.online ? 'online' : 'offline'}">${stats.online ? 'Online' : 'Offline'}</span>${stats.quality ? ` · Quality: ${escapeHtml(stats.quality)}` : ''}</div>
+    <div class="live-sync-mini">Supabase: <strong>${escapeHtml(stats.supabase)}</strong> | Last Sync: ${escapeHtml(stats.lastSync || '-')}</div>
+    <div class="live-sync-mini">Backend API: <span class="live-sync-badge ${backendStatus.state === 'online' ? 'online' : backendStatus.state === 'error' ? 'error' : 'offline'}">${USE_BACKEND ? escapeHtml(backendStatus.state) : 'disabled'}</span>${backendStatus.lastStatus ? ` (HTTP ${backendStatus.lastStatus})` : ''}${backendStatus.lastError ? ` — ${escapeHtml(backendStatus.lastError)}` : ''}</div>
+    <div class="live-sync-mini">Backend Ops: <strong>${backendOpQueue.pending()}</strong> pending${backendOpQueue.pending() > 0 ? ` <button class="btn btn-outline btn-sm" onclick="backendOpQueue.retryAll()">Retry</button> <button class="btn btn-outline btn-sm" onclick="backendOpQueue.clearAll()">Clear</button>` : ''}</div>`;
 }
 
 // Phase 21B: read-only store divergence report across DB ↔ REST ↔ Gist ↔ Supabase.
@@ -14759,50 +14595,6 @@ function renderLiveReconcilePanel() {
   const report = reconcileAllStores();
   const rows = report.stores.map(s => `<div class="live-sync-mini"><strong>${escapeHtml(s.name)}</strong>: local ${s.total} | REST ${s.rest} | Supabase ${s.supabase} | Gist ${s.gist} | <span class="${s.localOnly ? 'live-sync-badge offline' : 'live-sync-badge online'}">local-only ${s.localOnly}</span> | conflicts ${s.conflicts}</div>`).join('');
   host.innerHTML = rows + `<div class="live-sync-mini" style="margin-top:8px">Total divergence: <strong>${report.divergence}</strong> | Conflicts (${report.conflictsTotal}) · <em>read-only report</em></div>`;
-}
-
-function renderLiveNotificationsPanel() {
-  const host = document.getElementById('liveNotificationsPanel');
-  if (!host) return;
-  const notes = filterLiveRowsByScope((getLiveSyncState().notifications || []).filter(n => !n.archived));
-  host.innerHTML = notes.slice(0, 20).map(n => `<div class="plugin-card"><strong>${escapeHtml(n.title)}</strong><div class="live-sync-mini">${escapeHtml(n.message)} · ${new Date(n.date).toLocaleString('ar-EG')}</div><div class="live-sync-actions">${n.relatedPage ? `<button class="btn btn-outline btn-sm" onclick="showPage('${n.relatedPage}')">Open</button>` : ''}<button class="btn btn-outline btn-sm" onclick="markLiveNotificationRead('${n.id}')">Read</button><button class="btn btn-outline btn-sm" onclick="archiveLiveNotification('${n.id}')">Archive</button></div></div>`).join('') || '<div class="empty-state">لا توجد تنبيهات حية</div>';
-}
-
-function renderLiveSettingsPanel() {
-  const host = document.getElementById('liveSyncSettingsPanel');
-  if (!host) return;
-  const s = getLiveSyncState().settings;
-  host.innerHTML = `
-    <label style="display:flex;gap:8px;margin:8px 0"><input id="liveSetEnabled" type="checkbox" ${s.enabled ? 'checked' : ''}> Live Sync</label>
-    <label style="display:flex;gap:8px;margin:8px 0"><input id="liveSetTrust" type="checkbox" ${s.deviceTrust ? 'checked' : ''}> Device Trust</label>
-    <label style="display:flex;gap:8px;margin:8px 0"><input id="liveSetNotifications" type="checkbox" ${s.notifications ? 'checked' : ''}> Live Notifications</label>
-    <label style="display:flex;gap:8px;margin:8px 0"><input id="liveSetConflicts" type="checkbox" ${s.conflictWarnings ? 'checked' : ''}> Conflict Warnings</label>
-    <label style="display:flex;gap:8px;margin:8px 0"><input id="liveSetOfflineQueue" type="checkbox" ${s.offlineQueue ? 'checked' : ''}> Offline Queue</label>
-    <button class="btn btn-green" onclick="saveLiveSyncSettingsFromPage()">حفظ الإعدادات</button>`;
-}
-
-function syncLiveIntervalControl() {
-  const el = document.getElementById('liveSyncIntervalSelect');
-  if (el) el.value = getLiveSyncState().settings?.pollingInterval || '60';
-}
-
-function saveLiveSyncSettingsFromPage() {
-  const state = getLiveSyncState();
-  const intervalEl = document.getElementById('liveSyncIntervalSelect');
-  const settings = {
-    ...state.settings,
-    enabled: document.getElementById('liveSetEnabled') ? !!document.getElementById('liveSetEnabled').checked : state.settings.enabled,
-    pollingInterval: intervalEl ? intervalEl.value : state.settings.pollingInterval,
-    deviceTrust: document.getElementById('liveSetTrust') ? !!document.getElementById('liveSetTrust').checked : state.settings.deviceTrust,
-    notifications: document.getElementById('liveSetNotifications') ? !!document.getElementById('liveSetNotifications').checked : state.settings.notifications,
-    conflictWarnings: document.getElementById('liveSetConflicts') ? !!document.getElementById('liveSetConflicts').checked : state.settings.conflictWarnings,
-    offlineQueue: document.getElementById('liveSetOfflineQueue') ? !!document.getElementById('liveSetOfflineQueue').checked : state.settings.offlineQueue
-  };
-  saveLiveSyncState({ settings });
-  restartEnterpriseLiveSyncTimer();
-  logLiveSyncAction('settings', 'settings saved');
-  showToast('✅ تم حفظ إعدادات المزامنة الحية');
-  renderEnterpriseLiveSyncPage();
 }
 
 function runLiveSyncRefresh(manual = false) {
@@ -14891,63 +14683,6 @@ function markLiveSessionSuspicious(sessionId) {
   logLiveSyncAction('session_suspicious', sessionId);
   saveLiveSyncState({ sessions: state.sessions });
   renderEnterpriseLiveSyncPage();
-}
-
-function retryFailedLiveSyncQueue() {
-  const state = getLiveSyncState();
-  const queue = (state.queue || []).map(q => q.status === 'failed' ? { ...q, status: 'pending', retry_count: (q.retry_count || 0) + 1, updated_at: new Date().toISOString(), error: '' } : q);
-  saveLiveSyncState({ queue });
-  logLiveSyncAction('queue_retry', 'failed queue retried');
-  renderEnterpriseLiveSyncPage();
-}
-
-function clearCompletedLiveSyncQueue() {
-  const state = getLiveSyncState();
-  const queue = (state.queue || []).filter(q => q.status !== 'completed');
-  saveLiveSyncState({ queue });
-  logLiveSyncAction('queue_cleared', 'completed queue cleared');
-  renderEnterpriseLiveSyncPage();
-}
-
-function exportLiveSyncQueue() {
-  downloadJsonSafe(`digitronics_live_sync_queue_${localDateString()}.json`, { exportedAt: new Date().toISOString(), queue: getLiveSyncState().queue || [] });
-  logLiveSyncAction('queue_export', 'json');
-}
-
-function resolveLiveConflict(conflictId, decision) {
-  if (!canManageLiveSync()) return permissionDenied();
-  const state = getLiveSyncState();
-  const conflicts = (state.conflicts || []).map(c => c.id === conflictId ? { ...c, status: 'resolved', decision, resolvedBy: currentUser?.username || 'system', resolvedAt: new Date().toISOString() } : c);
-  saveLiveSyncState({ conflicts });
-  logLiveSyncAction('conflict_resolved', `${conflictId} ${decision}`);
-  renderEnterpriseLiveSyncPage();
-}
-
-function markLiveNotificationRead(id) {
-  const state = getLiveSyncState();
-  const notifications = (state.notifications || []).map(n => n.id === id ? { ...n, read: true } : n);
-  saveLiveSyncState({ notifications });
-  renderEnterpriseLiveSyncPage();
-}
-
-function archiveLiveNotification(id) {
-  const state = getLiveSyncState();
-  const notifications = (state.notifications || []).map(n => n.id === id ? { ...n, archived: true } : n);
-  saveLiveSyncState({ notifications });
-  renderEnterpriseLiveSyncPage();
-}
-
-function exportLiveSyncReport(type = 'json') {
-  const payload = { exportedAt: new Date().toISOString(), version: LIVE_SYNC_VERSION, state: getLiveSyncState(), device: getCurrentLiveDeviceSnapshot(), stats: getLiveSyncStats() };
-  logLiveSyncAction('export_report', type);
-  if (type === 'json') return downloadJsonSafe(`digitronics_live_sync_${localDateString()}.json`, payload);
-  const rows = ['type,id,name,status,user,branch,last_seen'].concat((payload.state.devices || []).map(d => ['device',d.id,d.name,d.syncStatus,d.user,d.branchName,d.lastSeen].map(v => `"${String(v ?? '').replace(/"/g,'""')}"`).join(','))).join('\n');
-  const blob = new Blob([`\ufeff${rows}`], { type:'text/csv;charset=utf-8;' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `digitronics_live_sync_${localDateString()}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
 }
 
 // ================= ENTERPRISE COMMAND CENTER =================
@@ -16705,13 +16440,6 @@ function showPage(page, options = {}) {
   if (page === 'config-backup') renderConfigurationPage('config-backup');
   if (page === 'config-export') renderConfigurationPage('config-export');
   if (page === 'config-import') renderConfigurationPage('config-import');
-  if (page === 'data-layer') renderDataLayerPage('data-layer');
-  if (page === 'connection-status') renderDataLayerPage('connection-status');
-  if (page === 'storage-providers') renderDataLayerPage('storage-providers');
-  if (page === 'offline-queue') renderDataLayerPage('offline-queue');
-  if (page === 'sync-preview') renderDataLayerPage('sync-preview');
-  if (page === 'repository-status') renderDataLayerPage('repository-status');
-  if (page === 'transaction-preview') renderDataLayerPage('transaction-preview');
   if (page === 'authentication-center') renderAuthPreviewPage('authentication-center');
   if (page === 'auth-preview-users') renderAuthPreviewPage('auth-preview-users');
   if (page === 'auth-preview-roles') renderAuthPreviewPage('auth-preview-roles');

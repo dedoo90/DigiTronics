@@ -267,6 +267,17 @@ const server = http.createServer((req, res) => {
   check('reconcileAllStores() divergence is numeric (read-only)', rec.divergence >= 0, 'divergence=' + rec.divergence);
   check('Live Reconciliation panel renders on Live Sync page', rec.hasPanelEl && rec.panelFilled);
 
+  // Phase 21D — Option B: single status page replaces preview/enterprise sync theater.
+  check('Phase 21D: dataLayer preview script tags removed from page', !/<script src="\.\/services\/dataLayer\//.test(srcCheck));
+  check('Phase 21D: enterprise live-sync theater panels removed (users/devices/sessions/queue/branch/settings/conflicts)',
+    !/id="liveUsersPanel"/.test(srcCheck) && !/id="liveDevicesPanel"/.test(srcCheck) && !/id="liveSessionsPanel"/.test(srcCheck) && !/id="liveSyncQueueTbody"/.test(srcCheck) && !/id="liveBranchPanel"/.test(srcCheck) && !/id="liveSyncSettingsPanel"/.test(srcCheck) && !/id="liveNotificationsPanel"/.test(srcCheck) && !/id="liveConflictsPanel"/.test(srcCheck));
+  check('Phase 21D: cosmetic conflict-resolution UI removed', !/onclick="resolveLiveConflict\(/.test(srcCheck));
+  check('Phase 21D: single status page keeps the Phase 21B reconciliation panel', /id="liveReconcilePanel"/.test(srcCheck));
+  const swCheck = await new Promise((resolve, reject) => {
+    http.get('http://127.0.0.1:' + PORT + '/sw.js', res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)); }).on('error', reject);
+  });
+  check('Phase 21D: sw.js precache drops dead dataLayer preview files', !/services\/dataLayer\//.test(swCheck));
+
   const err0 = errors.length;
   await page.evaluate(() => showPage('products'));
   await page.waitForTimeout(800);

@@ -1,4 +1,4 @@
-const DIGITRONICS_PWA_VERSION = 'omnistore-erp-v44-dashboard-v6-sw-reload-v1';
+const DIGITRONICS_PWA_VERSION = 'omnistore-erp-v44-dashboard-v6-sw-reload-v2';
 const APP_SHELL_CACHE = DIGITRONICS_PWA_VERSION;
 const APP_SHELL_ASSETS = [
   './',
@@ -160,23 +160,6 @@ const APP_SHELL_ASSETS = [
   './templates/config/default-pos.json',
   './templates/config/default-print.json',
   './templates/config/default-theme.json',
-  './services/dataLayer/DataProvider.js',
-  './services/dataLayer/StorageAdapter.js',
-  './services/dataLayer/SupabaseAdapterPreview.js',
-  './services/dataLayer/SQLiteAdapterPreview.js',
-  './services/dataLayer/IndexedDBAdapterPreview.js',
-  './services/dataLayer/MemoryAdapter.js',
-  './services/dataLayer/DataLayerValidator.js',
-  './services/dataLayer/DataRepository.js',
-  './services/dataLayer/TransactionManager.js',
-  './services/dataLayer/SyncManagerPreview.js',
-  './services/dataLayer/ConnectionHealthChecker.js',
-  './services/dataLayer/OfflineQueuePreview.js',
-  './services/dataLayer/ConflictResolverPreview.js',
-  './services/dataLayer/dataLayerUi.js',
-  './templates/dataLayer/provider.template.json',
-  './templates/dataLayer/storage.template.json',
-  './templates/dataLayer/sync.template.json',
   './services/auth/RoleManager.js',
   './services/auth/PermissionEngine.js',
   './services/auth/UserManager.js',
