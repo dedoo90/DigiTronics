@@ -2,6 +2,9 @@ const bcrypt = require('bcryptjs');
 
 const BCRYPT_ROUNDS = 10;
 const BCRYPT_PREFIX = /^\$2[aby]\$/;
+// Fixed hash used only to equalize login timing: when a username is unknown
+// we still pay a bcrypt compare so response time does not reveal existence.
+const DUMMY_HASH = bcrypt.hashSync('eso-enumeration-damping-password', BCRYPT_ROUNDS);
 
 function isBcryptHash(value) {
   return typeof value === 'string' && BCRYPT_PREFIX.test(value);
@@ -27,4 +30,10 @@ function verifyPassword(plain, stored) {
   return { match: candidate === current, needsRehash: candidate === current && current !== '' };
 }
 
-module.exports = { hashPassword, verifyPassword, isBcryptHash };
+// Runs a real bcrypt compare against a fixed dummy hash. Callers invoke this
+// when a lookup fails so the overall cost matches the successful-path compare.
+function verifyDummy(plain) {
+  return verifyPassword(plain, DUMMY_HASH);
+}
+
+module.exports = { hashPassword, verifyPassword, isBcryptHash, verifyDummy };

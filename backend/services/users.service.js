@@ -1,7 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const fileStore = require('../utils/fileStore');
 const logger = require('../utils/logger');
-const { hashPassword, verifyPassword } = require('../utils/password');
+const { hashPassword, verifyPassword, verifyDummy } = require('../utils/password');
 
 const STORE_NAME = 'users';
 
@@ -158,7 +158,12 @@ class UsersService {
 
   authenticate(username, password) {
     const user = this.getByUsername(username);
-    if (!user) return null;
+    if (!user) {
+      // Timing equalization (Phase 22B): pay a bcrypt compare even when the
+      // username is unknown so response time does not reveal existence.
+      verifyDummy(password);
+      return null;
+    }
     const result = verifyPassword(password, user.password);
     if (!result.match) return null;
     if (result.needsRehash) {
