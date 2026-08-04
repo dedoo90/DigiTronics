@@ -11193,7 +11193,7 @@ const digitronicsDataAdapter = {
   async listSales() {
     if (!USE_BACKEND) return DB.saleInvoices;
     try {
-      const res = await backendApi.sales.list();
+      const res = await backendApi.sales.getAll();
       if (res && res.success && Array.isArray(res.data)) {
         return res.data.map(inv => this._normalizeBackendSale(inv));
       }
@@ -11219,7 +11219,7 @@ const digitronicsDataAdapter = {
     if (!USE_BACKEND || this._refreshPending) return;
     this._refreshPending = true;
     try {
-      const res = await backendApi.sales.list();
+      const res = await backendApi.sales.getAll();
       if (!res || !res.success || !Array.isArray(res.data)) return;
       const backendSales = res.data.map(inv => this._normalizeBackendSale(inv));
       const localById = {};

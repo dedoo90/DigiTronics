@@ -219,6 +219,15 @@ const server = http.createServer((req, res) => {
   check('Sales adapter unchanged', sp.s);
   check('Purchases adapter unchanged', sp.p);
 
+  const srcCheck = await new Promise((resolve, reject) => {
+    http.get('http://127.0.0.1:' + PORT + '/' + PAGE, res => {
+      let d = '';
+      res.on('data', c => d += c);
+      res.on('end', () => resolve(d));
+    }).on('error', reject);
+  });
+  check('Sales pull uses getAll() (no sales.list call sites)', !/backendApi\.sales\.list\(/.test(srcCheck));
+
   const err0 = errors.length;
   await page.evaluate(() => showPage('products'));
   await page.waitForTimeout(800);
