@@ -11198,9 +11198,8 @@ const digitronicsDataAdapter = {
     if (!USE_BACKEND) return DB.saleInvoices;
     try {
       const res = await backendApi.sales.getAll();
-      if (res && res.success && Array.isArray(res.data)) {
-        return res.data.map(inv => this._normalizeBackendSale(inv));
-      }
+      const arr = res && res.success ? (Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.invoices) ? res.data.invoices : null)) : null;
+      if (arr) return arr.map(inv => this._normalizeBackendSale(inv));
       return DB.saleInvoices;
     } catch (e) {
       return DB.saleInvoices;
@@ -11224,8 +11223,10 @@ const digitronicsDataAdapter = {
     this._refreshPending = true;
     try {
       const res = await backendApi.sales.getAll();
-      if (!res || !res.success || !Array.isArray(res.data)) return;
-      const backendSales = res.data.map(inv => this._normalizeBackendSale(inv));
+      if (!res || !res.success) return;
+      const arr = Array.isArray(res.data) ? res.data : (res.data && Array.isArray(res.data.invoices) ? res.data.invoices : null);
+      if (!arr) return;
+      const backendSales = arr.map(inv => this._normalizeBackendSale(inv));
       const localById = {};
       (DB.saleInvoices || []).forEach(inv => { const key = inv._backendId || inv.id; localById[key] = inv; });
       const unsyncedKeys = {};
