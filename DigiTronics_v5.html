@@ -13174,12 +13174,6 @@ document.addEventListener('DOMContentLoaded', applyTheme);
 function doLogin() {
   const u = document.getElementById('loginUser').value.trim();
   const p = document.getElementById('loginPass').value;
-  const user = DB.users.find(x => x.username === u && x.password === p);
-  if (!user) {
-    document.getElementById('loginError').style.display = 'block';
-    return;
-  }
-
   const loginBtn = document.getElementById('loginBtn');
 
   const launchApp = (usr) => {
@@ -13207,6 +13201,33 @@ function doLogin() {
     updateGhStatusCard();
     if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 تسجيل الدخول'; }
   };
+
+  // Phase 23B: route through backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.auth) {
+    if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = '⏳ ...'; }
+    backendApi.auth.login(u, p).then(res => {
+      if (!res || !res.success || !res.data || !res.data.user) {
+        document.getElementById('loginError').style.display = 'block';
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 تسجيل الدخول'; }
+        return;
+      }
+      const d = res.data;
+      if (d.accessToken) localStorage.setItem('access_token', d.accessToken);
+      if (d.refreshToken) localStorage.setItem('refresh_token', d.refreshToken);
+      launchApp(d.user);
+    }).catch(() => {
+      document.getElementById('loginError').style.display = 'block';
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = '🔐 تسجيل الدخول'; }
+    });
+    return;
+  }
+
+  // Legacy local fallback
+  const user = DB.users.find(x => x.username === u && x.password === p);
+  if (!user) {
+    document.getElementById('loginError').style.display = 'block';
+    return;
+  }
 
   const proceed = () => {
     if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = '⏳ ...'; }
@@ -13244,6 +13265,12 @@ function doLogin() {
 
 function doLogout() {
   logActivity('تسجيل خروج');
+  // Phase 23B: notify backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.auth) {
+    backendApi.auth.logout().catch(() => {});
+  }
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
   currentUser = null;
   localStorage.removeItem(SESSION_USER_KEY);
   location.reload();
@@ -13252,6 +13279,46 @@ function doLogout() {
 function restoreSessionOnLoad() {
   const rememberedUser = (localStorage.getItem(SESSION_USER_KEY) || '').trim();
   if (!rememberedUser) return false;
+
+  // Phase 23B: restore session from backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.auth && localStorage.getItem('access_token')) {
+    backendApi.auth.me(rememberedUser).then(res => {
+      if (res && res.success && res.data && res.data.user) {
+        const usr = res.data.user;
+        currentUser = usr;
+        ensureBranches();
+        if (!currentUser.branchId) currentUser.branchId = 'MAIN';
+        currentBranchId = currentUser.branchId || 'MAIN';
+        currentUser.branchName = getBranchNameById(currentBranchId);
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('app').style.display = 'block';
+        const elN = document.getElementById('userName');
+        const elR = document.getElementById('userRole');
+        const elA = document.getElementById('userAvatar');
+        const roleLabel = getRoleLabel(usr.role);
+        if (elN) elN.textContent = usr.fullName || usr.username;
+        if (elR) elR.textContent = `${roleLabel} · ${currentUser.branchName || getBranchNameById(currentBranchId)}`;
+        if (elA) elA.textContent = (usr.fullName || usr.username).charAt(0).toUpperCase();
+        applyPermissions();
+        initApp();
+        scheduleSupabaseDiagnosticAutoTest('session-restore');
+        showPage(getDefaultPageForCurrentRole());
+        startUserRegistrationTimer();
+        updateGhStatusCard();
+      } else {
+        localStorage.removeItem(SESSION_USER_KEY);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+      }
+    }).catch(() => {
+      localStorage.removeItem(SESSION_USER_KEY);
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+    });
+    return true;
+  }
+
+  // Legacy local fallback
   const usr = DB.users.find(u => u.username === rememberedUser);
   if (!usr) {
     localStorage.removeItem(SESSION_USER_KEY);
