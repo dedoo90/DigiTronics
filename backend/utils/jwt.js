@@ -1,12 +1,16 @@
 const jwt = require('jsonwebtoken');
+const { randomUUID } = require('crypto');
 const config = require('../config');
 
 const ACCESS_TTL = config.jwtAccessTtl;
 const REFRESH_TTL = config.jwtRefreshTtl;
 const REFRESH_SECRET = config.jwtRefreshSecret;
 
+// Unique jti per issuance: two signings within the same second must yield
+// distinct tokens so token-level revocation can never hit a coincident
+// re-issued credential (Phase 22B auth hardening).
 function _claims(user) {
-  return { sub: String(user.id), username: user.username, role: user.role || '' };
+  return { sub: String(user.id), username: user.username, role: user.role || '', jti: randomUUID() };
 }
 
 function signAccessToken(user) {
