@@ -11328,6 +11328,14 @@ const digitronicsDataAdapter = {
           bs._importedFromBackend = true;
           DB.saleInvoices.push(bs);
           changed = true;
+        } else if (existing && !unsyncedKeys[bs.id] && String(existing.updatedAt || '') < String(bs.updatedAt || '')) {
+          const prevBackendId = existing._backendId || bs.id;
+          Object.assign(existing, bs);
+          existing._syncedToBackend = true;
+          existing._backendId = prevBackendId;
+          existing._importedFromBackend = true;
+          existing._lastSyncedAt = new Date().toISOString();
+          changed = true;
         }
       }
       if (changed) saveDB();
@@ -11412,6 +11420,14 @@ const digitronicsDataAdapter = {
           bs._backendId = bs._backendId || bs.id;
           bs._importedFromBackend = true;
           DB.purchaseInvoices.push(bs);
+          changed = true;
+        } else if (existing && !unsyncedKeys[bs.id] && String(existing.updatedAt || '') < String(bs.updatedAt || '')) {
+          const prevBackendId = existing._backendId || bs.id;
+          Object.assign(existing, bs);
+          existing._syncedToBackend = true;
+          existing._backendId = prevBackendId;
+          existing._importedFromBackend = true;
+          existing._lastSyncedAt = new Date().toISOString();
           changed = true;
         }
       }
@@ -11511,6 +11527,14 @@ const digitronicsDataAdapter = {
           bp._backendId = bp._backendId || bp.id;
           bp._importedFromBackend = true;
           DB.products.push(bp);
+          changed = true;
+        } else if (existing && !unsyncedKeys[bp.id] && String(existing.updatedAt || '') < String(bp.updatedAt || '')) {
+          const prevBackendId = existing._backendId || bp.id;
+          Object.assign(existing, bp);
+          existing._syncedToBackend = true;
+          existing._backendId = prevBackendId;
+          existing._importedFromBackend = true;
+          existing._lastSyncedAt = new Date().toISOString();
           changed = true;
         }
       }
@@ -11672,6 +11696,14 @@ const digitronicsDataAdapter = {
           bc._importedFromBackend = true;
           DB.customers.push(bc);
           changed = true;
+        } else if (existing && !unsyncedKeys[bc.id] && String(existing.updatedAt || '') < String(bc.updatedAt || '')) {
+          const prevBackendId = existing._backendId || bc.id;
+          Object.assign(existing, bc);
+          existing._syncedToBackend = true;
+          existing._backendId = prevBackendId;
+          existing._importedFromBackend = true;
+          existing._lastSyncedAt = new Date().toISOString();
+          changed = true;
         }
       }
       if (changed) saveDB();
@@ -11751,6 +11783,14 @@ const digitronicsDataAdapter = {
           bs._backendId = bs._backendId || bs.id;
           bs._importedFromBackend = true;
           DB.suppliers.push(bs);
+          changed = true;
+        } else if (existing && !unsyncedKeys[bs.id] && String(existing.updatedAt || '') < String(bs.updatedAt || '')) {
+          const prevBackendId = existing._backendId || bs.id;
+          Object.assign(existing, bs);
+          existing._syncedToBackend = true;
+          existing._backendId = prevBackendId;
+          existing._importedFromBackend = true;
+          existing._lastSyncedAt = new Date().toISOString();
           changed = true;
         }
       }
