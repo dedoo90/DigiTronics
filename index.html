@@ -34225,7 +34225,7 @@ function openUserModal() {
   openModal('userModal');
 }
 
-function addNewUser() {
+async function addNewUser() {
   if (!requirePermission('manageUsers')) return;
   const fullName = document.getElementById('newFullName').value.trim();
   const username = document.getElementById('newUsername').value.trim();
@@ -34234,7 +34234,18 @@ function addNewUser() {
   const role = document.getElementById('newRole').value;
   if (!username || !password) { showToast('أدخل اسم المستخدم وكلمة المرور', 'error'); return; }
   if (DB.users.find(u => u.username === username)) { showToast('اسم المستخدم موجود مسبقاً', 'error'); return; }
-  DB.users.push({ username, password, role, fullName, phone, pinVerified: true });
+  const newUser = { username, password, role, fullName, phone, pinVerified: true };
+  // Phase 23B: create in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.users) {
+    try {
+      const res = await backendApi.users.create(newUser);
+      if (res && res.success && res.data) {
+        newUser._backendId = res.data.id || null;
+        newUser._syncedToBackend = true;
+      }
+    } catch (_) {}
+  }
+  DB.users.push(newUser);
   saveDB();
   closeModal('userModal');
   renderUsers();
@@ -34242,9 +34253,14 @@ function addNewUser() {
   logActivity('إضافة مستخدم', username);
 }
 
-function renderUsers() {
+async function renderUsers() {
   const tbody = document.getElementById('usersTbody');
-  const visible = DB.users.filter(u => !u.hidden);
+  // Phase 23B: fetch from backend when enabled
+  let users = DB.users;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { users = await digitronicsDataAdapter.listUsers(); } catch (_) {}
+  }
+  const visible = (users || []).filter(u => !u.hidden);
   const roleLabel = r => r==='Manager'?'👑 أدمن':r==='WarehouseSales'?'🛒 بائع/مخزن':r==='Sales'?'💼 مبيعات':r==='Support'?'🔧 دعم':'👁️ مشاهد';
   tbody.innerHTML = visible.map((u, idx) => `<tr>
     <td>${idx + 1}</td>
@@ -34502,11 +34518,15 @@ function autoSaveCustomer(name, phone) {
 }
 
 
-function deleteUser(username) {
+async function deleteUser(username) {
   if (!isOwnerUser()) { showToast('الحذف متاح للمالك فقط', 'error'); return; }
   if (username === currentUser.username) { showToast('لا يمكن حذف نفسك', 'error'); return; }
   const u = DB.users.find(x => x.username === username);
   if (u && u.hidden) { showToast('لا يمكن حذف هذا المستخدم', 'error'); return; }
+  // Phase 23B: delete in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.users && u && u._backendId) {
+    try { await backendApi.users.delete(u._backendId); } catch (_) {}
+  }
   DB.users = DB.users.filter(x => x.username !== username);
   saveDB();
   renderUsers();
