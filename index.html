@@ -21251,7 +21251,7 @@ function parseProductTagsInput(id) {
   return [...new Set(tags)];
 }
 
-function saveProduct() {
+async function saveProduct() {
   const name = document.getElementById('prodName').value.trim();
   const minStock = parseInt(document.getElementById('prodMinStock').value) || 5;
   const buyPrice = parseFloat(document.getElementById('prodBuy').value) || 0;
@@ -21282,11 +21282,26 @@ function saveProduct() {
   }
 
   const productId = Date.now();
+  const newProduct = { id: productId, name, minStock, buyPrice, sellPrice, hasSerial: false, serial_tracking: false, tracking_type: 'quantity', stockQty: 0, categoryId, brandId, unitId, tags, customFields, barcodeFormat: barcodeSettings.barcode_format, businessType: getCurrentBusinessType(), ...businessFields };
+
+  // Phase 23B: create in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.inventory) {
+    try {
+      const res = await backendApi.inventory.create(newProduct);
+      if (res && res.success && res.data) {
+        newProduct._backendId = res.data.id || null;
+        newProduct._syncedToBackend = true;
+      }
+    } catch (_) {}
+  }
 
   if (hasSerial) {
     const serialsText = document.getElementById('prodSerials').value;
     const serials = serialsText.split(/[\n,]/).map(s => s.trim()).filter(s => s);
-    DB.products.push({ id: productId, name, minStock, buyPrice, sellPrice, hasSerial: true, serial_tracking: true, tracking_type: 'serial', categoryId, brandId, unitId, tags, customFields, barcodeFormat: barcodeSettings.barcode_format, businessType: getCurrentBusinessType(), ...businessFields });
+    newProduct.hasSerial = true;
+    newProduct.serial_tracking = true;
+    newProduct.tracking_type = 'serial';
+    DB.products.push(newProduct);
     serials.forEach(serial => {
       DB.serials.push({ serial, productId, status: 'available', purchaseInvoiceId: null, saleInvoiceId: null, branchId: getCurrentBranchMeta().branchId, branchName: getCurrentBranchMeta().branchName });
     });
@@ -21296,7 +21311,7 @@ function saveProduct() {
     closeModal('productModal'); renderProductsTable();
     showToast(`تم إضافة ${serials.length} سيريال للمنتج ${name}`);
   } else {
-    DB.products.push({ id: productId, name, minStock, buyPrice, sellPrice, hasSerial: false, serial_tracking: false, tracking_type: 'quantity', stockQty: 0, categoryId, brandId, unitId, tags, customFields, barcodeFormat: barcodeSettings.barcode_format, businessType: getCurrentBusinessType(), ...businessFields });
+    DB.products.push(newProduct);
     logProductChange('إضافة منتج', name, `بدون سيريال — الكمية تُضاف من فواتير الشراء`);
     if (!saveDB()) return;
     closeModal('productModal'); renderProductsTable();
@@ -21435,7 +21450,7 @@ function getInvoiceSerialDisplay(serial) {
   return extra.length ? `${value} (${extra.join(' | ')})` : value;
 }
 
-function renderProductsTable(filter = '') {
+async function renderProductsTable(filter = '') {
   const tbody = document.getElementById('productsTbody');
   const dynamicEngine = window.OmniBusinessEngine;
   const currentBusinessType = getCurrentBusinessType();
@@ -21454,7 +21469,11 @@ function renderProductsTable(filter = '') {
   syncSearchInputValue('productSearchInput', 'products');
   filter = getActiveSearch('products');
   const query = String(filter || '').trim().toLowerCase();
+  // Phase 23B: fetch from backend when enabled
   let products = DB.products;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { products = await digitronicsDataAdapter.listProducts(); } catch (_) {}
+  }
   // R1: window the rendered rows so a 10k/100k product DB does not freeze the
   // UI. Data and search are unaffected; only the DOM slice is capped and a
   // notice is shown. The full set is still available via search/filter.
@@ -21735,7 +21754,7 @@ function editProduct(id) {
   openModal('editProductModal');
 }
 
-function saveEditProduct() {
+async function saveEditProduct() {
   const id = parseInt(document.getElementById('editProdId').value);
   const p = DB.products.find(x => Number(x.id) === Number(id));
   if (!p) return;
@@ -21766,6 +21785,11 @@ function saveEditProduct() {
   }
   Object.assign(p, editSchemaPayload.direct);
   p.customFields = editCandidate.customFields;
+  
+  // Phase 23B: update in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.inventory && p._backendId) {
+    try { await backendApi.inventory.update(p._backendId, p); } catch (_) {}
+  }
   
   logProductChange('تعديل منتج', p.name, `من: ${oldName} (${oldBuy}/${oldSell}) إلى: ${escapeHtml(p.name)} (${p.buyPrice}/${p.sellPrice})`);
   
@@ -21893,11 +21917,15 @@ function applyPurchaseAveragesToOldCosts() {
   showToast(`✅ تم تحديث ${rows.length} صنف من متوسط الشراء`);
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
   if (!requirePermission('deleteProducts')) return;
   if (!confirm('هل تريد حذف هذا المنتج؟')) return;
   
   const p = DB.products.find(x => x.id === id);
+  // Phase 23B: delete in backend when enabled
+  if (USE_BACKEND && backendApi && backendApi.inventory && p && p._backendId) {
+    try { await backendApi.inventory.delete(p._backendId); } catch (_) {}
+  }
   DB.products = DB.products.filter(x => x.id !== id);
   DB.serials = DB.serials.filter(s => s.productId !== id);
   
