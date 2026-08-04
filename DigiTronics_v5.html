@@ -22966,7 +22966,7 @@ function openCustomerModal() {
   openModal('customerModal');
 }
 
-function saveCustomer() {
+async function saveCustomer() {
   const name = document.getElementById('custName').value.trim();
   const phone = document.getElementById('custPhone').value.trim();
   const phone2 = (document.getElementById('custPhone2')?.value || '').trim();
@@ -22990,9 +22990,21 @@ function saveCustomer() {
     exists.balance = Number.isFinite(balance) ? balance : 0;
     if (typeof exists.points !== 'number') exists.points = 0;
     exists.updatedAt = new Date().toISOString();
+    // Phase 23B: update in backend when enabled
+    if (USE_BACKEND && backendApi && backendApi.customers && exists._backendId) {
+      try { await backendApi.customers.update(exists._backendId, exists); } catch (_) {}
+    }
   } else {
     const now = new Date().toISOString();
-    DB.customers.push({ id: Date.now(), name, phone, phone2, address, notes, balance, points: 0, registrationDate: now, createdAt: now, updatedAt: now });
+    const newCustomer = { id: Date.now(), name, phone, phone2, address, notes, balance, points: 0, registrationDate: now, createdAt: now, updatedAt: now };
+    // Phase 23B: create in backend when enabled
+    if (USE_BACKEND && backendApi && backendApi.customers) {
+      try {
+        const res = await backendApi.customers.create(newCustomer);
+        if (res && res.success && res.data) { newCustomer._backendId = res.data.id || null; newCustomer._syncedToBackend = true; }
+      } catch (_) {}
+    }
+    DB.customers.push(newCustomer);
   }
   logAudit(exists ? 'تعديل عميل' : 'إضافة عميل', `${name} - ${phone || '-'}`, {
     module: 'crm',
@@ -23009,9 +23021,13 @@ function saveCustomer() {
   showToast('تم إضافة العميل');
 }
 
-function renderCustomersTable(filter = '') {
+async function renderCustomersTable(filter = '') {
   const tbody = document.getElementById('customersTbody');
+  // Phase 23B: fetch from backend when enabled
   let customers = DB.customers;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { customers = await digitronicsDataAdapter.listCustomers(); } catch (_) {}
+  }
   if (filter) customers = customers.filter(c => c.name.toLowerCase().includes(filter.toLowerCase()) || (c.phone && c.phone.includes(filter)));
   
   tbody.innerHTML = customers.slice(0, 100).map((c, idx) => {
