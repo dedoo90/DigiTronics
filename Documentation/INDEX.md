@@ -17,7 +17,7 @@
 | Phase 23D | HTML Consolidation | RELEASED | `Phase23D/` | phase23d-release |
 | Phase 23E | Database Schema Evolution | RELEASED | `Phase23E/` | phase23e-release |
 | Phase 23F | Performance & Optimization | RELEASED | `Phase23F/` | phase23f-release |
-| Phase 24 | API Foundation & Authentication | PLANNING ONLY | `Phase24/` | - |
+| Phase 24 | API Foundation & Authentication | PLANNING REVISION REQUIRED | `Phase24/` | - |
 
 ---
 
@@ -122,6 +122,10 @@
 | Rollback Plan | `Phase24/PHASE24_ROLLBACK_PLAN.md` |
 | Risk Register | `Phase24/PHASE24_RISK_REGISTER.md` |
 | Gate A Report | `Phase24/PHASE24_GATE_A_REPORT.md` |
+| Gate B Report | `Phase24/PHASE24_GATE_B_REPORT.md` |
+| Gate B Master Report | `Phase24/PHASE24_GATE_B_MASTER_REPORT.md` |
+| Findings Validation | `Phase24/PHASE24_FINDINGS_VALIDATION.md` |
+| Architecture Verification | `Phase24/PHASE24_ARCHITECTURE_VERIFICATION.md` |
 | Master Report | `Phase24/PHASE24_MASTER_REPORT.md` |
 
 ---
