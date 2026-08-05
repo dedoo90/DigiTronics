@@ -16,7 +16,7 @@
 | Phase 23C | Architecture & Technical Debt Assessment | APPROVED - Completed | `Phase23C/` | phase23c-docs |
 | Phase 23D | HTML Consolidation | RELEASED | `Phase23D/` | phase23d-release |
 | Phase 23E | Database Schema Evolution | RELEASED | `Phase23E/` | phase23e-release |
-| Phase 23F | Performance & Optimization | Pending | `Phase23F/` | |
+| Phase 23F | Performance & Optimization | RELEASED | `Phase23F/` | phase23f-release |
 
 ---
 
@@ -90,7 +90,17 @@
 
 | Document | Path |
 |----------|------|
-| (Pending) | `Phase23F/` |
+| Performance Audit | `Phase23F/PHASE23F_PERFORMANCE_AUDIT.md` |
+| Optimization Plan | `Phase23F/PHASE23F_OPTIMIZATION_PLAN.md` |
+| Test Optimization | `Phase23F/PHASE23F_TEST_OPTIMIZATION.md` |
+| Production Optimization | `Phase23F/PHASE23F_PRODUCTION_OPTIMIZATION.md` |
+| Final Validation | `Phase23F/PHASE23F_FINAL_VALIDATION.md` |
+| Final Release Report | `Phase23F/PHASE23F_FINAL_RELEASE_REPORT.md` |
+| Gate A Report | `Phase23F/PHASE23F_GATE_A_REPORT.md` |
+| Gate B Report | `Phase23F/PHASE23F_GATE_B_REPORT.md` |
+| Gate C Report | `Phase23F/PHASE23F_GATE_C_REPORT.md` |
+| Gate D Report | `Phase23F/PHASE23F_GATE_D_REPORT.md` |
+| Gate E Report | `Phase23F/PHASE23F_GATE_E_REPORT.md` |
 
 ---
 
