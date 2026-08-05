@@ -14666,7 +14666,7 @@ async function refreshPwaCache() {
   }
   try {
     const cache = await caches.open('digitronics-pwa-enterprise-v1');
-    await cache.addAll(['./', 'DigiTronics_v5.html', 'manifest.json', 'icons/digitronics-icon-192.svg', 'icons/digitronics-icon-512.svg']);
+    await cache.addAll(['./', 'index.html', 'manifest.json', 'icons/digitronics-icon-192.svg', 'icons/digitronics-icon-512.svg']);
     savePwaState({ lastCacheRefresh: new Date().toISOString(), updateAvailable: false });
     logPwaAudit('cache_refresh', 'App shell cache refreshed');
     showToast('✅ تم تحديث كاش التطبيق');

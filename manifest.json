@@ -1,11 +1,11 @@
 {
-  "id": "/DigiTronics_v5.html",
+  "id": "/index.html",
   "name": "OmniStore ERP",
   "short_name": "OmniStore",
   "description": "OmniStore ERP — configurable inventory, invoicing and business management.",
   "lang": "ar",
   "dir": "rtl",
-  "start_url": "./DigiTronics_v5.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "display_override": ["window-controls-overlay", "standalone", "minimal-ui", "browser"],
@@ -67,13 +67,13 @@
     {
       "name": "نقطة البيع",
       "short_name": "بيع",
-      "url": "./DigiTronics_v5.html#pos",
+      "url": "./index.html#pos",
       "icons": [{ "src": "icons/digitronics-icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" }]
     },
     {
       "name": "بحث بالسيريال",
       "short_name": "سيريال",
-      "url": "./DigiTronics_v5.html#serialsearch",
+      "url": "./index.html#serialsearch",
       "icons": [{ "src": "icons/digitronics-icon-192.svg", "sizes": "192x192", "type": "image/svg+xml" }]
     }
   ]

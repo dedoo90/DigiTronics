@@ -3,7 +3,6 @@ const APP_SHELL_CACHE = DIGITRONICS_PWA_VERSION;
 const APP_SHELL_ASSETS = [
   './',
   './index.html',
-  './DigiTronics_v5.html',
   './services/businessEngine/registry.js',
   './services/businessEngine/businessEngine.js',
   './services/modulePlatform/moduleRegistry.js',
@@ -415,7 +414,7 @@ self.addEventListener('fetch', event => {
         const copy = response.clone();
         caches.open(APP_SHELL_CACHE).then(cache => cache.put(request, copy)).catch(() => {});
         return response;
-      }).catch(() => cached || caches.match('./index.html') || caches.match('./DigiTronics_v5.html'));
+      }).catch(() => cached || caches.match('./index.html'));
       return cached || network;
     })
   );
