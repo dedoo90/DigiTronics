@@ -14,8 +14,8 @@
 | Phase 22C | Unknown | Placeholder | `Phase22C/` | |
 | Phase 23 | Backend Migration | Complete | `Phase23/` | phase23b-stable |
 | Phase 23C | Architecture & Technical Debt Assessment | APPROVED - Completed | `Phase23C/` | phase23c-docs |
-| Phase 23D | HTML Consolidation | Pending Review (Redesigned) | `Phase23D/` | phase23d-docs |
-| Phase 23E | Legacy Cleanup | Pending | `Phase23E/` | |
+| Phase 23D | HTML Consolidation | RELEASED | `Phase23D/` | phase23d-release |
+| Phase 23E | Database Schema Evolution | RELEASED | `Phase23E/` | phase23e-release |
 | Phase 23F | Performance & Optimization | Pending | `Phase23F/` | |
 
 ---
@@ -70,7 +70,19 @@
 
 | Document | Path |
 |----------|------|
-| (Pending) | `Phase23E/` |
+| Schema Audit | `Phase23E/PHASE23E_SCHEMA_AUDIT.md` |
+| Migration Plan | `Phase23E/PHASE23E_MIGRATION_PLAN.md` |
+| Backup Plan | `Phase23E/PHASE23E_BACKUP_PLAN.md` |
+| Test Migration | `Phase23E/PHASE23E_TEST_MIGRATION.md` |
+| Production Migration | `Phase23E/PHASE23E_PRODUCTION_MIGRATION.md` |
+| Post-Migration Validation | `Phase23E/PHASE23E_POST_MIGRATION_VALIDATION.md` |
+| Final Release Report | `Phase23E/PHASE23E_FINAL_RELEASE_REPORT.md` |
+| Gate A Report | `Phase23E/PHASE23E_GATE_A_REPORT.md` |
+| Gate B Report | `Phase23E/PHASE23E_GATE_B_REPORT.md` |
+| Gate C Report | `Phase23E/PHASE23E_GATE_C_REPORT.md` |
+| Gate D Report | `Phase23E/PHASE23E_GATE_D_REPORT.md` |
+| Gate E Report | `Phase23E/PHASE23E_GATE_E_REPORT.md` |
+| Gate F Report | `Phase23E/PHASE23E_GATE_F_REPORT.md` |
 
 ---
 
