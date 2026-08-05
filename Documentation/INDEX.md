@@ -104,6 +104,20 @@
 
 ---
 
+## Roadmap Documents
+
+| Document | Path |
+|----------|------|
+| Product Vision | `Roadmap/PRODUCT_VISION.md` |
+| Project Roadmap V2 | `Roadmap/PROJECT_ROADMAP_V2.md` |
+| Feature Backlog | `Roadmap/FEATURE_BACKLOG.md` |
+| Enterprise Gap Analysis | `Roadmap/ENTERPRISE_GAP_ANALYSIS.md` |
+| Technical Debt Register | `Roadmap/TECHNICAL_DEBT_REGISTER.md` |
+| Architecture Evolution | `Roadmap/ARCHITECTURE_EVOLUTION_PLAN.md` |
+| Roadmap Report | `Roadmap/PROJECT_ROADMAP_V2_REPORT.md` |
+
+---
+
 ## How to Use This Index
 
 1. Find the phase you're looking for in the table above
