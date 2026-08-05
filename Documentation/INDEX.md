@@ -17,7 +17,7 @@
 | Phase 23D | HTML Consolidation | RELEASED | `Phase23D/` | phase23d-release |
 | Phase 23E | Database Schema Evolution | RELEASED | `Phase23E/` | phase23e-release |
 | Phase 23F | Performance & Optimization | RELEASED | `Phase23F/` | phase23f-release |
-| Phase 24 | API Foundation & Authentication | PLANNING REVISION REQUIRED | `Phase24/` | - |
+| Phase 24 | API Foundation & Authentication | REVISED - READY FOR GATE B RE-APPROVAL | `Phase24/` | - |
 
 ---
 
@@ -126,6 +126,7 @@
 | Gate B Master Report | `Phase24/PHASE24_GATE_B_MASTER_REPORT.md` |
 | Findings Validation | `Phase24/PHASE24_FINDINGS_VALIDATION.md` |
 | Architecture Verification | `Phase24/PHASE24_ARCHITECTURE_VERIFICATION.md` |
+| Revision Report | `Phase24/PHASE24_REVISION_REPORT.md` |
 | Master Report | `Phase24/PHASE24_MASTER_REPORT.md` |
 
 ---
