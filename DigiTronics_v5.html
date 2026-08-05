@@ -37604,165 +37604,178 @@ function onVoucherPartySelect() {
   if (balance > 0) document.getElementById('vchAmount').value = Math.abs(balance).toFixed(2);
 }
 
-function saveVoucher() {
-  if (!requirePermission('editTreasury')) return;
-  const type = document.getElementById('vchType').value;
-  const partyType = document.getElementById('vchPartyType').value;
-  const amount = parseFloat(document.getElementById('vchAmount').value) || 0;
-  const method = document.getElementById('vchMethod').value;
-  const desc = document.getElementById('vchDesc').value.trim();
-  const date = document.getElementById('vchDate').value || localDateString();
-  const voucherDate = localDateWithCurrentTime(date);
-  const phone = document.getElementById('vchPhone').value.trim();
+async function saveVoucher() {
+   if (!requirePermission('editTreasury')) return;
+   const type = document.getElementById('vchType').value;
+   const partyType = document.getElementById('vchPartyType').value;
+   const amount = parseFloat(document.getElementById('vchAmount').value) || 0;
+   const method = document.getElementById('vchMethod').value;
+   const desc = document.getElementById('vchDesc').value.trim();
+   const date = document.getElementById('vchDate').value || localDateString();
+   const voucherDate = localDateWithCurrentTime(date);
+   const phone = document.getElementById('vchPhone').value.trim();
 
-  if (!amount || amount <= 0) { showToast('أدخل مبلغاً صحيحاً', 'error'); return; }
-  if (!desc) { showToast('أدخل بيان السند', 'error'); return; }
+   if (!amount || amount <= 0) { showToast('أدخل مبلغاً صحيحاً', 'error'); return; }
+   if (!desc) { showToast('أدخل بيان السند', 'error'); return; }
 
-  const isProfitDist = type === 'profit_distribution';
+   const isProfitDist = type === 'profit_distribution';
 
-  let partyName = '', partyId = null;
-  if (isProfitDist) {
-    partyId = document.getElementById('vchPartySelect').value;
-    const partner = (DB.capitalPartners || []).find(x => String(x.id) === String(partyId));
-    if (!partner) { showToast('اختر الشريك', 'error'); return; }
-    partyName = partner.name;
-  } else if (partyType === 'other') {
-    partyName = document.getElementById('vchPartyText').value.trim();
-    if (!partyName) { showToast('أدخل اسم الطرف', 'error'); return; }
-  } else {
-    partyId = document.getElementById('vchPartySelect').value;
-    const list = partyType === 'customer' ? DB.customers : DB.suppliers;
-    const entity = list.find(x => x.id == partyId);
-    if (!entity) { showToast('اختر ' + (partyType === 'customer' ? 'العميل' : 'المورد'), 'error'); return; }
-    partyName = entity.name;
-  }
+   let partyName = '', partyId = null;
+   if (isProfitDist) {
+     partyId = document.getElementById('vchPartySelect').value;
+     const partner = (DB.capitalPartners || []).find(x => String(x.id) === String(partyId));
+     if (!partner) { showToast('اختر الشريك', 'error'); return; }
+     partyName = partner.name;
+   } else if (partyType === 'other') {
+     partyName = document.getElementById('vchPartyText').value.trim();
+     if (!partyName) { showToast('أدخل اسم الطرف', 'error'); return; }
+   } else {
+     partyId = document.getElementById('vchPartySelect').value;
+     const list = partyType === 'customer' ? DB.customers : DB.suppliers;
+     const entity = list.find(x => x.id == partyId);
+     if (!entity) { showToast('اختر ' + (partyType === 'customer' ? 'العميل' : 'المورد'), 'error'); return; }
+     partyName = entity.name;
+   }
 
-  DB.vouchers = DB.vouchers || [];
-  const nextNum = getVchNextNum();
-  const vchId = isProfitDist
-    ? 'PRF-' + String(nextNum).padStart(5, '0')
-    : (type === 'receipt' ? 'RCV-' : 'PAY-') + String(nextNum).padStart(5, '0');
+   DB.vouchers = DB.vouchers || [];
+   const nextNum = getVchNextNum();
+   const vchId = isProfitDist
+     ? 'PRF-' + String(nextNum).padStart(5, '0')
+     : (type === 'receipt' ? 'RCV-' : 'PAY-') + String(nextNum).padStart(5, '0');
 
-  const voucher = {
-    id: vchId,
-    type: isProfitDist ? 'payment' : type,  // treasury: always 'payment' type for profit dist
-    voucherType: isProfitDist ? 'profit_distribution' : undefined,
-    partyType: isProfitDist ? 'partner' : partyType,
-    partyId,
-    partyName,
-    phone: isProfitDist ? '' : phone,
-    amount,
-    method: isProfitDist ? 'cash' : method,
-    desc,
-    date: voucherDate,
-    user: currentUser ? currentUser.username : 'system'
-  };
-  if (isProfitDist) {
-    const branchId = document.getElementById('financeBranchFilter')?.value || 'MAIN';
-    voucher.transactionCategory = 'partner_profit';
-    voucher.referenceType = 'partner_profit';
-    voucher.referenceId = `PRF-${nextNum}`;
-    voucher.branchId = branchId;
-    voucher.branchName = getBranchNameById(branchId);
-  }
+   const voucher = {
+     id: vchId,
+     type: isProfitDist ? 'payment' : type,  // treasury: always 'payment' type for profit dist
+     voucherType: isProfitDist ? 'profit_distribution' : undefined,
+     partyType: isProfitDist ? 'partner' : partyType,
+     partyId,
+     partyName,
+     phone: isProfitDist ? '' : phone,
+     amount,
+     method: isProfitDist ? 'cash' : method,
+     desc,
+     date: voucherDate,
+     user: currentUser ? currentUser.username : 'system'
+   };
+   if (isProfitDist) {
+     const branchId = document.getElementById('financeBranchFilter')?.value || 'MAIN';
+     voucher.transactionCategory = 'partner_profit';
+     voucher.referenceType = 'partner_profit';
+     voucher.referenceId = `PRF-${nextNum}`;
+     voucher.branchId = branchId;
+     voucher.branchName = getBranchNameById(branchId);
+   }
 
-  DB.vouchers.push(voucher);
+   // Phase 23B: create in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.vouchers) {
+     try {
+       const res = await backendApi.vouchers.create(voucher);
+       if (res && res.success && res.data) { voucher._backendId = res.data.id || null; voucher._syncedToBackend = true; }
+     } catch (_) {}
+   }
 
-  // Update cash flow — always creates a cash outflow for profit distributions
-  const cashType = type === 'receipt' ? 'in' : 'out';
-  const cashMeta = isProfitDist ? {
-    referenceType: 'partner_profit',
-    referenceId: vchId,
-    entryKind: 'partner_profit_share',
-    sourceModule: 'capital-partners',
-    branchId: voucher.branchId,
-    branchName: voucher.branchName
-  } : {};
-  addCashEntry(cashType, amount, method,
-    `${isProfitDist ? 'توزيع أرباح' : type === 'receipt' ? 'سند قبض' : 'سند صرف'} #${vchId} - ${partyName} - ${desc}`,
-    voucherDate, cashMeta);
+   DB.vouchers.push(voucher);
 
-  // NOTE: the voucher record pushed above is already part of the AR/AP transaction
-  // ledger (getCustomerArApTransactions / getSupplierArApTransactions). Debt is derived
-  // from that ledger, so we must NOT also mutate customer.balance / supplier.balance
-  // here — doing so double-counts the payment.
+   // Update cash flow — always creates a cash outflow for profit distributions
+   const cashType = type === 'receipt' ? 'in' : 'out';
+   const cashMeta = isProfitDist ? {
+     referenceType: 'partner_profit',
+     referenceId: vchId,
+     entryKind: 'partner_profit_share',
+     sourceModule: 'capital-partners',
+     branchId: voucher.branchId,
+     branchName: voucher.branchName
+   } : {};
+   addCashEntry(cashType, amount, method,
+     `${isProfitDist ? 'توزيع أرباح' : type === 'receipt' ? 'سند قبض' : 'سند صرف'} #${vchId} - ${partyName} - ${desc}`,
+     voucherDate, cashMeta);
 
-  logActivity(isProfitDist ? 'توزيع أرباح' : type === 'receipt' ? 'سند قبض' : 'سند صرف',
-    `#${vchId} - ${partyName} - ${formatMoney(amount)}`);
+   // NOTE: the voucher record pushed above is already part of the AR/AP transaction
+   // ledger (getCustomerArApTransactions / getSupplierArApTransactions). Debt is derived
+   // from that ledger, so we must NOT also mutate customer.balance / supplier.balance
+   // here — doing so double-counts the payment.
 
-  saveDB();
-  closeModal('voucherModal');
-  renderVouchers();
-  showToast(`✅ تم حفظ ${isProfitDist ? 'توزيع الأرباح' : type === 'receipt' ? 'سند القبض' : 'سند الصرف'} #${vchId}`);
+   logActivity(isProfitDist ? 'توزيع أرباح' : type === 'receipt' ? 'سند قبض' : 'سند صرف',
+     `#${vchId} - ${partyName} - ${formatMoney(amount)}`);
 
-  // Auto-print
-  printVoucher(voucher);
-}
+   saveDB();
+   closeModal('voucherModal');
+   renderVouchers();
+   showToast(`✅ تم حفظ ${isProfitDist ? 'توزيع الأرباح' : type === 'receipt' ? 'سند القبض' : 'سند الصرف'} #${vchId}`);
 
-function renderVouchers() {
-  DB.vouchers = DB.vouchers || [];
-  let vouchers = [...DB.vouchers].sort((a, b) => new Date(b.date) - new Date(a.date));
+   // Auto-print
+   printVoucher(voucher);
+ }
 
-  const filterType = document.getElementById('vchFilterType')?.value || '';
-  const filterParty = document.getElementById('vchFilterParty')?.value || '';
-  const filterFrom = document.getElementById('vchFilterFrom')?.value || '';
-  const filterTo = document.getElementById('vchFilterTo')?.value || '';
+async function renderVouchers() {
+   DB.vouchers = DB.vouchers || [];
+   // Phase 23B: fetch from backend when enabled
+   let vouchers = DB.vouchers;
+   if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+     try { vouchers = await digitronicsDataAdapter.listVouchers(); } catch (_) {}
+   }
+   let sorted = [...vouchers].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-  if (filterType === 'profit_distribution') {
-    vouchers = vouchers.filter(v => v.voucherType === 'profit_distribution');
-  } else if (filterType) {
-    vouchers = vouchers.filter(v => v.type === filterType);
-  }
-  if (filterParty) vouchers = vouchers.filter(v => v.partyType === filterParty);
-  if (filterFrom) vouchers = vouchers.filter(v => new Date(v.date) >= new Date(filterFrom + 'T00:00:00'));
-  if (filterTo) {
-    const toEnd = new Date(filterTo + 'T23:59:59');
-    vouchers = vouchers.filter(v => new Date(v.date) <= toEnd);
-  }
+   const filterType = document.getElementById('vchFilterType')?.value || '';
+   const filterParty = document.getElementById('vchFilterParty')?.value || '';
+   const filterFrom = document.getElementById('vchFilterFrom')?.value || '';
+   const filterTo = document.getElementById('vchFilterTo')?.value || '';
 
-  const totalReceipt = vouchers.filter(v => v.type === 'receipt').reduce((s, v) => s + v.amount, 0);
-  const totalPayment = vouchers.filter(v => v.type === 'payment').reduce((s, v) => s + v.amount, 0);
-  document.getElementById('vch-receipt-total').textContent = formatMoney(totalReceipt);
-  document.getElementById('vch-payment-total').textContent = formatMoney(totalPayment);
-  document.getElementById('vch-count').textContent = vouchers.length;
-  const net = totalReceipt - totalPayment;
-  const netEl = document.getElementById('vch-net');
-  netEl.textContent = formatMoney(Math.abs(net));
-  netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+   if (filterType === 'profit_distribution') {
+     sorted = sorted.filter(v => v.voucherType === 'profit_distribution');
+   } else if (filterType) {
+     sorted = sorted.filter(v => v.type === filterType);
+   }
+   if (filterParty) sorted = sorted.filter(v => v.partyType === filterParty);
+   if (filterFrom) sorted = sorted.filter(v => new Date(v.date) >= new Date(filterFrom + 'T00:00:00'));
+   if (filterTo) {
+     const toEnd = new Date(filterTo + 'T23:59:59');
+     sorted = sorted.filter(v => new Date(v.date) <= toEnd);
+   }
 
-  const tbody = document.getElementById('vouchersTbody');
-  tbody.innerHTML = vouchers.map(v => {
-    const isProfitDist = v.voucherType === 'profit_distribution';
-    const isReceipt = v.type === 'receipt' && !isProfitDist;
-    const partyBadge = v.partyType === 'customer'
-      ? '<span class="badge badge-blue">عميل</span>'
-      : v.partyType === 'supplier'
-      ? '<span class="badge badge-yellow">مورد</span>'
-      : v.partyType === 'partner'
-      ? '<span class="badge" style="background:rgba(0,200,83,.15);color:rgb(0,200,83)">شريك</span>'
-      : '<span class="badge" style="background:rgba(124,58,237,.15);color:var(--purple)">أخرى</span>';
-    return `<tr>
-      <td style="font-weight:700;font-family:monospace">${v.id}</td>
-      <td>${new Date(v.date).toLocaleDateString('ar-EG')}</td>
-      <td>${isProfitDist
-        ? '<span class="badge" style="background:rgba(0,200,83,.15);color:rgb(0,200,83)">₿ توزيع أرباح</span>'
-        : isReceipt
-        ? '<span class="badge badge-green">📥 قبض</span>'
-        : '<span class="badge badge-red">📤 صرف</span>'}</td>
-      <td>${partyBadge} ${v.partyName}</td>
-      <td style="font-size:0.78rem">${v.desc}</td>
-      <td>${getPaymentLabel(v.method)}</td>
-      <td style="font-weight:700;color:${isReceipt ? 'var(--green)' : 'var(--red)'}">${formatMoney(v.amount)}</td>
-      <td>${v.user || '-'}</td>
-      <td>
-        <button class="btn btn-sm btn-accent" onclick="printVoucher(DB.vouchers.find(x=>x.id==='${v.id}'))">🖨️</button>
-        <button class="btn btn-sm btn-green" onclick="shareVoucherWhatsApp(DB.vouchers.find(x=>x.id==='${v.id}'))">📱</button>
-        <button class="btn btn-sm btn-yellow" onclick="exportVoucherImg('${v.id}')">📤</button>
-        ${can('deleteData') ? `<button class="btn btn-sm btn-danger" onclick="deleteVoucher('${v.id}')">🗑️</button>` : ''}
-      </td>
-    </tr>`;
-  }).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px">لا توجد سندات</td></tr>';
-}
+   const totalReceipt = sorted.filter(v => v.type === 'receipt').reduce((s, v) => s + v.amount, 0);
+   const totalPayment = sorted.filter(v => v.type === 'payment').reduce((s, v) => s + v.amount, 0);
+   document.getElementById('vch-receipt-total').textContent = formatMoney(totalReceipt);
+   document.getElementById('vch-payment-total').textContent = formatMoney(totalPayment);
+   document.getElementById('vch-count').textContent = sorted.length;
+   const net = totalReceipt - totalPayment;
+   const netEl = document.getElementById('vch-net');
+   netEl.textContent = formatMoney(Math.abs(net));
+   netEl.style.color = net >= 0 ? 'var(--green)' : 'var(--red)';
+
+   const tbody = document.getElementById('vouchersTbody');
+   tbody.innerHTML = sorted.map(v => {
+     const isProfitDist = v.voucherType === 'profit_distribution';
+     const isReceipt = v.type === 'receipt' && !isProfitDist;
+     const partyBadge = v.partyType === 'customer'
+       ? '<span class="badge badge-blue">عميل</span>'
+       : v.partyType === 'supplier'
+       ? '<span class="badge badge-yellow">مورد</span>'
+       : v.partyType === 'partner'
+       ? '<span class="badge" style="background:rgba(0,200,83,.15);color:rgb(0,200,83)">شريك</span>'
+       : '<span class="badge" style="background:rgba(124,58,237,.15);color:var(--purple)">أخرى</span>';
+     return `<tr>
+       <td style="font-weight:700;font-family:monospace">${v.id}</td>
+       <td>${new Date(v.date).toLocaleDateString('ar-EG')}</td>
+       <td>${isProfitDist
+         ? '<span class="badge" style="background:rgba(0,200,83,.15);color:rgb(0,200,83)">₿ توزيع أرباح</span>'
+         : isReceipt
+         ? '<span class="badge badge-green">📥 قبض</span>'
+         : '<span class="badge badge-red">📤 صرف</span>'}</td>
+       <td>${partyBadge} ${v.partyName}</td>
+       <td style="font-size:0.78rem">${v.desc}</td>
+       <td>${getPaymentLabel(v.method)}</td>
+       <td style="font-weight:700;color:${isReceipt ? 'var(--green)' : 'var(--red)'}">${formatMoney(v.amount)}</td>
+       <td>${v.user || '-'}</td>
+       <td>
+         <button class="btn btn-sm btn-accent" onclick="printVoucher(DB.vouchers.find(x=>x.id==='${v.id}'))">🖨️</button>
+         <button class="btn btn-sm btn-green" onclick="shareVoucherWhatsApp(DB.vouchers.find(x=>x.id==='${v.id}'))">📱</button>
+         <button class="btn btn-sm btn-yellow" onclick="exportVoucherImg('${v.id}')">📤</button>
+         ${can('deleteData') ? `<button class="btn btn-sm btn-danger" onclick="deleteVoucher('${v.id}')">🗑️</button>` : ''}
+       </td>
+     </tr>`;
+   }).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px">لا توجد سندات</td></tr>';
+ }
 
 function clearVoucherFilter() {
   document.getElementById('vchFilterType').value = '';
@@ -37772,14 +37785,19 @@ function clearVoucherFilter() {
   renderVouchers();
 }
 
-function deleteVoucher(id) {
-  if (!requirePermission('editTreasury')) return;
-  if (!confirm('هل تريد حذف هذا السند؟')) return;
-  DB.vouchers = (DB.vouchers || []).filter(v => v.id !== id);
-  saveDB();
-  renderVouchers();
-  showToast('تم حذف السند');
-}
+async function deleteVoucher(id) {
+   if (!requirePermission('editTreasury')) return;
+   if (!confirm('هل تريد حذف هذا السند؟')) return;
+   const voucher = (DB.vouchers || []).find(v => v.id === id);
+   DB.vouchers = (DB.vouchers || []).filter(v => v.id !== id);
+   // Phase 23B: delete in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.vouchers && voucher && voucher._backendId) {
+     try { await backendApi.vouchers.delete(voucher._backendId); } catch (_) {}
+   }
+   saveDB();
+   renderVouchers();
+   showToast('تم حذف السند');
+ }
 
 function printVoucher(voucher) {
   if (!voucher) return;
