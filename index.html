@@ -29828,77 +29828,77 @@ function editEmployee(id) {
   openModal('employeeModal');
 }
 
-function saveEmployee() {
-  if (!requirePermission('manageEmployees')) return;
-  const name = document.getElementById('empName').value.trim();
-  const position = document.getElementById('empPosition').value.trim();
-  const phone = (document.getElementById('empPhone')?.value || '').trim();
-  const phone2 = (document.getElementById('empPhone2')?.value || '').trim();
-  const address = (document.getElementById('empAddress')?.value || '').trim();
-  const hireDate = document.getElementById('empHireDate')?.value || '';
-  const branchId = document.getElementById('empBranch')?.value || currentBranchId || 'MAIN';
-  const status = document.getElementById('empStatus')?.value || 'active';
-  const username = (document.getElementById('empUsername')?.value || '').trim();
-  const notes = (document.getElementById('empNotes')?.value || '').trim();
-  const salary = parseFloat(document.getElementById('empSalary').value) || 0;
-  const commission = parseFloat(document.getElementById('empCommission').value) || 0;
-  const bonus = parseFloat(document.getElementById('empBonus').value) || 0;
-  const advance = parseFloat(document.getElementById('empAdvance').value) || 0;
-  const vacationDays = parseInt(document.getElementById('empVacationDays').value, 10) || 0;
-  
-  if (!name) { showToast('أدخل اسم الموظف', 'error'); return; }
-  
-  if (editingEmployeeId) {
-    const emp = DB.employees.find(e => e.id === editingEmployeeId);
-    if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
-    emp.name = name;
-    emp.position = position;
-    emp.phone = phone;
-    emp.phone2 = phone2;
-    emp.address = address;
-    emp.hireDate = hireDate;
-    emp.branchId = branchId;
-    emp.branchName = getBranchNameById(branchId);
-    emp.status = status;
-    emp.username = username;
-    emp.notes = notes;
-    emp.salary = salary;
-    emp.commission = commission;
-    emp.bonus = bonus;
-    emp.advance = advance;
-    emp.vacationDays = Math.max(0, vacationDays);
-  } else {
-    DB.employees.push({
-      id: Date.now(),
-      name,
-      position,
-      phone,
-      phone2,
-      address,
-      hireDate,
-      branchId,
-      branchName: getBranchNameById(branchId),
-      status,
-      username,
-      notes,
-      salary,
-      commission,
-      bonus,
-      advance,
-      vacationDays: Math.max(0, vacationDays),
-      lastPaid: null
-    });
-  }
-  
-  saveDB();
-  closeModal('employeeModal');
-  renderEmployees();
-  renderHRManagement();
-  renderEmployeePerformance();
-  showToast(editingEmployeeId ? 'تم تعديل بيانات الموظف' : 'تم إضافة الموظف');
-  logAudit(editingEmployeeId ? 'تعديل موظف' : 'إضافة موظف', name, { module: 'employees', actionType: editingEmployeeId ? 'edit' : 'create', recordId: String(editingEmployeeId || ''), description: name });
-  editingEmployeeId = null;
-}
+async function saveEmployee() {
+   if (!requirePermission('manageEmployees')) return;
+   const name = document.getElementById('empName').value.trim();
+   const position = document.getElementById('empPosition').value.trim();
+   const phone = (document.getElementById('empPhone')?.value || '').trim();
+   const phone2 = (document.getElementById('empPhone2')?.value || '').trim();
+   const address = (document.getElementById('empAddress')?.value || '').trim();
+   const hireDate = document.getElementById('empHireDate')?.value || '';
+   const branchId = document.getElementById('empBranch')?.value || currentBranchId || 'MAIN';
+   const status = document.getElementById('empStatus')?.value || 'active';
+   const username = (document.getElementById('empUsername')?.value || '').trim();
+   const notes = (document.getElementById('empNotes')?.value || '').trim();
+   const salary = parseFloat(document.getElementById('empSalary').value) || 0;
+   const commission = parseFloat(document.getElementById('empCommission').value) || 0;
+   const bonus = parseFloat(document.getElementById('empBonus').value) || 0;
+   const advance = parseFloat(document.getElementById('empAdvance').value) || 0;
+   const vacationDays = parseInt(document.getElementById('empVacationDays').value, 10) || 0;
+   
+   if (!name) { showToast('أدخل اسم الموظف', 'error'); return; }
+
+   if (editingEmployeeId) {
+     const emp = DB.employees.find(e => e.id === editingEmployeeId);
+     if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
+     emp.name = name;
+     emp.position = position;
+     emp.phone = phone;
+     emp.phone2 = phone2;
+     emp.address = address;
+     emp.hireDate = hireDate;
+     emp.branchId = branchId;
+     emp.branchName = getBranchNameById(branchId);
+     emp.status = status;
+     emp.username = username;
+     emp.notes = notes;
+     emp.salary = salary;
+     emp.commission = commission;
+     emp.bonus = bonus;
+     emp.advance = advance;
+     emp.vacationDays = Math.max(0, vacationDays);
+     // Phase 23B: update in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.employees && emp._backendId) {
+       try { await backendApi.employees.update(emp._backendId, emp); } catch (_) {}
+     }
+   } else {
+     const newEmp = {
+       id: Date.now(),
+       name, position, phone, phone2, address, hireDate, branchId,
+       branchName: getBranchNameById(branchId),
+       status, username, notes, salary, commission, bonus, advance,
+       vacationDays: Math.max(0, vacationDays),
+       lastPaid: null
+     };
+     // Phase 23B: create in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.employees) {
+       try {
+         const res = await backendApi.employees.create(newEmp);
+         if (res && res.success && res.data) { newEmp._backendId = res.data.id || null; newEmp._syncedToBackend = true; }
+       } catch (_) {}
+     }
+     DB.employees.push(newEmp);
+   }
+   
+   saveDB();
+   closeModal('employeeModal');
+   renderEmployees();
+   renderHRManagement();
+   renderEmployeePerformance();
+   showToast(editingEmployeeId ? 'تم تعديل بيانات الموظف' : 'تم إضافة الموظف');
+   logAudit(editingEmployeeId ? 'تعديل موظف' : 'إضافة موظف', name, { module: 'employees', actionType: editingEmployeeId ? 'edit' : 'create', recordId: String(editingEmployeeId || ''), description: name });
+   editingEmployeeId = null;
+ }
 
 function renderHRManagement() {
   ensureHRState();
@@ -29990,90 +29990,95 @@ function renderEmployeePerformance() {
   }).join('') || '<tr><td colspan="7" style="text-align:center">لا يوجد بيانات</td></tr>';
 }
 
-function renderEmployees() {
-  ensureHRState();
-  populateEmployeeBranchControls();
-  const search = String(document.getElementById('employeeSearchInput')?.value || '').trim().toLowerCase();
-  const branchFilter = String(document.getElementById('employeeBranchFilter')?.value || '').trim();
-  const canFullHR = can('manageEmployees') || can('all');
-  const employees = getVisibleEmployees().filter(e => {
-    if (branchFilter && getEmployeeBranchId(e) !== branchFilter) return false;
-    if (!search) return true;
-    return [e.name, e.phone, e.phone2, e.position, e.branchName, e.address].join(' ').toLowerCase().includes(search);
-  });
-  const today = localDateString();
-  const count = employees.length;
-  const salaries = employees.reduce((sum, e) => sum + (e.salary || 0), 0);
-  const bonuses = employees.reduce((sum, e) => sum + (e.bonus || 0), 0);
-  const present = employees.filter(e => getTodayAttendance(e.id)?.checkIn).length;
-  const absent = employees.filter(e => (e.status || 'active') === 'active' && !getTodayAttendance(e.id)?.checkIn).length;
-  
-  document.getElementById('emp-count').textContent = count;
-  document.getElementById('emp-salaries').textContent = canFullHR ? formatMoney(salaries) : '***';
-  document.getElementById('emp-bonuses').textContent = canFullHR ? formatMoney(bonuses) : '***';
-  const presentEl = document.getElementById('emp-present'); if (presentEl) presentEl.textContent = present;
-  const absentEl = document.getElementById('emp-absent'); if (absentEl) absentEl.textContent = canFullHR ? absent : '-';
-  
-  const tbody = document.getElementById('employeesTbody');
-  tbody.innerHTML = employees.map((e, idx) => {
-    const att = getTodayAttendance(e.id);
-    const attendanceBtns = `<button class="btn btn-sm btn-outline" onclick="employeeCheckIn(${e.id})">حضور</button><button class="btn btn-sm btn-outline" onclick="employeeCheckOut(${e.id})">انصراف</button>`;
-    return `<tr>
-    <td>${idx + 1}</td>
-    <td>${escapeHtml(e.name)}<div style="font-size:.68rem;color:var(--text2)">${escapeHtml(e.branchName || getBranchNameById(getEmployeeBranchId(e)))} · ${att?.checkIn ? 'حاضر اليوم' : 'لم يسجل حضور'}</div></td>
-    <td>${escapeHtml(e.position || '-')}</td>
-    <td>${canFullHR ? formatMoney(e.salary) : '***'}</td>
-    <td>${canFullHR ? formatMoney(e.commission || 0) : '***'}</td>
-    <td>${canFullHR ? formatMoney(e.bonus || 0) : '***'}</td>
-    <td>${canFullHR ? formatMoney(e.advance || 0) : '***'}</td>
-    <td>${(e.vacationDays || 0)} يوم</td>
-    <td>${canFullHR ? formatMoney((e.salary || 0) + (e.commission || 0) + (e.bonus || 0) - (e.advance || 0)) : '***'}</td>
-    <td>${e.lastPaid ? new Date(e.lastPaid).toLocaleDateString('ar-EG') : 'لم يُصرف'}</td>
-    <td>
-      ${attendanceBtns}
-      ${canFullHR ? `<button class="btn btn-sm btn-accent" onclick="openEmployeeProfile(${e.id})">👤 ملف</button>
-      <button class="btn btn-sm btn-green" onclick="paySalary(${e.id})">💰 صرف</button>
-      <button class="btn btn-sm btn-yellow" onclick="openEmployeeLeaveModal(${e.id})">🌴 إجازة</button>
-      <button class="btn btn-sm btn-outline" onclick="editEmployee(${e.id})">✏️ تعديل</button>
-      <button class="btn btn-sm btn-danger" onclick="deleteEmployeeById(${e.id})">🗑️</button>` : ''}
-    </td>
-  </tr>`;
-  }).join('') || '<tr><td colspan="11" style="text-align:center">لا يوجد موظفين</td></tr>';
+async function renderEmployees() {
+   ensureHRState();
+   populateEmployeeBranchControls();
+   // Phase 23B: fetch from backend when enabled
+   let employees = getVisibleEmployees();
+   if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+     try { employees = await digitronicsDataAdapter.listEmployees(); } catch (_) {}
+   }
+   const search = String(document.getElementById('employeeSearchInput')?.value || '').trim().toLowerCase();
+   const branchFilter = String(document.getElementById('employeeBranchFilter')?.value || '').trim();
+   const canFullHR = can('manageEmployees') || can('all');
+   const filtered = employees.filter(e => {
+     if (branchFilter && getEmployeeBranchId(e) !== branchFilter) return false;
+     if (!search) return true;
+     return [e.name, e.phone, e.phone2, e.position, e.branchName, e.address].join(' ').toLowerCase().includes(search);
+   });
+   const today = localDateString();
+   const count = filtered.length;
+   const salaries = filtered.reduce((sum, e) => sum + (e.salary || 0), 0);
+   const bonuses = filtered.reduce((sum, e) => sum + (e.bonus || 0), 0);
+   const present = filtered.filter(e => getTodayAttendance(e.id)?.checkIn).length;
+   const absent = filtered.filter(e => (e.status || 'active') === 'active' && !getTodayAttendance(e.id)?.checkIn).length;
+   
+   document.getElementById('emp-count').textContent = count;
+   document.getElementById('emp-salaries').textContent = canFullHR ? formatMoney(salaries) : '***';
+   document.getElementById('emp-bonuses').textContent = canFullHR ? formatMoney(bonuses) : '***';
+   const presentEl = document.getElementById('emp-present'); if (presentEl) presentEl.textContent = present;
+   const absentEl = document.getElementById('emp-absent'); if (absentEl) absentEl.textContent = canFullHR ? absent : '-';
+   
+   const tbody = document.getElementById('employeesTbody');
+   tbody.innerHTML = filtered.map((e, idx) => {
+     const att = getTodayAttendance(e.id);
+     const attendanceBtns = `<button class="btn btn-sm btn-outline" onclick="employeeCheckIn(${e.id})">حضور</button><button class="btn btn-sm btn-outline" onclick="employeeCheckOut(${e.id})">انصراف</button>`;
+     return `<tr>
+     <td>${idx + 1}</td>
+     <td>${escapeHtml(e.name)}<div style="font-size:.68rem;color:var(--text2)">${escapeHtml(e.branchName || getBranchNameById(getEmployeeBranchId(e)))} · ${att?.checkIn ? 'حاضر اليوم' : 'لم يسجل حضور'}</div></td>
+     <td>${escapeHtml(e.position || '-')}</td>
+     <td>${canFullHR ? formatMoney(e.salary) : '***'}</td>
+     <td>${canFullHR ? formatMoney(e.commission || 0) : '***'}</td>
+     <td>${canFullHR ? formatMoney(e.bonus || 0) : '***'}</td>
+     <td>${canFullHR ? formatMoney(e.advance || 0) : '***'}</td>
+     <td>${(e.vacationDays || 0)} يوم</td>
+     <td>${canFullHR ? formatMoney((e.salary || 0) + (e.commission || 0) + (e.bonus || 0) - (e.advance || 0)) : '***'}</td>
+     <td>${e.lastPaid ? new Date(e.lastPaid).toLocaleDateString('ar-EG') : 'لم يُصرف'}</td>
+     <td>
+       ${attendanceBtns}
+       ${canFullHR ? `<button class="btn btn-sm btn-accent" onclick="openEmployeeProfile(${e.id})">👤 ملف</button>
+       <button class="btn btn-sm btn-green" onclick="paySalary(${e.id})">💰 صرف</button>
+       <button class="btn btn-sm btn-yellow" onclick="openEmployeeLeaveModal(${e.id})">🌴 إجازة</button>
+       <button class="btn btn-sm btn-outline" onclick="editEmployee(${e.id})">✏️ تعديل</button>
+       <button class="btn btn-sm btn-danger" onclick="deleteEmployeeById(${e.id})">🗑️</button>` : ''}
+     </td>
+   </tr>`;
+   }).join('') || '<tr><td colspan="11" style="text-align:center">لا يوجد موظفين</td></tr>';
 
-  const attTbody = document.getElementById('employeeAttendanceTbody');
-  if (attTbody) {
-    const visibleIds = new Set(employees.map(e => String(e.id)));
-    attTbody.innerHTML = (DB.employeeAttendance || []).filter(a => visibleIds.has(String(a.employeeId))).slice(0, 100).map(a => `<tr>
-      <td>${escapeHtml(a.date || '-')}</td><td>${escapeHtml(a.employeeName || '-')}</td><td>${escapeHtml(a.branchName || getBranchNameById(a.branchId || 'MAIN'))}</td><td>${escapeHtml(a.checkIn || '-')}</td><td>${escapeHtml(a.checkOut || '-')}</td><td>${toSafeFloat(a.overtimeHours, 0)}</td><td>${a.checkOut ? '<span class="badge badge-green">مكتمل</span>' : '<span class="badge badge-yellow">حضور فقط</span>'}</td>
-    </tr>`).join('') || '<tr><td colspan="7" style="text-align:center">لا توجد سجلات حضور</td></tr>';
-  }
+   const attTbody = document.getElementById('employeeAttendanceTbody');
+   if (attTbody) {
+     const visibleIds = new Set(filtered.map(e => String(e.id)));
+     attTbody.innerHTML = (DB.employeeAttendance || []).filter(a => visibleIds.has(String(a.employeeId))).slice(0, 100).map(a => `<tr>
+       <td>${escapeHtml(a.date || '-')}</td><td>${escapeHtml(a.employeeName || '-')}</td><td>${escapeHtml(a.branchName || getBranchNameById(a.branchId || 'MAIN'))}</td><td>${escapeHtml(a.checkIn || '-')}</td><td>${escapeHtml(a.checkOut || '-')}</td><td>${toSafeFloat(a.overtimeHours, 0)}</td><td>${a.checkOut ? '<span class="badge badge-green">مكتمل</span>' : '<span class="badge badge-yellow">حضور فقط</span>'}</td>
+     </tr>`).join('') || '<tr><td colspan="7" style="text-align:center">لا توجد سجلات حضور</td></tr>';
+   }
 
-  const leaveTbody = document.getElementById('employeeLeavesTbody');
-  if (leaveTbody) {
-    const visibleIds = new Set(employees.map(e => String(e.id)));
-    leaveTbody.innerHTML = (DB.employeeLeaves || []).filter(l => visibleIds.has(String(l.employeeId))).slice(0, 100).map(l => `<tr>
-      <td>${escapeHtml(l.employeeName || '-')}</td><td>${escapeHtml(l.type || '-')}</td><td>${escapeHtml(l.start || '-')}</td><td>${escapeHtml(l.end || '-')}</td><td>${escapeHtml(l.reason || '-')}</td><td><span class="badge badge-blue">${escapeHtml(l.status || '-')}</span></td>
-    </tr>`).join('') || '<tr><td colspan="6" style="text-align:center">لا توجد إجازات</td></tr>';
-  }
-  
-  // Salary log
-  const logTbody = document.getElementById('salaryLogTbody');
-  if (!canFullHR) {
-    logTbody.innerHTML = '<tr><td colspan="9" style="text-align:center">غير متاح لصلاحيتك</td></tr>';
-    return;
-  }
-  logTbody.innerHTML = DB.salaryLog.slice(0, 50).map(log => `<tr>
-    <td>${new Date(log.date).toLocaleDateString('ar-EG')}</td>
-    <td>${log.employeeName}</td>
-    <td>${formatMoney(log.salary)}</td>
-    <td>${formatMoney(log.commission || 0)}</td>
-    <td>${formatMoney(log.bonus || 0)}</td>
-    <td>${formatMoney(log.advance || 0)}</td>
-    <td>${formatMoney(log.vacationDeduction || 0)}</td>
-    <td>${formatMoney(log.finalSalary ?? ((log.salary || 0) + (log.commission || 0) + (log.bonus || 0) + (log.overtimeValue || 0) - (log.advance || 0) - (log.vacationDeduction || 0)))}</td>
-    <td>${log.user || '-'}</td>
-  </tr>`).join('') || '<tr><td colspan="9" style="text-align:center">لا توجد سجلات</td></tr>';
-}
+   const leaveTbody = document.getElementById('employeeLeavesTbody');
+   if (leaveTbody) {
+     const visibleIds = new Set(filtered.map(e => String(e.id)));
+     leaveTbody.innerHTML = (DB.employeeLeaves || []).filter(l => visibleIds.has(String(l.employeeId))).slice(0, 100).map(l => `<tr>
+       <td>${escapeHtml(l.employeeName || '-')}</td><td>${escapeHtml(l.type || '-')}</td><td>${escapeHtml(l.start || '-')}</td><td>${escapeHtml(l.end || '-')}</td><td>${escapeHtml(l.reason || '-')}</td><td><span class="badge badge-blue">${escapeHtml(l.status || '-')}</span></td>
+     </tr>`).join('') || '<tr><td colspan="6" style="text-align:center">لا توجد إجازات</td></tr>';
+   }
+   
+   // Salary log
+   const logTbody = document.getElementById('salaryLogTbody');
+   if (!canFullHR) {
+     logTbody.innerHTML = '<tr><td colspan="9" style="text-align:center">غير متاح لصلاحيتك</td></tr>';
+     return;
+   }
+   logTbody.innerHTML = DB.salaryLog.slice(0, 50).map(log => `<tr>
+     <td>${new Date(log.date).toLocaleDateString('ar-EG')}</td>
+     <td>${log.employeeName}</td>
+     <td>${formatMoney(log.salary)}</td>
+     <td>${formatMoney(log.commission || 0)}</td>
+     <td>${formatMoney(log.bonus || 0)}</td>
+     <td>${formatMoney(log.advance || 0)}</td>
+     <td>${formatMoney(log.vacationDeduction || 0)}</td>
+     <td>${formatMoney(log.finalSalary ?? ((log.salary || 0) + (log.commission || 0) + (log.bonus || 0) + (log.overtimeValue || 0) - (log.advance || 0) - (log.vacationDeduction || 0)))}</td>
+     <td>${log.user || '-'}</td>
+   </tr>`).join('') || '<tr><td colspan="9" style="text-align:center">لا توجد سجلات</td></tr>';
+ }
 
 function paySalary(id) {
   const emp = DB.employees.find(e => e.id === id);
@@ -30176,18 +30181,22 @@ function confirmPaySalary(id) {
   showToast(`✅ تم صرف راتب ${emp.name} #${vchId}`);
 }
 
-function deleteEmployee(idx) {
-  if (!requirePermission('manageEmployees')) return;
-  if (!confirm('هل تريد حذف هذا الموظف؟')) return;
-  const emp = DB.employees[idx];
-  DB.employees.splice(idx, 1);
-  saveDB();
-  renderEmployees();
-  renderHRManagement();
-  renderEmployeePerformance();
-  if (emp) logAudit('حذف موظف', emp.name, { module: 'employees', actionType: 'delete', recordId: String(emp.id), description: emp.name });
-  showToast('تم الحذف');
-}
+async function deleteEmployee(idx) {
+   if (!requirePermission('manageEmployees')) return;
+   if (!confirm('هل تريد حذف هذا الموظف؟')) return;
+   const emp = DB.employees[idx];
+   DB.employees.splice(idx, 1);
+   // Phase 23B: delete in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.employees && emp && emp._backendId) {
+     try { await backendApi.employees.delete(emp._backendId); } catch (_) {}
+   }
+   saveDB();
+   renderEmployees();
+   renderHRManagement();
+   renderEmployeePerformance();
+   if (emp) logAudit('حذف موظف', emp.name, { module: 'employees', actionType: 'delete', recordId: String(emp.id), description: emp.name });
+   showToast('تم الحذف');
+ }
 
 function deleteEmployeeById(id) {
   const idx = DB.employees.findIndex(e => String(e.id) === String(id));

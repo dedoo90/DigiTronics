@@ -29446,77 +29446,77 @@ function editEmployee(id) {
   openModal('employeeModal');
 }
 
-function saveEmployee() {
-  if (!requirePermission('manageEmployees')) return;
-  const name = document.getElementById('empName').value.trim();
-  const position = document.getElementById('empPosition').value.trim();
-  const phone = (document.getElementById('empPhone')?.value || '').trim();
-  const phone2 = (document.getElementById('empPhone2')?.value || '').trim();
-  const address = (document.getElementById('empAddress')?.value || '').trim();
-  const hireDate = document.getElementById('empHireDate')?.value || '';
-  const branchId = document.getElementById('empBranch')?.value || currentBranchId || 'MAIN';
-  const status = document.getElementById('empStatus')?.value || 'active';
-  const username = (document.getElementById('empUsername')?.value || '').trim();
-  const notes = (document.getElementById('empNotes')?.value || '').trim();
-  const salary = parseFloat(document.getElementById('empSalary').value) || 0;
-  const commission = parseFloat(document.getElementById('empCommission').value) || 0;
-  const bonus = parseFloat(document.getElementById('empBonus').value) || 0;
-  const advance = parseFloat(document.getElementById('empAdvance').value) || 0;
-  const vacationDays = parseInt(document.getElementById('empVacationDays').value, 10) || 0;
-  
-  if (!name) { showToast('أدخل اسم الموظف', 'error'); return; }
-  
-  if (editingEmployeeId) {
-    const emp = DB.employees.find(e => e.id === editingEmployeeId);
-    if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
-    emp.name = name;
-    emp.position = position;
-    emp.phone = phone;
-    emp.phone2 = phone2;
-    emp.address = address;
-    emp.hireDate = hireDate;
-    emp.branchId = branchId;
-    emp.branchName = getBranchNameById(branchId);
-    emp.status = status;
-    emp.username = username;
-    emp.notes = notes;
-    emp.salary = salary;
-    emp.commission = commission;
-    emp.bonus = bonus;
-    emp.advance = advance;
-    emp.vacationDays = Math.max(0, vacationDays);
-  } else {
-    DB.employees.push({
-      id: Date.now(),
-      name,
-      position,
-      phone,
-      phone2,
-      address,
-      hireDate,
-      branchId,
-      branchName: getBranchNameById(branchId),
-      status,
-      username,
-      notes,
-      salary,
-      commission,
-      bonus,
-      advance,
-      vacationDays: Math.max(0, vacationDays),
-      lastPaid: null
-    });
-  }
-  
-  saveDB();
-  closeModal('employeeModal');
-  renderEmployees();
-  renderHRManagement();
-  renderEmployeePerformance();
-  showToast(editingEmployeeId ? 'تم تعديل بيانات الموظف' : 'تم إضافة الموظف');
-  logAudit(editingEmployeeId ? 'تعديل موظف' : 'إضافة موظف', name, { module: 'employees', actionType: editingEmployeeId ? 'edit' : 'create', recordId: String(editingEmployeeId || ''), description: name });
-  editingEmployeeId = null;
-}
+async function saveEmployee() {
+   if (!requirePermission('manageEmployees')) return;
+   const name = document.getElementById('empName').value.trim();
+   const position = document.getElementById('empPosition').value.trim();
+   const phone = (document.getElementById('empPhone')?.value || '').trim();
+   const phone2 = (document.getElementById('empPhone2')?.value || '').trim();
+   const address = (document.getElementById('empAddress')?.value || '').trim();
+   const hireDate = document.getElementById('empHireDate')?.value || '';
+   const branchId = document.getElementById('empBranch')?.value || currentBranchId || 'MAIN';
+   const status = document.getElementById('empStatus')?.value || 'active';
+   const username = (document.getElementById('empUsername')?.value || '').trim();
+   const notes = (document.getElementById('empNotes')?.value || '').trim();
+   const salary = parseFloat(document.getElementById('empSalary').value) || 0;
+   const commission = parseFloat(document.getElementById('empCommission').value) || 0;
+   const bonus = parseFloat(document.getElementById('empBonus').value) || 0;
+   const advance = parseFloat(document.getElementById('empAdvance').value) || 0;
+   const vacationDays = parseInt(document.getElementById('empVacationDays').value, 10) || 0;
+   
+   if (!name) { showToast('أدخل اسم الموظف', 'error'); return; }
+
+   if (editingEmployeeId) {
+     const emp = DB.employees.find(e => e.id === editingEmployeeId);
+     if (!emp) { showToast('الموظف غير موجود', 'error'); return; }
+     emp.name = name;
+     emp.position = position;
+     emp.phone = phone;
+     emp.phone2 = phone2;
+     emp.address = address;
+     emp.hireDate = hireDate;
+     emp.branchId = branchId;
+     emp.branchName = getBranchNameById(branchId);
+     emp.status = status;
+     emp.username = username;
+     emp.notes = notes;
+     emp.salary = salary;
+     emp.commission = commission;
+     emp.bonus = bonus;
+     emp.advance = advance;
+     emp.vacationDays = Math.max(0, vacationDays);
+     // Phase 23B: update in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.employees && emp._backendId) {
+       try { await backendApi.employees.update(emp._backendId, emp); } catch (_) {}
+     }
+   } else {
+     const newEmp = {
+       id: Date.now(),
+       name, position, phone, phone2, address, hireDate, branchId,
+       branchName: getBranchNameById(branchId),
+       status, username, notes, salary, commission, bonus, advance,
+       vacationDays: Math.max(0, vacationDays),
+       lastPaid: null
+     };
+     // Phase 23B: create in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.employees) {
+       try {
+         const res = await backendApi.employees.create(newEmp);
+         if (res && res.success && res.data) { newEmp._backendId = res.data.id || null; newEmp._syncedToBackend = true; }
+       } catch (_) {}
+     }
+     DB.employees.push(newEmp);
+   }
+   
+   saveDB();
+   closeModal('employeeModal');
+   renderEmployees();
+   renderHRManagement();
+   renderEmployeePerformance();
+   showToast(editingEmployeeId ? 'تم تعديل بيانات الموظف' : 'تم إضافة الموظف');
+   logAudit(editingEmployeeId ? 'تعديل موظف' : 'إضافة موظف', name, { module: 'employees', actionType: editingEmployeeId ? 'edit' : 'create', recordId: String(editingEmployeeId || ''), description: name });
+   editingEmployeeId = null;
+ }
 
 function renderHRManagement() {
   ensureHRState();
