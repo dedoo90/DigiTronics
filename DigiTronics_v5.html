@@ -25791,7 +25791,13 @@ function switchReportTab(tab, el) {
   document.getElementById('rtab-' + tab).classList.add('active');
 }
 
-function renderReports() {
+async function renderReports() {
+  DB.reports = DB.reports || [];
+  // Phase 23B: fetch from backend when enabled
+  let reports = DB.reports;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { reports = await digitronicsDataAdapter.listReports(); } catch (_) {}
+  }
   const monthInput = document.getElementById('reportMonth');
   if (!monthInput.value) {
     const now = new Date();
