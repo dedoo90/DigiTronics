@@ -19932,8 +19932,13 @@ function getNetInvoiceProfit(invoice) {
 }
 
 // ================= DASHBOARD =================
-function renderDashboard() {
-  const dashboardVersionKey = getDataVersionKey('dashboard');
+async function renderDashboard() {
+  DB.dashboard = DB.dashboard || [];
+  // Phase 23B: fetch from backend when enabled
+  let dashboardData = DB.dashboard;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { dashboardData = await digitronicsDataAdapter.listDashboard(); } catch (_) {}
+  }
   const today = new Date();
   const todayInvoices = DB.saleInvoices.filter(inv => isToday(inv.date));
   
@@ -26696,7 +26701,13 @@ function smartStatCard(label, value, icon, color = 'blue', sensitive = false, hi
   return `<div class="stat-card ${color}" style="padding:14px"><div class="stat-icon">${icon}</div><div class="stat-value" style="font-size:1.05rem">${typeof value === 'number' ? smartMoney(value, sensitive) : smartValue(value, sensitive)}</div><div class="stat-label">${label}</div>${hint ? `<div class="smart-muted">${hint}</div>` : ''}</div>`;
 }
 
-function renderSmartBusinessDashboard() {
+async function renderSmartBusinessDashboard() {
+  DB.dashboard = DB.dashboard || [];
+  // Phase 23B: fetch from backend when enabled
+  let dashboardData = DB.dashboard;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { dashboardData = await digitronicsDataAdapter.listDashboard(); } catch (_) {}
+  }
   if (!canAccessPage('smart-business')) { permissionDenied(); return; }
   if (Date.now() - lastSmartBusinessAuditAt > 60000) {
     lastSmartBusinessAuditAt = Date.now();
@@ -26796,7 +26807,13 @@ function renderSmartBusinessPanels(snapshot) {
 }
 
 // ================= EXECUTIVE FINANCIAL DASHBOARD =================
-function renderExecDashboard() {
+async function renderExecDashboard() {
+  DB.dashboard = DB.dashboard || [];
+  // Phase 23B: fetch from backend when enabled
+  let dashboardData = DB.dashboard;
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { dashboardData = await digitronicsDataAdapter.listDashboard(); } catch (_) {}
+  }
   if (!canAccessPage('exec-dashboard')) { permissionDenied(); return; }
   populateExecBranchFilter();
   const { from, to, period } = getExecDateRange();
