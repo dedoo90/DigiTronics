@@ -1,9 +1,9 @@
-# Phase 23D — Investigation Report: HTML Consolidation
+# Phase 23D — Investigation Report (Redesigned)
 
 **Repository:** E:\Projects\ESO
 **Baseline:** phase23c-docs (tag phase23c-docs)
 **Date:** 2026-08-05
-**Status:** Documentation Only — No Code Changes
+**Status:** Implementation Phase — Code Changes Allowed
 
 ---
 
@@ -13,25 +13,85 @@ Phase 23C (Architecture & Technical Debt Assessment) is **100% complete**. All a
 
 Phase 23D addresses **HTML consolidation**: merging two HTML files into a single canonical entry point, updating all references (manifest.json, Service Worker, docker-compose.yml), and validating the consolidated result.
 
+**Critical Finding:** The current Phase23D documents contain **incorrect assumptions** about the HTML files. `index.html` is the evolved production version with Dashboard V6, performance layer, and IndexedDB fallback. `DigiTronics_v5.html` is the legacy version with Dashboard V3. A simple merge is NOT possible.
+
 ---
 
 ## 1. Current State Analysis
 
 ### 1.1 HTML Files
 
-| File | Lines | Status |
-|------|-------|--------|
-| `index.html` | 37,827 | Primary entry point (nginx default) |
-| `DigiTronics_v5.html` | 37,464 | Legacy entry point (manifest.json default) |
+| File | Lines | Status | Version |
+|------|-------|--------|---------|
+| `index.html` | 40,288 | Primary entry point | V6 Enterprise |
+| `DigiTronics_v5.html` | 39,903 | Legacy entry point | V3 |
 
-### 1.2 File Drift Analysis
+### 1.2 Feature Comparison
 
-The two HTML files have **363 lines of drift** in non-Phase-23B areas:
-- `index.html` has additional features not in `DigiTronics_v5.html`
-- `DigiTronics_v5.html` has Dashboard V3 CSS not in `index.html`
-- Both files are functionally identical for Phase 23B migrations (93 migration points each)
+#### Dashboard Architecture
 
-### 1.3 Phase 23B Migration Status
+| Feature | index.html (V6) | DigiTronics_v5.html (V3) |
+|---------|-----------------|--------------------------|
+| Dashboard version | V6 Enterprise | V3 |
+| CSS namespace | `.d6-*` classes | Standard classes |
+| KPI cards | Spark bars, trends, mini-charts | Standard stat-cards |
+| Chart grid | 3 canvases | Single sales chart |
+| Module grid | Interactive tiles | None |
+| Activity timeline | Yes | None |
+| FAB menu | Yes | None |
+| Widget row | Smart alerts, Top products, Top customers, Tasks | None |
+| Header | Global search, Clock, Connection status, User profile | Basic header |
+| Skeleton loading | Yes | None |
+
+#### Performance Layer
+
+| Feature | index.html | DigiTronics_v5.html |
+|---------|-----------|---------------------|
+| `computeStockMap()` | Yes | No |
+| `getStockMap()` | Yes | No |
+| `__stockCache` | Yes | No |
+| `__netTotalCache` | Yes | No |
+| `scheduleRender()` | Yes | No |
+| `broadcastDbChanged()` | Yes | No |
+| `eqId()` | Yes | No |
+| `dbWriteLock` | Yes | No |
+| `releaseDbWriteLock()` | Yes | No |
+| `__idbGet` / `__idbSet` | Yes | No |
+
+#### Data Safety
+
+| Feature | index.html | DigiTronics_v5.html |
+|---------|-----------|---------------------|
+| IndexedDB fallback | Yes | No |
+| `restoreFromIDBIfNeeded()` | Yes | No |
+| `saveDB()` with IndexedDB | Yes | No |
+| Quota handling | Graceful degradation | None |
+
+#### Demo Safety
+
+| Feature | index.html | DigiTronics_v5.html |
+|---------|-----------|---------------------|
+| Demo safety badges | No | Yes |
+| `.demo-safety-badge` CSS | No | Yes |
+| "Preview Only" overlay | No | Yes |
+
+#### Backend Integration
+
+| Feature | index.html | DigiTronics_v5.html |
+|---------|-----------|---------------------|
+| USE_BACKEND references | 233 | 228 |
+| Supplier balance migration | No | Yes |
+| `reconcileMissingCashPurchaseEntries()` | No | Yes |
+
+### 1.3 Line Count Analysis
+
+| File | Total Lines | Unique Lines | Shared Lines |
+|------|-------------|--------------|--------------|
+| `index.html` | 40,288 | 1,440 | 38,848 |
+| `DigiTronics_v5.html` | 39,903 | 1,055 | 38,848 |
+| **Drift** | **385** | **2,495** | — |
+
+### 1.4 Phase 23B Migration Status
 
 | Metric | index.html | DigiTronics_v5.html |
 |--------|-----------|---------------------|
@@ -41,16 +101,19 @@ The two HTML files have **363 lines of drift** in non-Phase-23B areas:
 
 **Finding:** Phase 23B migrations are fully synchronized. Drift is in non-Phase-23B features only.
 
-### 1.4 References to DigiTronics_v5.html
+### 1.5 References to DigiTronics_v5.html
 
 | File | Reference | Impact |
 |------|-----------|--------|
-| `manifest.json` | `"start_url": "DigiTronics_v5.html"` | PWA install targets wrong file |
+| `manifest.json` | `"start_url": "DigiTronics_v5.html"` | PWA installs wrong file |
+| `manifest.json` | `"id": "/DigiTronics_v5.html"` | PWA id wrong |
+| `manifest.json` | Shortcuts reference DigiTronics_v5.html | Shortcuts wrong |
 | `sw.js` | Caches both HTML files | Dual cache entry |
 | `docker-compose.yml` | Mounts both files | Both files served |
 | `nginx.conf` | Serves `index.html` as default | Primary entry point |
+| `refreshPwaCache()` | References DigiTronics_v5.html | Wrong file refreshed |
 
-### 1.5 Backup Files
+### 1.6 Backup Files
 
 | Location | Files | Count |
 |----------|-------|-------|
@@ -68,16 +131,33 @@ The two HTML files have **363 lines of drift** in non-Phase-23B areas:
 - `DigiTronics_v5.html` is archived or removed
 - All unique features from `DigiTronics_v5.html` are merged into `index.html`
 
-### 2.2 Updated References
+### 2.2 Features to Port FROM DigiTronics_v5.html
+
+| Feature | Location | Risk | Action |
+|---------|----------|------|--------|
+| Supplier balance migration | JavaScript section | MEDIUM | Port |
+| `reconcileMissingCashPurchaseEntries()` | JavaScript section | MEDIUM | Port |
+
+### 2.3 Features to NOT Port
+
+| Feature | Reason |
+|---------|--------|
+| Dashboard V3 | Replaced by V6 |
+| Demo safety badges | Intentionally removed |
+| Dashboard V3 CSS | Replaced by V6 CSS |
+
+### 2.4 Updated References
 
 | File | Current | Target |
 |------|---------|--------|
 | `manifest.json` | `"start_url": "DigiTronics_v5.html"` | `"start_url": "index.html"` |
+| `manifest.json` | `"id": "/DigiTronics_v5.html"` | `"id": "/index.html"` |
+| `manifest.json` | Shortcuts reference DigiTronics_v5.html | Shortcuts reference index.html |
 | `sw.js` | Caches both HTML files | Caches only `index.html` |
 | `docker-compose.yml` | Mounts both files | Mounts only `index.html` |
 | `refreshPwaCache()` | References `DigiTronics_v5.html` | References `index.html` |
 
-### 2.3 Backup File Handling
+### 2.5 Backup File Handling
 
 - Backup files archived to separate branch/tag
 - `.bak` files removed from version control
@@ -91,10 +171,14 @@ The two HTML files have **363 lines of drift** in non-Phase-23B areas:
 
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
-| PWA users have cached old manifest | High | Medium | Force SW update on deployment |
-| Feature loss during merge | High | Low | Careful diff analysis, feature verification |
-| Service Worker cache invalidation | Medium | Low | Update SW cache names, force refresh |
-| Rollback complexity | Medium | Low | Git tag before merge, clear rollback procedure |
+| Feature loss during merge | HIGH | MEDIUM | Dry run on branch, feature verification, rollback point |
+| PWA users cached old manifest | HIGH | HIGH | Force SW update, cache name bump, version increment |
+| Service Worker cache invalidation | MEDIUM | HIGH | Update SW cache names, force refresh, version bump |
+| Dashboard regression | HIGH | LOW | Visual regression testing, Dashboard V6 verification |
+| Data loss (IndexedDB fallback) | HIGH | LOW | Verify IndexedDB fallback intact, test data persistence |
+| Rollback complexity | MEDIUM | LOW | Git tag before merge, clear procedure, test rollback |
+| Supplier migration lost | MEDIUM | MEDIUM | Port from DigiTronics_v5.html |
+| `reconcileMissingCashPurchaseEntries()` lost | MEDIUM | MEDIUM | Port from DigiTronics_v5.html |
 
 ### 3.2 Risk Mitigation
 
@@ -102,6 +186,8 @@ The two HTML files have **363 lines of drift** in non-Phase-23B areas:
 2. **Feature verification** — Test all functionality after merge
 3. **SW update** — Force Service Worker update on deployment
 4. **Incremental merge** — Merge unique features first, then validate
+5. **Dry run** — Test merge on branch before applying to main
+6. **Visual regression** — Compare UI before/after merge
 
 ---
 
@@ -111,19 +197,18 @@ The two HTML files have **363 lines of drift** in non-Phase-23B areas:
 
 | File | Change Type | Risk |
 |------|-------------|------|
-| `index.html` | Merge features from DigiTronics_v5.html | High |
-| `DigiTronics_v5.html` | Archive/remove | Low |
-| `manifest.json` | Update `start_url` | Low |
-| `sw.js` | Update cache list | Low |
-| `docker-compose.yml` | Remove DigiTronics_v5.html mount | Low |
-| `refreshPwaCache()` | Update HTML reference | Low |
+| `index.html` | Merge features from DigiTronics_v5.html | HIGH |
+| `DigiTronics_v5.html` | Archive/remove | LOW |
+| `manifest.json` | Update `start_url`, `id`, shortcuts | LOW |
+| `sw.js` | Update cache list | LOW |
+| `docker-compose.yml` | Remove DigiTronics_v5.html mount | LOW |
+| `refreshPwaCache()` | Update HTML reference | LOW |
 
 ### 4.2 Files NOT Affected
 
 | File | Reason |
 |------|--------|
 | `backend/*` | No backend changes |
-| `sw.js` (external) | Only cache list changes |
 | `package.json` | No dependency changes |
 
 ---
@@ -132,28 +217,30 @@ The two HTML files have **363 lines of drift** in non-Phase-23B areas:
 
 ### 5.1 Phase Sequence
 
-1. **Pre-Merge** — Create git tag, backup current state
-2. **Feature Merge** — Merge unique features from DigiTronics_v5.html into index.html
-3. **Reference Update** — Update manifest.json, sw.js, docker-compose.yml
-4. **Validation** — Test all functionality, verify no regression
-5. **Cleanup** — Archive DigiTronics_v5.html, remove .bak files
-6. **Post-Merge** — Force SW update, verify PWA installation
+```
+Phase A: Preparation
+    ↓ (gate: all tasks complete)
+Phase B: Verification
+    ↓ (gate: risks verified, test baseline established)
+Phase C: Dry Run
+    ↓ (gate: merge validated on branch, all tests pass)
+Phase D: Merge
+    ↓ (gate: merge applied, all tests pass)
+Phase E: Validation
+    ↓ (gate: all tests pass, manual testing complete)
+Phase F: Rollback
+    ↓ (gate: rollback point created, procedure verified)
+Phase G: Deployment
+    ↓ (gate: deployment files updated, PWA verified)
+Phase H: Post Deployment
+    ↓ (gate: monitoring active, cleanup complete)
+```
 
 ### 5.2 Task Dependencies
 
-```
-Pre-Merge (tag)
-    ↓
-Feature Merge (index.html)
-    ↓
-Reference Update (manifest.json, sw.js, docker-compose.yml)
-    ↓
-Validation (E2E tests, manual testing)
-    ↓
-Cleanup (archive, remove .bak)
-    ↓
-Post-Merge (SW update, PWA verification)
-```
+- Phase A → Phase B → Phase C → Phase D → Phase E → Phase F → Phase G → Phase H
+- Each phase gate must pass before next phase begins
+- Rollback available at any point
 
 ---
 
@@ -172,6 +259,7 @@ Post-Merge (SW update, PWA verification)
 - Test all CRUD operations
 - Test offline mode
 - Test responsive design
+- Visual regression testing
 
 ### 6.3 Verification Checklist
 
@@ -183,18 +271,32 @@ Post-Merge (SW update, PWA verification)
 - [ ] Offline mode works
 - [ ] No console errors
 - [ ] No visual regression
+- [ ] Dashboard V6 intact
+- [ ] Performance layer intact
+- [ ] IndexedDB fallback intact
 
 ---
 
 ## 7. Rollback Strategy
 
-### 7.1 Rollback Procedure
+### 7.1 Rollback Points
 
-1. **Git tag** — `phase23d-pre-merge` created before merge
-2. **Rollback command** — `git revert <merge-commit>` or `git reset --hard phase23d-pre-merge`
-3. **Verification** — Run E2E tests to confirm rollback success
+| Point | Tag | Purpose |
+|-------|-----|---------|
+| Pre-merge | `phase23d-pre-merge` | Before any code changes |
+| Post-merge | `phase23d-post-merge` | After merge applied |
+| Pre-deploy | `phase23d-pre-deploy` | Before deployment files changed |
+| Post-deploy | `phase23d-post-deploy` | After deployment |
 
-### 7.2 Rollback Scope
+### 7.2 Rollback Procedure
+
+1. **Identify failure point** — Which phase failed?
+2. **Select rollback point** — Which tag to revert to?
+3. **Execute rollback** — `git revert <merge-commit>` or `git reset --hard <tag>`
+4. **Verify rollback** — Run E2E tests to confirm
+5. **Document rollback** — Record what happened and why
+
+### 7.3 Rollback Scope
 
 - Revert index.html to pre-merge state
 - Revert manifest.json, sw.js, docker-compose.yml
@@ -220,7 +322,8 @@ Post-Merge (SW update, PWA verification)
 - [ ] No console errors
 - [ ] No visual regression
 - [ ] Backup files archived
-- [ `.bak` files removed
+- [ ] `.bak` files removed
+- [ ] Rollback procedure verified
 
 ---
 
@@ -231,11 +334,12 @@ Post-Merge (SW update, PWA verification)
 1. **Create git tag** — `phase23d-pre-merge`
 2. **Run full test suite** — Establish baseline
 3. **Document unique features** — List all features in DigiTronics_v5.html not in index.html
+4. **Verify feature diff** — Confirm merge strategy
 
 ### 9.2 During Merge
 
-1. **Merge unique features first** — CSS, JS, HTML differences
-2. **Validate after each merge** — Prevent cascading errors
+1. **Port unique features first** — Supplier migration, reconciliation function
+2. **Validate after each port** — Prevent cascading errors
 3. **Keep DigiTronics_v5.html until validation complete** — Safety net
 
 ### 9.3 Post-Merge

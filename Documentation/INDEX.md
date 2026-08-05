@@ -14,7 +14,7 @@
 | Phase 22C | Unknown | Placeholder | `Phase22C/` | |
 | Phase 23 | Backend Migration | Complete | `Phase23/` | phase23b-stable |
 | Phase 23C | Architecture & Technical Debt Assessment | APPROVED - Completed | `Phase23C/` | phase23c-docs |
-| Phase 23D | HTML Consolidation | APPROVED - Completed | `Phase23D/` | phase23d-docs |
+| Phase 23D | HTML Consolidation | Pending Review (Redesigned) | `Phase23D/` | phase23d-docs |
 | Phase 23E | Legacy Cleanup | Pending | `Phase23E/` | |
 | Phase 23F | Performance & Optimization | Pending | `Phase23F/` | |
 
@@ -56,6 +56,13 @@
 | Roadmap | `Phase23D/PHASE23D_ROADMAP.md` |
 | Master Prompt | `Phase23D/PHASE23D_MASTER_PROMPT.md` |
 | Checklist | `Phase23D/PHASE23D_CHECKLIST.md` |
+| Implementation Strategy | `Phase23D/PHASE23D_IMPLEMENTATION_STRATEGY.md` |
+| Risk Register | `Phase23D/PHASE23D_RISK_REGISTER.md` |
+| Rollback Plan | `Phase23D/PHASE23D_ROLLBACK_PLAN.md` |
+| Deployment Plan | `Phase23D/PHASE23D_DEPLOYMENT_PLAN.md` |
+| Test Plan | `Phase23D/PHASE23D_TEST_PLAN.md` |
+| Feature Diff | `Phase23D/PHASE23D_FEATURE_DIFF.md` |
+| File Matrix | `Phase23D/PHASE23D_FILE_MATRIX.md` |
 
 ---
 

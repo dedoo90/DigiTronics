@@ -1,9 +1,9 @@
-# Phase 23D — Roadmap: HTML Consolidation
+# Phase 23D — Roadmap (Redesigned)
 
 **Repository:** E:\Projects\ESO
 **Baseline:** phase23c-docs (tag phase23c-docs)
 **Date:** 2026-08-05
-**Status:** Documentation Only — No Code Changes
+**Status:** Implementation Phase — Code Changes Allowed
 
 ---
 
@@ -30,12 +30,12 @@
 
 ---
 
-## Phase 23D — HTML Consolidation
+## Phase 23D — HTML Consolidation (Redesigned)
 
 ### Objectives
 
 1. Establish `index.html` as the single canonical entry point
-2. Merge unique features from `DigiTronics_v5.html` into `index.html`
+2. ~~Port missing features from `DigiTronics_v5.html` into `index.html`~~ **NOT REQUIRED — Both functions already exist**
 3. Update all references (manifest.json, Service Worker, docker-compose.yml)
 4. Archive or remove `DigiTronics_v5.html`
 5. Clean up backup files and repository clutter
@@ -43,14 +43,15 @@
 ### Scope
 
 **Included:**
-- HTML file consolidation (merge unique features)
-- manifest.json update (start_url → index.html)
+- ~~Feature porting (supplier migration, reconciliation function)~~ **NOT REQUIRED**
+- manifest.json update (start_url, id, shortcuts → index.html)
 - Service Worker update (cache list)
 - docker-compose.yml update (remove DigiTronics_v5.html mount)
-- refreshPwaCache() update (HTML reference)
+- refreshPwaCache() update (HTML reference at line 14669)
 - Backup file archival
 - .bak file removal
-- Validation (E2E tests, manual testing)
+- Validation (E2E tests, manual testing, visual regression)
+- nginx.conf monitoring (no changes required)
 
 **Excluded:**
 - Security hardening (Phase 23F)
@@ -58,6 +59,18 @@
 - Code refactoring
 - Backend changes
 - New features
+- Dashboard V3 (replaced by V6)
+- Demo safety badges (intentionally removed)
+- nginx.conf changes (monitor only — default root points to index.html)
+
+### nginx.conf Monitoring
+
+**Status:** Monitor Only — No Migration Required
+
+**Validation:**
+- [ ] Confirm default root points to index.html
+- [ ] No reference to DigiTronics_v5.html in nginx.conf
+- [ ] No migration required
 
 ### Dependencies
 
@@ -68,10 +81,12 @@
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| PWA users have cached old manifest | High | Force SW update on deployment |
-| Feature loss during merge | High | Careful diff analysis, feature verification |
-| Service Worker cache invalidation | Medium | Update SW cache names, force refresh |
-| Rollback complexity | Medium | Git tag before merge, clear rollback procedure |
+| Feature loss during merge | HIGH | Dry run on branch, feature verification, rollback point |
+| PWA users cached old manifest | HIGH | Force SW update, cache name bump, version increment |
+| Service Worker cache invalidation | MEDIUM | Update SW cache names, force refresh, version bump |
+| Dashboard regression | HIGH | Visual regression testing, Dashboard V6 verification |
+| Data loss (IndexedDB fallback) | HIGH | Verify IndexedDB fallback intact, test data persistence |
+| Rollback complexity | MEDIUM | Git tag before merge, clear procedure, test rollback |
 
 ### Rollback
 
@@ -87,8 +102,9 @@
 - Test Service Worker update
 - Test all CRUD operations
 - Test offline mode
+- Visual regression testing
+- Performance validation
 - Verify no console errors
-- Verify no visual regression
 
 ### Completion Criteria
 
@@ -100,118 +116,147 @@
 - [ ] No regression in functionality
 - [ ] Backup files archived
 - [ ] `.bak` files removed
-
-### Tasks
-
-#### 23D-1: Pre-Merge Preparation
-
-| # | Task | Justification (Investigation Report) |
-|---|------|--------------------------------------|
-| 1 | Create git tag `phase23d-pre-merge` | Section 7: Rollback strategy |
-| 2 | Run full test suite to establish baseline | Section 6.1: Automated testing |
-| 3 | Document unique features in DigiTronics_v5.html | Section 1.2: File drift analysis |
-
-#### 23D-2: Feature Merge
-
-| # | Task | Justification (Investigation Report) |
-|---|------|--------------------------------------|
-| 4 | Merge unique CSS from DigiTronics_v5.html | Section 1.2: Dashboard V3 CSS |
-| 5 | Merge unique JavaScript from DigiTronics_v5.html | Section 1.2: Feature variations |
-| 6 | Merge unique HTML from DigiTronics_v5.html | Section 1.2: Feature variations |
-| 7 | Validate merge (no feature loss) | Section 8.1: Functional criteria |
-
-#### 23D-3: Reference Update
-
-| # | Task | Justification (Investigation Report) |
-|---|------|--------------------------------------|
-| 8 | Update manifest.json (start_url → index.html) | Section 1.4: manifest.json reference |
-| 9 | Update sw.js (cache only index.html) | Section 1.4: sw.js cache list |
-| 10 | Update docker-compose.yml (remove DigiTronics_v5.html) | Section 1.4: docker-compose.yml mount |
-| 11 | Update refreshPwaCache() (HTML reference) | Section 2.2: Updated references |
-
-#### 23D-4: Validation
-
-| # | Task | Justification (Investigation Report) |
-|---|------|--------------------------------------|
-| 12 | Run all E2E tests (80/80) | Section 6.1: Automated testing |
-| 13 | Run all backend tests (253/253) | Section 6.1: Automated testing |
-| 14 | Test PWA installation | Section 6.2: Manual testing |
-| 15 | Test Service Worker update | Section 6.2: Manual testing |
-| 16 | Test all CRUD operations | Section 6.2: Manual testing |
-| 17 | Verify no console errors | Section 6.2: Manual testing |
-
-#### 23D-5: Cleanup
-
-| # | Task | Justification (Investigation Report) |
-|---|------|--------------------------------------|
-| 18 | Archive DigiTronics_v5.html | Section 1.5: Backup files |
-| 19 | Remove .bak files from repository | Section 1.5: Backup files |
-| 20 | Add test-results/ to .gitignore | Section 1.5: Backup files |
-| 21 | Force Service Worker update | Section 9.3: Post-merge |
+- [ ] Rollback procedure verified
 
 ---
 
-## Future Phase Definitions
+## Implementation Phases
 
-### Phase 23E — Legacy Cleanup
+### Phase A: Preparation
 
-**Objective:** Remove deprecated code, archive backup files, and clean up repository clutter using the Deprecate → Archive → Delete workflow.
+**Goal:** Establish baseline and create rollback point
+**Inputs:** Phase 23C documentation, current repository state
+**Outputs:** Git tag, baseline test results
+**Preconditions:** Phase 23C complete, all tests passing
 
-**Scope:**
-- Deprecated adapters removal
-- Supabase remnants cleanup
-- Deprecated helpers removal
-- Compatibility layer cleanup
-- Obsolete utilities removal
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 1 | Create git tag `phase23d-pre-merge` | Section 7: Rollback strategy | Tag exists | Delete tag |
+| 2 | Run all E2E tests (baseline) | Section 6.1: Automated testing | 80/80 pass | None |
+| 3 | Run all backend tests (baseline) | Section 6.1: Automated testing | 253/253 pass | None |
+| 4 | Document unique features | Section 1.2: Feature comparison | Feature diff complete | None |
 
-**Dependencies:**
-- Phase 23C architecture documentation — **COMPLETE**
-- Phase 23D HTML consolidation — **MUST COMPLETE FIRST**
+**Gate:** All tasks complete, baseline established, feature diff approved
 
-**Entry Criteria:**
-- Phase 23D tagged as stable
-- All deprecated code identified and marked
-- Backup files archived
+### Phase B: Verification
 
-**Exit Criteria:**
-- No references to removed code remain
-- Backup files archived to separate branch
-- .bak files removed from repository
-- test-results/ added to .gitignore
-- All tests pass (80/80 E2E, 253+ backend)
-- No regression in functionality
+**Goal:** Verify risks and test baseline
+**Inputs:** Feature diff, risk assessment
+**Outputs:** Verified risks, test baseline
+**Preconditions:** Phase A complete
 
----
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 5 | Verify risk register complete | Section 3: Risk assessment | All risks documented | None |
+| 6 | Verify rollback plan complete | Section 7: Rollback strategy | Plan approved | None |
+| 7 | Verify deployment plan complete | Section 5: Migration order | Plan approved | None |
+| 8 | Verify test plan complete | Section 6: Validation strategy | Plan approved | None |
+| 9 | Verify test baseline | Section 6.1: Automated testing | Baseline verified | None |
 
-### Phase 23F — Performance & Optimization
+**Gate:** All risks verified, test baseline established
 
-**Objective:** Establish performance baselines, identify bottlenecks through measurement, and implement targeted optimizations.
+### Phase C: Dry Run
 
-**Scope:**
-- Performance benchmarking
-- Cache optimization
-- Lazy loading
-- Virtual scrolling
-- Bundle optimization
-- Service Worker optimization
+**Goal:** Test merge on branch before applying to main
+**Inputs:** Feature diff, merge strategy
+**Outputs:** Validated merge on branch
+**Preconditions:** Phase B complete
 
-**Dependencies:**
-- Phase 23C architecture documentation — **COMPLETE**
-- Phase 23D HTML consolidation — **MUST COMPLETE FIRST**
-- Phase 23E legacy cleanup — **SHOULD COMPLETE FIRST**
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 10 | Create branch `phase23d-dry-run` | Section 5: Migration order | Branch exists | Delete branch |
+| 11 | Port supplier migration | Section 1.2: Feature comparison | Function ported | `git checkout -- index.html` |
+| 12 | Port `reconcileMissingCashPurchaseEntries()` | Section 1.2: Feature comparison | Function ported | `git checkout -- index.html` |
+| 13 | Run all E2E tests on branch | Section 6.1: Automated testing | 80/80 pass | Delete branch |
+| 14 | Run all backend tests on branch | Section 6.1: Automated testing | 253/253 pass | Delete branch |
+| 15 | Visual regression on branch | Section 6.2: Manual testing | No regression | Delete branch |
 
-**Entry Criteria:**
-- Phase 23E tagged as stable
-- Performance baselines established
-- Bottlenecks identified through measurement
+**Gate:** Merge validated on branch, all tests pass, no visual regression
 
-**Exit Criteria:**
-- Performance benchmarks before/after documented
-- Vercel cache headers aligned with nginx
-- Code splitting implemented (if justified by benchmarks)
-- Virtual scroll integrated (if justified by benchmarks)
-- All tests pass (80/80 E2E, 253+ backend)
-- Performance improvement verified
+### Phase D: Merge
+
+**Goal:** Apply merge to main
+**Inputs:** Validated merge from dry run
+**Outputs:** Merged index.html
+**Preconditions:** Phase C complete
+
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 16 | Switch to main branch | Section 5: Migration order | Main branch clean | None |
+| 17 | Port supplier migration | Section 1.2: Feature comparison | Function ported | `git checkout -- index.html` |
+| 18 | Port `reconcileMissingCashPurchaseEntries()` | Section 1.2: Feature comparison | Function ported | `git checkout -- index.html` |
+| 19 | Run all E2E tests on main | Section 6.1: Automated testing | 80/80 pass | `git checkout -- index.html` |
+| 20 | Run all backend tests on main | Section 6.1: Automated testing | 253/253 pass | `git checkout -- index.html` |
+| 21 | Commit merge | Section 5: Migration order | Commit created | `git reset HEAD~1` |
+
+**Gate:** Merge applied to main, all tests pass, commit created
+
+### Phase E: Validation
+
+**Goal:** Final validation before deployment
+**Inputs:** Merged code
+**Outputs:** Validation results
+**Preconditions:** Phase D complete
+
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 22 | Run all E2E tests (final) | Section 6.1: Automated testing | 80/80 pass | `git revert <commit>` |
+| 23 | Run all backend tests (final) | Section 6.1: Automated testing | 253/253 pass | `git revert <commit>` |
+| 24 | Manual testing (PWA, SW, CRUD, offline) | Section 6.2: Manual testing | All pass | `git revert <commit>` |
+| 25 | Visual regression testing | Section 6.2: Manual testing | No regression | `git revert <commit>` |
+| 26 | Performance validation | Section 6.2: Manual testing | Performance intact | `git revert <commit>` |
+
+**Gate:** All validation complete, no regression
+
+### Phase F: Rollback
+
+**Goal:** Create rollback point and verify procedure
+**Inputs:** Validated merge
+**Outputs:** Rollback point, verified procedure
+**Preconditions:** Phase E complete
+
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 27 | Create git tag `phase23d-post-merge` | Section 7: Rollback strategy | Tag exists | Delete tag |
+| 28 | Verify rollback procedure | Section 7: Rollback strategy | Procedure works | None |
+
+**Gate:** Rollback point created, procedure verified
+
+### Phase G: Deployment
+
+**Goal:** Update deployment files and deploy
+**Inputs:** Validated merge
+**Outputs:** Updated deployment files
+**Preconditions:** Phase F complete
+
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 29 | Update manifest.json | Section 1.5: References | start_url updated | `git checkout -- manifest.json` |
+| 30 | Update sw.js | Section 1.5: References | Cache list updated | `git checkout -- sw.js` |
+| 31 | Update docker-compose.yml | Section 1.5: References | Mount removed | `git checkout -- docker-compose.yml` |
+| 32 | Update refreshPwaCache() | Section 1.5: References | Reference updated | `git checkout -- index.html` |
+| 33 | Commit deployment | Section 5: Migration order | Commit created | `git reset HEAD~1` |
+| 34 | Deploy to production | Section 5: Migration order | Deployment successful | `git revert <commit>` |
+
+**Gate:** Deployment complete, PWA works
+
+### Phase H: Post Deployment
+
+**Goal:** Verify deployment and cleanup
+**Inputs:** Deployed code
+**Outputs:** Verified deployment, cleaned repository
+**Preconditions:** Phase G complete
+
+| # | Task | Justification (Investigation Report) | Validation | Rollback |
+|---|------|--------------------------------------|------------|----------|
+| 35 | Monitor error logs | Section 6.2: Manual testing | No issues | `git revert <commit>` |
+| 36 | Archive DigiTronics_v5.html | Section 1.6: Backup files | File archived | Restore from archive |
+| 37 | Remove .bak files | Section 1.6: Backup files | Files removed | Restore from git |
+| 38 | Add test-results/ to .gitignore | Section 1.6: Backup files | Entry added | Remove from .gitignore |
+| 39 | Force Service Worker update | Section 9.3: Post-merge | SW updated | Restore cache name |
+| 40 | Final commit | Section 5: Migration order | Commit created | `git revert <commit>` |
+
+**Gate:** Deployment verified, cleanup complete
 
 ---
 
@@ -236,10 +281,10 @@ Phase 23F (Performance & Optimization)
 | Phase | Effort | Risk |
 |-------|--------|------|
 | 23C | 2-3 days | Low |
-| 23D | 2-3 days | Medium |
+| 23D | 3-5 days | Medium |
 | 23E | 1-2 days | Low |
 | 23F | 3-5 days | Low |
-| **Total** | **8-13 days** | — |
+| **Total** | **9-15 days** | — |
 
 ---
 
@@ -255,6 +300,7 @@ Phase 23F (Performance & Optimization)
 - Single HTML file entry point
 - All references updated
 - No regression
+- Rollback procedure verified
 
 ### Phase 23E
 - Deprecated code removed
