@@ -17,7 +17,7 @@
 | Phase 23D | HTML Consolidation | RELEASED | `Phase23D/` | phase23d-release |
 | Phase 23E | Database Schema Evolution | RELEASED | `Phase23E/` | phase23e-release |
 | Phase 23F | Performance & Optimization | RELEASED | `Phase23F/` | phase23f-release |
-| Phase 24 | API Foundation & Authentication | REVISED - READY FOR GATE B RE-APPROVAL | `Phase24/` | - |
+| Phase 24 | API Foundation & Authentication | GATE C0 COMPLETE — READY FOR IMPLEMENTATION | `Phase24/` | - |
 
 ---
 
@@ -110,24 +110,52 @@
 | Document | Path |
 |----------|------|
 | Architecture | `Phase24/PHASE24_ARCHITECTURE.md` |
+| Architecture Baseline | `Phase24/PHASE24_ARCHITECTURE_BASELINE.md` |
 | API Specification | `Phase24/PHASE24_API_SPECIFICATION.md` |
 | Authentication Design | `Phase24/PHASE24_AUTHENTICATION_DESIGN.md` |
 | Authorization Design | `Phase24/PHASE24_AUTHORIZATION_DESIGN.md` |
 | Permission Matrix | `Phase24/PHASE24_PERMISSION_MATRIX.md` |
+| Role Mapping | `Phase24/PHASE24_ROLE_MAPPING.md` |
+| Tenant Migration | `Phase24/PHASE24_TENANT_MIGRATION.md` |
 | Security Model | `Phase24/PHASE24_SECURITY_MODEL.md` |
 | Service Architecture | `Phase24/PHASE24_SERVICE_ARCHITECTURE.md` |
-| OpenAPI Strategy | `Phase24/PHASE24_OPENAPI_STRATEGY.md` |
 | Test Strategy | `Phase24/PHASE24_TEST_STRATEGY.md` |
 | Deployment Strategy | `Phase24/PHASE24_DEPLOYMENT_STRATEGY.md` |
-| Rollback Plan | `Phase24/PHASE24_ROLLBACK_PLAN.md` |
 | Risk Register | `Phase24/PHASE24_RISK_REGISTER.md` |
 | Gate A Report | `Phase24/PHASE24_GATE_A_REPORT.md` |
 | Gate B Report | `Phase24/PHASE24_GATE_B_REPORT.md` |
 | Gate B Master Report | `Phase24/PHASE24_GATE_B_MASTER_REPORT.md` |
+| Gate B1 Report | `Phase24/PHASE24_GATE_B1_REPORT.md` |
+| Gate B1.5 Report | `Phase24/PHASE24_GATE_B1_5_REPORT.md` |
+| Gate B2 Approval Report | `Phase24/PHASE24_GATE_B2_APPROVAL_REPORT.md` |
+| Implementation Readiness Report | `Phase24/PHASE24_IMPLEMENTATION_READINESS_REPORT.md` |
+| Executive Summary | `Phase24/PHASE24_EXECUTIVE_SUMMARY.md` |
 | Findings Validation | `Phase24/PHASE24_FINDINGS_VALIDATION.md` |
 | Architecture Verification | `Phase24/PHASE24_ARCHITECTURE_VERIFICATION.md` |
+| Architecture Consistency Report | `Phase24/PHASE24_ARCHITECTURE_CONSISTENCY_REPORT.md` |
+| Gate B Final Audit | `Phase24/PHASE24_GATE_B_FINAL_AUDIT.md` |
 | Revision Report | `Phase24/PHASE24_REVISION_REPORT.md` |
+| ADR Impact Analysis | `Phase24/PHASE24_ADR_IMPACT_ANALYSIS.md` |
+| Baseline Alignment Report | `Phase24/PHASE24_BASELINE_ALIGNMENT_REPORT.md` |
 | Master Report | `Phase24/PHASE24_MASTER_REPORT.md` |
+| ADR-001 Role Model | `Phase24/ADR-001-ROLE-MODEL.md` |
+| ADR-002 Tenant Model | `Phase24/ADR-002-TENANT-MODEL.md` |
+| Implementation Blueprint | `Phase24/PHASE24_IMPLEMENTATION_BLUEPRINT.md` |
+| Work Breakdown Structure | `Phase24/PHASE24_WORK_BREAKDOWN_STRUCTURE.md` |
+| File Change Matrix | `Phase24/PHASE24_FILE_CHANGE_MATRIX.md` |
+| API Changelog Plan | `Phase24/PHASE24_API_CHANGELOG_PLAN.md` |
+| Test Execution Plan | `Phase24/PHASE24_TEST_EXECUTION_PLAN.md` |
+| Release Plan | `Phase24/PHASE24_RELEASE_PLAN.md` |
+| Gate C0 Report | `Phase24/PHASE24_GATE_C0_REPORT.md` |
+
+---
+
+## Architecture Documents
+
+| Document | Path |
+|----------|------|
+| ADR Index | `Architecture/ADR_INDEX.md` |
+| Glossary | `Architecture/GLOSSARY.md` |
 
 ---
 
