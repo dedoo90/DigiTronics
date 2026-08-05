@@ -1,4 +1,5 @@
 const usersService = require('../services/users.service');
+const mfaService = require('../services/mfa.service');
 const { success, error } = require('../utils/apiResponse');
 const logger = require('../utils/logger');
 const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
@@ -30,10 +31,28 @@ function _clearAuthCookies(res) {
 
 function login(req, res) {
   try {
-    const { username, password } = req.body || {};
+    const { username, password, mfaToken } = req.body || {};
     if (!username || password === undefined || password === null) return error(res, 'username and password are required', 400);
     const user = usersService.authenticate(username, password);
     if (!user) return error(res, 'Invalid username or password', 401);
+
+    if (user.mfaEnabled) {
+      if (!mfaToken) {
+        const tempToken = signAccessToken({ ...user, mfaPending: true }, '5m');
+        return success(res, {
+          mfaRequired: true,
+          tempToken,
+          userId: user.id,
+          message: 'MFA verification required'
+        }, 'MFA required');
+      }
+
+      const mfaResult = mfaService.verifyLogin(user.id, mfaToken);
+      if (mfaResult.error || !mfaResult.verified) {
+        return error(res, 'Invalid MFA code', 401);
+      }
+    }
+
     const accessToken = signAccessToken(user);
     const refreshToken = signRefreshToken(user);
     _setAuthCookies(res, accessToken, refreshToken);

@@ -64,9 +64,11 @@ const reportsRoutes = require('./routes/reports.routes');
 const usersRoutes = require('./routes/users.routes');
 const authRoutes = require('./routes/auth.routes');
 const oauthRoutes = require('./routes/oauth.routes');
+const mfaRoutes = require('./routes/mfa.routes');
 
 app.use('/api/v1', apiRouter);
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth/mfa', mfaRoutes);
 
 // OAuth routes (mounted at root for OAuth callbacks)
 if (oauthConfig.enabled) {
