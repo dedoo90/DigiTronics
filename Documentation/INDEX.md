@@ -14,7 +14,7 @@
 | Phase 22C | Unknown | Placeholder | `Phase22C/` | |
 | Phase 23 | Backend Migration | Complete | `Phase23/` | phase23b-stable |
 | Phase 23C | Architecture & Technical Debt Assessment | APPROVED - Completed | `Phase23C/` | phase23c-docs |
-| Phase 23D | HTML Consolidation | Pending | `Phase23D/` | |
+| Phase 23D | HTML Consolidation | APPROVED - Completed | `Phase23D/` | phase23d-docs |
 | Phase 23E | Legacy Cleanup | Pending | `Phase23E/` | |
 | Phase 23F | Performance & Optimization | Pending | `Phase23F/` | |
 
