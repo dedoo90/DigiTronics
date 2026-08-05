@@ -7,16 +7,16 @@
 
 ## Phases
 
-| Phase | Name | Status | Folder |
-|-------|------|--------|--------|
-| Phase 21 | Unknown | Placeholder | `Phase21/` |
-| Phase 22 | Unknown | Placeholder | `Phase22/` |
-| Phase 22C | Unknown | Placeholder | `Phase22C/` |
-| Phase 23 | Backend Migration | Complete | `Phase23/` |
-| Phase 23C | Architecture & Technical Debt Assessment | Approved - Documentation Complete | `Phase23C/` |
-| Phase 23D | HTML Consolidation | Pending | `Phase23D/` |
-| Phase 23E | Legacy Cleanup | Pending | `Phase23E/` |
-| Phase 23F | Performance & Optimization | Pending | `Phase23F/` |
+| Phase | Name | Status | Folder | Tag |
+|-------|------|--------|--------|-----|
+| Phase 21 | Unknown | Placeholder | `Phase21/` | |
+| Phase 22 | Unknown | Placeholder | `Phase22/` | |
+| Phase 22C | Unknown | Placeholder | `Phase22C/` | |
+| Phase 23 | Backend Migration | Complete | `Phase23/` | phase23b-stable |
+| Phase 23C | Architecture & Technical Debt Assessment | APPROVED - Completed | `Phase23C/` | phase23c-docs |
+| Phase 23D | HTML Consolidation | Pending | `Phase23D/` | |
+| Phase 23E | Legacy Cleanup | Pending | `Phase23E/` | |
+| Phase 23F | Performance & Optimization | Pending | `Phase23F/` | |
 
 ---
 
