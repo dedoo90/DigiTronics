@@ -2,7 +2,7 @@
 ## DigiTronics V2 Enterprise Security Model
 
 **Date:** 2026-08-05
-**Status:** PLANNING ONLY
+**Status:** REVISED - Aligned with Verified Architecture
 **Phase:** 24 - API Foundation & Authentication
 
 ---
@@ -18,244 +18,221 @@
 | Zero Trust | Verify everything |
 | Security by Design | Built-in, not bolted-on |
 
-### 1.2 Security Layers
+### 1.2 Security Layers (Aligned with Verified Architecture)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  Layer 1: Network Security                                  │
-│  - WAF (Cloudflare/AWS)                                     │
-│  - DDoS Protection                                          │
-│  - SSL/TLS                                                  │
+│  - Nginx reverse proxy                                      │
+│  - SSL/TLS (production)                                     │
+│  - Security headers                                         │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 2: Application Security                              │
-│  - Rate Limiting                                            │
-│  - CORS                                                     │
-│  - Security Headers                                         │
+│  - Rate Limiting (express-rate-limit)                       │
+│  - CORS (cors middleware)                                   │
+│  - Security Headers (helmet)                                │
+│  - Body Sanitization                                        │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 3: Authentication                                    │
-│  - JWT                                                      │
-│  - MFA                                                      │
-│  - Password Policy                                          │
+│  - JWT (jsonwebtoken)                                       │
+│  - bcrypt Password Hashing                                  │
+│  - Token Revocation (in-memory)                             │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 4: Authorization                                     │
-│  - RBAC                                                     │
-│  - Tenant Isolation                                         │
+│  - RBAC (role-based)                                        │
 │  - Permission Checks                                        │
+│  - Write Guards                                             │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 5: Data Security                                     │
-│  - Encryption at Rest                                       │
-│  - Encryption in Transit                                    │
-│  - Input Validation                                         │
+│  - Atomic File Writes                                       │
+│  - Input Validation (Joi)                                   │
+│  - Output Encoding                                          │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 6: Monitoring                                        │
-│  - Audit Logging                                            │
-│  - Intrusion Detection                                      │
-│  - Alerting                                                 │
+│  - Morgan HTTP Logging                                      │
+│  - Winston Application Logging                              │
+│  - Health Checks                                            │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. NETWORK SECURITY
+## 2. NETWORK SECURITY (VERIFIED)
 
-### 2.1 WAF Rules
+### 2.1 Nginx Security Headers
 
-| Rule | Action | Description |
-|------|--------|-------------|
-| SQL Injection | Block | Detect and block SQL injection |
-| XSS | Block | Detect and block cross-site scripting |
-| Path Traversal | Block | Detect and block path traversal |
-| Rate Limiting | Throttle | Limit request rate |
+| Header | Value | Status |
+|--------|-------|--------|
+| X-Content-Type-Options | nosniff | ✅ VERIFIED |
+| X-Frame-Options | DENY | ✅ VERIFIED |
+| Referrer-Policy | no-referrer | ✅ VERIFIED |
+| Permissions-Policy | camera=(), microphone=() | ✅ VERIFIED |
 
-### 2.2 DDoS Protection
-
-| Layer | Protection |
-|-------|------------|
-| L3/L4 | Cloudflare/AWS Shield |
-| L7 | Cloudflare/AWS WAF |
-| Application | Rate limiting |
-
-### 2.3 SSL/TLS
+### 2.2 SSL/TLS
 
 | Setting | Value |
 |---------|-------|
 | Minimum TLS | 1.2 |
 | Preferred TLS | 1.3 |
-| HSTS | Enabled |
-| HSTS Max-Age | 31536000 |
+| HSTS | Enabled (production) |
 
 ---
 
-## 3. APPLICATION SECURITY
+## 3. APPLICATION SECURITY (VERIFIED)
 
 ### 3.1 Rate Limiting
 
-| Endpoint | Limit | Window | Action |
+| Endpoint | Limit | Window | Status |
 |----------|-------|--------|--------|
-| POST /auth/login | 5 | 15 min | Block IP |
-| POST /auth/register | 3 | 1 hour | Block IP |
-| POST /auth/forgot-password | 3 | 1 hour | Block IP |
-| GET /api/* | 100 | 15 min | Throttle |
-| POST /api/* | 50 | 15 min | Throttle |
+| POST /api/v1/auth/login | 20 attempts | 15 min | ✅ VERIFIED |
+| GET /api/* | 1000 requests | 15 min | ✅ VERIFIED |
 
-### 3.2 CORS Configuration
+### 3.2 Body Sanitization
 
-```javascript
-{
-  origin: [
-    'https://digitronics.app',
-    'https://www.digitronics.app',
-    'http://localhost:3000'  // Development only
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 86400
-}
-```
+| Protection | Implementation | Status |
+|------------|----------------|--------|
+| Prototype Pollution | Strip __proto__, constructor | ✅ VERIFIED |
+| $-prefixed keys | Strip $ keys | ✅ VERIFIED |
 
-### 3.3 Security Headers
+### 3.3 Security Headers (Helmet)
 
-| Header | Value | Purpose |
-|--------|-------|---------|
-| X-Content-Type-Options | nosniff | Prevent MIME sniffing |
-| X-Frame-Options | DENY | Prevent clickjacking |
-| X-XSS-Protection | 1; mode=block | XSS protection |
-| Strict-Transport-Security | max-age=31536000 | Force HTTPS |
-| Content-Security-Policy | default-src 'self' | Prevent XSS |
-| Referrer-Policy | strict-origin-when-cross-origin | Control referrer |
-| Permissions-Policy | camera=(), microphone=() | Restrict features |
+| Header | Value | Status |
+|--------|-------|--------|
+| X-Content-Type-Options | nosniff | ✅ VERIFIED |
+| X-Frame-Options | DENY | ✅ VERIFIED |
+| X-XSS-Protection | 1; mode=block | ✅ VERIFIED |
 
 ---
 
-## 4. AUTHENTICATION SECURITY
+## 4. AUTHENTICATION SECURITY (VERIFIED)
 
 ### 4.1 Password Security
 
+| Measure | Implementation | Status |
+|---------|----------------|--------|
+| Hashing | bcrypt | ✅ VERIFIED |
+| Rounds | 10 | ✅ VERIFIED |
+| Auto-migrate | Yes | ✅ VERIFIED |
+| Timing Equalization | Dummy hash | ✅ VERIFIED |
+
+### 4.2 JWT Security
+
+| Measure | Implementation | Status |
+|---------|----------------|--------|
+| Library | jsonwebtoken | ✅ VERIFIED |
+| Access Token TTL | 15 minutes | ✅ VERIFIED |
+| Refresh Token TTL | 7 days | ✅ VERIFIED |
+| Separate Secrets | Yes | ✅ VERIFIED |
+| Token Claims | sub, username, role, jti | ✅ VERIFIED |
+
+### 4.3 Token Revocation (Aligned)
+
+| Measure | Implementation | Status |
+|---------|----------------|--------|
+| Storage | In-memory Set | ✅ VERIFIED |
+| Scope | Per-process | ✅ VERIFIED |
+| Revocation | revokeToken() | ✅ VERIFIED |
+
+**Note:** Token revocation is per-process only. In multi-instance deployments, revocation does not carry across instances.
+
+---
+
+## 5. AUTHORIZATION SECURITY (VERIFIED)
+
+### 5.1 RBAC Implementation
+
+| Measure | Implementation | Status |
+|---------|----------------|--------|
+| Role Guard | requireRole() | ✅ VERIFIED |
+| Permission Guard | requirePermission() | ✅ VERIFIED |
+| Write Guard | writeRoleGuard() | ✅ VERIFIED |
+| Owner/Admin Bypass | Yes | ✅ VERIFIED |
+
+### 5.2 Roles (Verified Existing)
+
+| Role | Access Level | Status |
+|------|--------------|--------|
+| Owner | Full access | ✅ VERIFIED |
+| Admin | Full access | ✅ VERIFIED |
+| Manager | Write access | ✅ VERIFIED |
+| Sales | Write access | ✅ VERIFIED |
+| Viewer | Read-only | ✅ VERIFIED |
+
+---
+
+## 6. DATA SECURITY (VERIFIED)
+
+### 6.1 File Persistence Security
+
+| Measure | Implementation | Status |
+|---------|----------------|--------|
+| Atomic Writes | Temp-file-then-rename | ✅ VERIFIED |
+| Cache Validation | mtime check | ✅ VERIFIED |
+| Corruption Recovery | Automatic | ✅ VERIFIED |
+
+### 6.2 Input Validation
+
+| Measure | Implementation | Status |
+|---------|----------------|--------|
+| Schema Validation | Joi | ✅ VERIFIED |
+| Request Sanitization | Body sanitizer | ✅ VERIFIED |
+
+---
+
+## 7. MONITORING SECURITY (VERIFIED)
+
+### 7.1 Logging
+
+| Type | Implementation | Status |
+|------|----------------|--------|
+| HTTP Access | Morgan | ✅ VERIFIED |
+| Application | Winston | ✅ VERIFIED |
+| Slow Requests | Detection | ✅ VERIFIED |
+
+### 7.2 Health Checks
+
+| Endpoint | Purpose | Status |
+|----------|---------|--------|
+| /api/v1/health | Application health | ✅ VERIFIED |
+| /api/v1/liveness | Liveness probe | ✅ VERIFIED |
+| /api/v1/ready | Readiness probe | ✅ VERIFIED |
+
+---
+
+## 8. NEW SECURITY FEATURES (Phase 24 Scope)
+
+### 8.1 OAuth2 Security
+
 | Measure | Implementation |
 |---------|----------------|
-| Hashing | bcrypt (cost 12) |
-| Minimum length | 12 characters |
-| Complexity | Upper, lower, number, special |
-| History | Last 5 passwords |
-| Expiry | 90 days |
-| Breached check | HaveIBeenPwned |
+| Provider | Google, GitHub |
+| Flow | Authorization Code |
+| State Parameter | CSRF protection |
+| Token Exchange | Server-side only |
 
-### 4.2 Token Security
-
-| Measure | Implementation |
-|---------|----------------|
-| Algorithm | RS256 |
-| Access token expiry | 15 minutes |
-| Refresh token expiry | 7 days |
-| Token rotation | On every use |
-| Blacklisting | Redis |
-
-### 4.3 MFA Security
+### 8.2 MFA Security
 
 | Measure | Implementation |
 |---------|----------------|
 | Method | TOTP |
-| Backup codes | 10 codes |
-| Rate limiting | 5 attempts/15 min |
-| Device trust | Configurable |
+| Backup Codes | 10 single-use |
+| Rate Limiting | 5 attempts/15min |
+| Device Trust | Configurable |
 
----
-
-## 5. AUTHORIZATION SECURITY
-
-### 5.1 Permission Checks
-
-| Check | Implementation |
-|-------|----------------|
-| Role validation | Middleware |
-| Permission validation | Middleware |
-| Tenant isolation | RLS policies |
-| Branch isolation | Query filters |
-
-### 5.2 Privilege Escalation Prevention
-
-| Measure | Implementation |
-|---------|----------------|
-| Role hierarchy | Enforced |
-| Permission inheritance | Limited |
-| Custom roles | Restricted |
-| Admin protection | Super Admin only |
-
----
-
-## 6. DATA SECURITY
-
-### 6.1 Encryption at Rest
-
-| Data | Encryption |
-|------|------------|
-| Passwords | bcrypt |
-| Tokens | AES-256 |
-| Sensitive data | AES-256 |
-| Backups | AES-256 |
-
-### 6.2 Encryption in Transit
-
-| Connection | Encryption |
-|------------|------------|
-| Client → API | TLS 1.3 |
-| API → Database | TLS 1.2 |
-| API → Cache | TLS 1.2 |
-
-### 6.3 Input Validation
-
-| Input | Validation |
-|-------|------------|
-| Email | RFC 5322 |
-| Password | Policy check |
-| Name | Alphanumeric + spaces |
-| Phone | E.164 format |
-
-### 6.4 Output Encoding
-
-| Context | Encoding |
-|---------|----------|
-| HTML | HTML entities |
-| JavaScript | JS escaping |
-| URL | URL encoding |
-| SQL | Parameterized queries |
-
----
-
-## 7. API SECURITY
-
-### 7.1 API Key Security
+### 8.3 API Key Security
 
 | Measure | Implementation |
 |---------|----------------|
 | Format | Prefixed string |
 | Hashing | SHA-256 |
-| Rotation | Manual |
 | Scope | Limited permissions |
-
-### 7.2 Request Validation
-
-| Validation | Implementation |
-|------------|----------------|
-| Content-Type | Enforced |
-| Body size | 1MB limit |
-| Required fields | Joi validation |
-| Type checking | Schema validation |
-
-### 7.3 Response Security
-
-| Measure | Implementation |
-|---------|----------------|
-| Error messages | Generic |
-| Stack traces | Hidden |
-| Sensitive data | Masked |
+| Rotation | Manual |
 
 ---
 
-## 8. AUDIT SECURITY
+## 9. SECURITY AUDIT
 
-### 8.1 Audit Events
+### 9.1 Audit Events
 
 | Event | Level | Details |
 |-------|-------|---------|
@@ -264,77 +241,29 @@
 | Logout | INFO | user_id, ip |
 | Password change | INFO | user_id, ip |
 | Permission denied | WARN | user_id, resource, action |
-| Tenant violation | CRITICAL | user_id, tenant_id |
 
-### 8.2 Audit Log Security
+### 9.2 Log Security
 
 | Measure | Implementation |
 |---------|----------------|
 | Immutability | Append-only |
-| Retention | 1 year |
-| Access control | Admin only |
-| Encryption | AES-256 |
+| Retention | Configurable |
+| Access Control | Admin only |
 
 ---
 
-## 9. INCIDENT RESPONSE
+## 10. SECURITY TESTING
 
-### 9.1 Incident Types
-
-| Type | Severity | Response |
-|------|----------|----------|
-| Data breach | Critical | Immediate |
-| Unauthorized access | High | 1 hour |
-| DDoS attack | High | Immediate |
-| Vulnerability | Medium | 24 hours |
-
-### 9.2 Response Steps
-
-| Step | Action |
-|------|--------|
-| 1 | Detect and alert |
-| 2 | Contain |
-| 3 | Investigate |
-| 4 | Remediate |
-| 5 | Report |
-| 6 | Learn |
-
----
-
-## 10. COMPLIANCE
-
-### 10.1 Standards
-
-| Standard | Status |
-|----------|--------|
-| OWASP Top 10 | Compliant |
-| GDPR | Partial |
-| SOC 2 | Future |
-| ISO 27001 | Future |
-
-### 10.2 Data Protection
-
-| Measure | Implementation |
-|---------|----------------|
-| Data minimization | Collect only needed |
-| Purpose limitation | Use only for stated purpose |
-| Storage limitation | Delete when no longer needed |
-| Right to erasure | Supported |
-
----
-
-## 11. SECURITY TESTING
-
-### 11.1 Test Types
+### 10.1 Test Types
 
 | Type | Frequency |
 |------|-----------|
-| SAST | Every build |
-| DAST | Weekly |
+| Unit Tests | Every build |
+| Integration Tests | Every build |
+| Security Tests | Weekly |
 | Penetration | Quarterly |
-| Bug bounty | Continuous |
 
-### 11.2 Vulnerability Management
+### 10.2 Vulnerability Management
 
 | Phase | Action |
 |-------|--------|
@@ -345,22 +274,5 @@
 
 ---
 
-## 12. SECURITY MONITORING
-
-### 12.1 Metrics
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| security_auth_failures | Counter | Failed authentications |
-| security_rate_limit_hits | Counter | Rate limit violations |
-| security_permission_denied | Counter | Permission denials |
-| security_tenant_violations | Counter | Tenant violations |
-
-### 12.2 Alerts
-
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| Brute force | > 20 failures/min | Critical |
-| DDoS detected | > 1000 req/sec | Critical |
-| Tenant violation | > 0 | Critical |
-| Permission escalation | > 0 | Critical |
+**Document Generated:** 2026-08-05
+**Status:** REVISED - Aligned with Verified Architecture

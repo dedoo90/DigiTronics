@@ -2,7 +2,7 @@
 ## DigiTronics V2 Enterprise Deployment Strategy
 
 **Date:** 2026-08-05
-**Status:** PLANNING ONLY
+**Status:** REVISED - Aligned with Verified Architecture
 **Phase:** 24 - API Foundation & Authentication
 
 ---
@@ -16,149 +16,214 @@
 | Strategy | Blue-Green |
 | Zero-downtime | Yes |
 | Rollback | Automated |
-| Environment | Docker + Kubernetes |
+| Environment | Docker + Docker Compose |
 
 ### 1.2 Environments
 
 | Environment | Purpose | Infrastructure |
 |-------------|---------|----------------|
 | Development | Local development | Docker Compose |
-| Staging | Pre-production testing | Kubernetes |
-| Production | Live system | Kubernetes |
+| Staging | Pre-production testing | Docker Compose |
+| Production | Live system | Docker + Nginx |
 
 ---
 
-## 2. INFRASTRUCTURE
+## 2. INFRASTRUCTURE (ALIGNED WITH VERIFIED ARCHITECTURE)
 
-### 2.1 Docker Configuration
+### 2.1 Current State (Verified)
+
+| Component | Status | Technology |
+|-----------|--------|------------|
+| Runtime | EXISTS | Node.js 22 |
+| Framework | EXISTS | Express.js |
+| Data Persistence | EXISTS | JSON file storage |
+| Authentication | EXISTS | JWT + bcrypt |
+| Rate Limiting | EXISTS | express-rate-limit |
+| Security | EXISTS | Helmet + Nginx |
+
+### 2.2 Docker Configuration (Aligned)
 
 ```dockerfile
-# Dockerfile
-FROM node:20-alpine AS builder
+# Dockerfile - Aligned with verified backend/Dockerfile
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 COPY . .
-RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
+RUN addgroup -g 1001 -S digitronics && \
+    adduser -S digitronics -u 1001
+COPY --from=builder /app ./
+RUN chown -R digitronics:digitronics /app
+USER digitronics
 
-EXPOSE 3000
-CMD ["node", "dist/server.js"]
+EXPOSE 3001
+CMD ["node", "server.js"]
 ```
 
-### 2.2 Docker Compose (Development)
+### 2.3 Docker Compose (Development)
 
 ```yaml
-# docker-compose.yml
+# docker-compose.yml - Aligned with verified configuration
 version: '3.8'
 
 services:
-  api:
-    build: .
+  backend:
+    build: ./backend
     ports:
-      - "3000:3000"
+      - "${BACKEND_PORT:-3001}:3001"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://user:pass@db:5432/digitronics
-      - REDIS_URL=redis://redis:6379
-    depends_on:
-      - db
-      - redis
-  
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=digitronics
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-dev-secret}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-dev-secret-refresh}
+      - AUTH_REQUIRED=${AUTH_REQUIRED:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-1000}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-  
-  redis:
-    image: redis:7-alpine
-    volumes:
-      - redis_data:/data
+      - ./backend/data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-volumes:
-  postgres_data:
-  redis_data:
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+      - ./manifest.json:/usr/share/nginx/html/manifest.json:ro
+      - ./sw.js:/usr/share/nginx/html/sw.js:ro
+      - ./icons:/usr/share/nginx/html/icons:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    profiles:
+      - nginx
 ```
 
-### 2.3 Kubernetes Manifests
+### 2.4 Environment Variables
 
-```yaml
-# k8s/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: digitronics-api
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: digitronics-api
-  template:
-    metadata:
-      labels:
-        app: digitronics-api
-    spec:
-      containers:
-        - name: api
-          image: digitronics/api:latest
-          ports:
-            - containerPort: 3000
-          env:
-            - name: NODE_ENV
-              value: production
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: digitronics-secrets
-                  key: database-url
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "250m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 3000
-            initialDelaySeconds: 5
-            periodSeconds: 5
+```bash
+# .env.example - Aligned with verified configuration
+PORT=3001
+JWT_SECRET=change-me-to-a-long-random-string
+JWT_REFRESH_SECRET=change-me-to-another-long-random-string
+JWT_ACCESS_TTL=15m
+JWT_REFRESH_TTL=7d
+AUTH_REQUIRED=false
+CORS_ORIGINS=
+RATE_LIMIT_MAX=1000
+BODY_LIMIT=10mb
+LOG_FILE=
+SLOW_REQUEST_MS=1000
+HTTP_PORT=80
 ```
 
 ---
 
-## 3. CI/CD PIPELINE
+## 3. DATA PERSISTENCE (ALIGNED)
 
-### 3.1 Pipeline Stages
+### 3.1 Current State (Verified)
 
+| Aspect | Status |
+|--------|--------|
+| Storage | JSON file persistence |
+| Location | backend/data/ |
+| Files | purchases.json, sales.json |
+| Pattern | Atomic writes with temp-file-then-rename |
+| Cache | In-memory with mtime validation |
+
+### 3.2 Data Volume Mount
+
+```yaml
+volumes:
+  - ./backend/data:/app/data
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     CI/CD PIPELINE                          │
-├─────────────────────────────────────────────────────────────┤
-│  1. Code Review → 2. Build → 3. Test → 4. Deploy Staging   │
-│     → 5. Integration Tests → 6. Deploy Production          │
-└─────────────────────────────────────────────────────────────┘
+
+### 3.3 Backup Strategy
+
+| Type | Frequency | Method |
+|------|-----------|--------|
+| Full | Daily | Copy backend/data/*.json |
+| Incremental | Hourly | rsync |
+| Retention | 7 days | Automated cleanup |
+
+---
+
+## 4. NGINX CONFIGURATION (ALIGNED)
+
+### 4.1 Nginx Config
+
+```nginx
+# nginx.conf - Aligned with verified configuration
+worker_processes auto;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    sendfile on;
+    keepalive_timeout 65;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+
+    upstream digitronics_backend {
+        server backend:3001;
+        keepalive 32;
+    }
+
+    server {
+        listen 80;
+        server_name _;
+
+        # Security headers
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+        # Static frontend
+        location / {
+            root /usr/share/nginx/html;
+            try_files $uri $uri/ /index.html;
+        }
+
+        # API proxy
+        location /api/ {
+            proxy_pass http://digitronics_backend;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Health endpoint
+        location /api/v1/health {
+            proxy_pass http://digitronics_backend;
+            proxy_read_timeout 5s;
+        }
+    }
+}
 ```
 
-### 3.2 GitHub Actions
+---
+
+## 5. CI/CD PIPELINE (ALIGNED)
+
+### 5.1 GitHub Actions
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -173,12 +238,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
       - name: Install dependencies
         run: npm ci
+        working-directory: ./backend
       - name: Run tests
         run: npm test
-      - name: Run security scan
-        run: npm run security:scan
+        working-directory: ./backend
 
   build:
     needs: test
@@ -186,293 +255,109 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Docker image
-        run: docker build -t digitronics/api:${{ github.sha }} .
+        run: docker build -t digitronics-backend:${{ github.sha }} ./backend
       - name: Push to registry
-        run: docker push digitronics/api:${{ github.sha }}
+        run: docker push digitronics-backend:${{ github.sha }}
 
-  deploy-staging:
+  deploy:
     needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to staging
-        run: kubectl set image deployment/digitronics-api api=digitronics/api:${{ github.sha }} -n staging
-
-  deploy-production:
-    needs: deploy-staging
     runs-on: ubuntu-latest
     environment: production
     steps:
       - name: Deploy to production
-        run: kubectl set image deployment/digitronics-api api=digitronics/api:${{ github.sha }} -n production
+        run: |
+          docker-compose down
+          docker-compose up -d
 ```
 
 ---
 
-## 4. BLUE-GREEN DEPLOYMENT
+## 6. MONITORING (ALIGNED)
 
-### 4.1 Deployment Process
+### 6.1 Health Checks
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     BLUE-GREEN DEPLOYMENT                   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  1. Deploy new version to GREEN environment                 │
-│                                                             │
-│  2. Run health checks on GREEN                              │
-│                                                             │
-│  3. Switch traffic from BLUE to GREEN                       │
-│                                                             │
-│  4. Monitor for issues                                      │
-│                                                             │
-│  5. If issues → Rollback to BLUE                            │
-│     If success → Terminate BLUE                             │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+| Endpoint | Purpose | Interval |
+|----------|---------|----------|
+| /api/v1/health | Application health | 30s |
+| /api/v1/liveness | Liveness probe | 10s |
+| /api/v1/ready | Readiness probe | 5s |
 
-### 4.2 Kubernetes Implementation
+### 6.2 Logging
 
-```yaml
-# k8s/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: digitronics-api
-spec:
-  selector:
-    app: digitronics-api
-    version: green
-  ports:
-    - port: 80
-      targetPort: 3000
-```
+| Type | Technology | Purpose |
+|------|------------|---------|
+| Access | Morgan | HTTP requests |
+| Application | Winston | App logs |
+| Error | Winston | Error tracking |
 
 ---
 
-## 5. MONITORING
+## 7. SECURITY (ALIGNED)
 
-### 5.1 Health Checks
+### 7.1 Security Measures
 
-| Check | Endpoint | Interval |
-|-------|----------|----------|
-| Liveness | /health | 10s |
-| Readiness | /health/ready | 5s |
-| Startup | /health/startup | 30s |
-
-### 5.2 Prometheus Metrics
-
-```javascript
-const promClient = require('prom-client');
-
-const collectDefaultMetrics = promClient.collectDefaultMetrics;
-collectDefaultMetrics();
-
-const httpRequestDuration = new promClient.Histogram({
-  name: 'http_request_duration_seconds',
-  help: 'Duration of HTTP requests in seconds',
-  labelNames: ['method', 'route', 'status_code'],
-  buckets: [0.01, 0.05, 0.1, 0.5, 1, 5]
-});
-
-app.use((req, res, next) => {
-  const end = httpRequestDuration.startTimer();
-  res.on('finish', () => {
-    end({ method: req.method, route: req.route?.path, status_code: res.statusCode });
-  });
-  next();
-});
-```
+| Measure | Implementation |
+|---------|----------------|
+| HTTPS | Nginx + SSL |
+| Security Headers | Helmet + Nginx |
+| Rate Limiting | express-rate-limit |
+| CORS | cors middleware |
+| Input Validation | Joi schemas |
+| Password Hashing | bcrypt |
 
 ---
 
-## 6. SECRETS MANAGEMENT
+## 8. ROLLBACK PROCEDURE
 
-### 6.1 Kubernetes Secrets
-
-```yaml
-# k8s/secrets.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: digitronics-secrets
-type: Opaque
-stringData:
-  database-url: postgresql://user:pass@db:5432/digitronics
-  redis-url: redis://redis:6379
-  jwt-secret: your-jwt-secret
-  jwt-refresh-secret: your-refresh-secret
-```
-
-### 6.2 Environment Variables
-
-| Variable | Source |
-|----------|--------|
-| DATABASE_URL | Secret |
-| REDIS_URL | Secret |
-| JWT_SECRET | Secret |
-| JWT_REFRESH_SECRET | Secret |
-| NODE_ENV | ConfigMap |
-
----
-
-## 7. LOGGING
-
-### 7.1 Structured Logging
-
-```javascript
-const winston = require('winston');
-
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  defaultMeta: { service: 'digitronics-api' },
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' })
-  ]
-});
-```
-
-### 7.2 Log Aggregation
-
-| Tool | Purpose |
-|------|---------|
-| ELK Stack | Log aggregation |
-| Fluentd | Log collection |
-| Kibana | Log visualization |
-
----
-
-## 8. ALERTING
-
-### 8.1 Alert Rules
-
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| HighErrorRate | 5xx > 5% | Critical |
-| HighLatency | p95 > 2s | High |
-| PodRestart | Restart > 3 | Medium |
-| MemoryUsage | > 80% | Medium |
-
-### 8.2 Alertmanager Configuration
-
-```yaml
-# alertmanager.yml
-route:
-  group_by: ['alertname', 'severity']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 1h
-  receiver: 'slack'
-
-receivers:
-  - name: 'slack'
-    slack_configs:
-      - api_url: 'https://hooks.slack.com/xxx'
-        channel: '#alerts'
-```
-
----
-
-## 9. BACKUP STRATEGY
-
-### 9.1 Database Backup
-
-| Type | Frequency | Retention |
-|------|-----------|-----------|
-| Full | Daily | 30 days |
-| Incremental | Hourly | 7 days |
-| WAL | Continuous | 3 days |
-
-### 9.2 Backup Commands
+### 8.1 Rollback Steps
 
 ```bash
-# Full backup
-pg_dump -U user digitronics > backup_$(date +%Y%m%d).sql
+# 1. Stop current deployment
+docker-compose down
 
-# Restore
-psql -U user digitronics < backup_20260805.sql
+# 2. Checkout previous version
+git checkout <previous-commit>
+
+# 3. Rebuild and deploy
+docker-compose build
+docker-compose up -d
+
+# 4. Verify health
+curl http://localhost:3001/api/v1/health
 ```
 
 ---
 
-## 10. DISASTER RECOVERY
+## 9. DEPLOYMENT CHECKLIST
 
-### 10.1 RPO/RTO
+### 9.1 Pre-Deployment
 
-| Metric | Target |
-|--------|--------|
-| RPO | 1 hour |
-| RTO | 4 hours |
+| Check | Action |
+|-------|--------|
+| 1 | Run tests |
+| 2 | Build Docker image |
+| 3 | Verify health check |
+| 4 | Check logs |
 
-### 10.2 DR Process
+### 9.2 Deployment
 
-| Step | Action |
-|------|--------|
-| 1 | Assess damage |
-| 2 | Restore database |
-| 3 | Deploy application |
-| 4 | Verify functionality |
-| 5 | Switch DNS |
+| Check | Action |
+|-------|--------|
+| 1 | Pull latest code |
+| 2 | Stop services |
+| 3 | Start services |
+| 4 | Verify health |
 
----
+### 9.3 Post-Deployment
 
-## 11. ROLLBACK PROCEDURES
-
-### 11.1 Rollback Triggers
-
-| Trigger | Action |
-|---------|--------|
-| Error rate > 10% | Automatic rollback |
-| Health check failure | Automatic rollback |
-| Manual trigger | Manual rollback |
-
-### 11.2 Rollback Commands
-
-```bash
-# Rollback to previous version
-kubectl rollout undo deployment/digitronics-api -n production
-
-# Rollback to specific version
-kubectl rollout undo deployment/digitronics-api --to-revision=5 -n production
-```
+| Check | Action |
+|-------|--------|
+| 1 | Monitor logs |
+| 2 | Check error rates |
+| 3 | Verify API responses |
+| 4 | Test critical flows |
 
 ---
 
-## 12. PERFORMANCE TUNING
-
-### 12.1 Resource Limits
-
-| Resource | Request | Limit |
-|----------|---------|-------|
-| CPU | 250m | 500m |
-| Memory | 256Mi | 512Mi |
-
-### 12.2 Autoscaling
-
-```yaml
-# k8s/hpa.yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: digitronics-api
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: digitronics-api
-  minReplicas: 3
-  maxReplicas: 10
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-```
+**Document Generated:** 2026-08-05
+**Status:** REVISED - Aligned with Verified Architecture

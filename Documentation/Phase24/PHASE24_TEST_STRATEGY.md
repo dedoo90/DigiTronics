@@ -2,7 +2,7 @@
 ## DigiTronics V2 Enterprise Test Strategy
 
 **Date:** 2026-08-05
-**Status:** PLANNING ONLY
+**Status:** REVISED - Aligned with Verified Architecture
 **Phase:** 24 - API Foundation & Authentication
 
 ---
@@ -19,14 +19,14 @@
 ├─────────────────────────────────────────────────────────────┤
 │                     INTEGRATION TESTS (30%)                 │
 │  - API endpoints                                            │
-│  - Database operations                                      │
+│  - File operations                                          │
 │  - Service interactions                                     │
 ├─────────────────────────────────────────────────────────────┤
 │                     UNIT TESTS (60%)                        │
 │  - Services                                                 │
-│  - Repositories                                             │
-│  - Middleware                                               │
 │  - Utilities                                                │
+│  - Middleware                                               │
+│  - Helpers                                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -35,16 +35,60 @@
 | Component | Target | Minimum |
 |-----------|--------|---------|
 | Services | 90% | 80% |
-| Repositories | 85% | 75% |
+| Utilities | 85% | 75% |
 | Middleware | 95% | 90% |
 | Routes | 80% | 70% |
 | Overall | 85% | 75% |
 
+### 1.3 Test Environment
+
+| Component | Technology | Status |
+|-----------|------------|--------|
+| Runtime | Node.js 22 | EXISTS |
+| Framework | Jest | EXISTS |
+| HTTP Testing | Supertest | EXISTS |
+| E2E | Playwright | EXISTS |
+| Data Persistence | JSON files (test) | EXISTS |
+| Authentication | JWT (test) | EXISTS |
+
 ---
 
-## 2. UNIT TESTS
+## 2. EXISTING TESTS (VERIFIED)
 
-### 2.1 Service Tests
+### 2.1 Backend Tests
+
+| Test File | Purpose | Status |
+|-----------|---------|--------|
+| auth.test.js | Authentication endpoints | EXISTS |
+| security.test.js | Security middleware | EXISTS |
+| smoke.test.js | Smoke tests | EXISTS |
+| health.test.js | Health endpoint | EXISTS |
+| crud.test.js | CRUD operations | EXISTS |
+| sales.test.js | Sales invoices | EXISTS |
+| purchases.test.js | Purchase invoices | EXISTS |
+| inventory.test.js | Inventory management | EXISTS |
+| partnersVouchers.test.js | Partners & vouchers | EXISTS |
+| dashboardReports.test.js | Dashboard & reports | EXISTS |
+| middleware.test.js | Middleware behavior | EXISTS |
+| fileStore.test.js | File persistence | EXISTS |
+| sync.test.js | Sync operations | EXISTS |
+| shutdown.test.js | Graceful shutdown | EXISTS |
+| helpers.test.js | Test utilities | EXISTS |
+
+### 2.2 Test Helpers
+
+| Helper | Purpose | Status |
+|--------|---------|--------|
+| authHelper.js | Authentication utilities | EXISTS |
+| cleanup.js | Test cleanup | EXISTS |
+| testData.js | Test data generation | EXISTS |
+| testServer.js | Test server setup | EXISTS |
+
+---
+
+## 3. UNIT TESTS
+
+### 3.1 Service Tests
 
 ```javascript
 // tests/unit/services/auth.service.test.js
@@ -54,10 +98,9 @@ describe('AuthService', () => {
       // Arrange
       const email = 'test@example.com';
       const password = 'ValidPassword123!';
-      const tenantSlug = 'test-tenant';
       
       // Act
-      const result = await authService.login(email, password, tenantSlug);
+      const result = await authService.login(email, password);
       
       // Assert
       expect(result).toHaveProperty('access_token');
@@ -69,98 +112,110 @@ describe('AuthService', () => {
       // Arrange
       const email = 'test@example.com';
       const password = 'WrongPassword';
-      const tenantSlug = 'test-tenant';
       
       // Act & Assert
-      await expect(authService.login(email, password, tenantSlug))
+      await expect(authService.login(email, password))
         .rejects.toThrow('Invalid credentials');
     });
   });
 });
 ```
 
-### 2.2 Repository Tests
+### 3.2 Utility Tests
 
 ```javascript
-// tests/unit/repositories/user.repository.test.js
-describe('UserRepository', () => {
-  describe('findByEmail', () => {
-    it('should return user for valid email', async () => {
+// tests/unit/utils/jwt.test.js
+describe('JWT Utils', () => {
+  describe('signAccessToken', () => {
+    it('should generate valid access token', () => {
       // Arrange
-      const email = 'test@example.com';
+      const payload = { sub: 'user-123', role: 'admin' };
       
       // Act
-      const user = await userRepository.findByEmail(email);
+      const token = signAccessToken(payload);
       
       // Assert
-      expect(user).toBeDefined();
-      expect(user.email).toBe(email);
+      expect(token).toBeDefined();
+      expect(typeof token).toBe('string');
+    });
+  });
+  
+  describe('verifyAccessToken', () => {
+    it('should verify valid token', () => {
+      // Arrange
+      const payload = { sub: 'user-123', role: 'admin' };
+      const token = signAccessToken(payload);
+      
+      // Act
+      const decoded = verifyAccessToken(token);
+      
+      // Assert
+      expect(decoded.sub).toBe('user-123');
+      expect(decoded.role).toBe('admin');
     });
     
-    it('should return null for non-existent email', async () => {
+    it('should throw on invalid token', () => {
       // Arrange
-      const email = 'nonexistent@example.com';
+      const invalidToken = 'invalid.token.here';
       
-      // Act
-      const user = await userRepository.findByEmail(email);
-      
-      // Assert
-      expect(user).toBeNull();
+      // Act & Assert
+      expect(() => verifyAccessToken(invalidToken)).toThrow();
     });
   });
 });
 ```
 
-### 2.3 Middleware Tests
+### 3.3 Middleware Tests
 
 ```javascript
-// tests/unit/middleware/authenticate.test.js
-describe('authenticate middleware', () => {
-  it('should pass valid token', async () => {
-    // Arrange
-    const req = { headers: { authorization: `Bearer ${validToken}` } };
-    const res = {};
-    const next = jest.fn();
+// tests/unit/middleware/auth.test.js
+describe('Auth Middleware', () => {
+  describe('requireAuth', () => {
+    it('should pass with valid token', async () => {
+      // Arrange
+      const req = { headers: { authorization: `Bearer ${validToken}` } };
+      const res = {};
+      const next = jest.fn();
+      
+      // Act
+      await requireAuth(req, res, next);
+      
+      // Assert
+      expect(next).toHaveBeenCalled();
+      expect(req.user).toBeDefined();
+    });
     
-    // Act
-    await authenticate(req, res, next);
-    
-    // Assert
-    expect(next).toHaveBeenCalled();
-    expect(req.user).toBeDefined();
-  });
-  
-  it('should reject invalid token', async () => {
-    // Arrange
-    const req = { headers: { authorization: 'Bearer invalid' } };
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
-    const next = jest.fn();
-    
-    // Act
-    await authenticate(req, res, next);
-    
-    // Assert
-    expect(res.status).toHaveBeenCalledWith(401);
-    expect(next).not.toHaveBeenCalled();
+    it('should reject without token', async () => {
+      // Arrange
+      const req = { headers: {} };
+      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+      const next = jest.fn();
+      
+      // Act
+      await requireAuth(req, res, next);
+      
+      // Assert
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(next).not.toHaveBeenCalled();
+    });
   });
 });
 ```
 
 ---
 
-## 3. INTEGRATION TESTS
+## 4. INTEGRATION TESTS
 
-### 3.1 API Tests
+### 4.1 API Endpoint Tests
 
 ```javascript
 // tests/integration/auth/login.test.js
-describe('POST /auth/login', () => {
+describe('POST /api/v1/auth/login', () => {
   it('should return 200 for valid credentials', async () => {
     // Arrange
     const payload = {
       email: 'test@example.com',
-      password: 'ValidPassword123!',
-      tenant_slug: 'test-tenant'
+      password: 'ValidPassword123!'
     };
     
     // Act
@@ -178,8 +233,7 @@ describe('POST /auth/login', () => {
     // Arrange
     const payload = {
       email: 'test@example.com',
-      password: 'WrongPassword',
-      tenant_slug: 'test-tenant'
+      password: 'WrongPassword'
     };
     
     // Act
@@ -191,62 +245,50 @@ describe('POST /auth/login', () => {
     expect(response.status).toBe(401);
     expect(response.body.success).toBe(false);
   });
-  
-  it('should return 429 when rate limited', async () => {
-    // Arrange
-    const payload = {
-      email: 'test@example.com',
-      password: 'WrongPassword',
-      tenant_slug: 'test-tenant'
-    };
-    
-    // Act - Make 6 requests
-    for (let i = 0; i < 6; i++) {
-      await request(app)
-        .post('/api/v1/auth/login')
-        .send(payload);
-    }
-    
-    // Assert
-    expect(response.status).toBe(429);
-  });
 });
 ```
 
-### 3.2 Database Tests
+### 4.2 File Persistence Tests
 
 ```javascript
-// tests/integration/repositories/user.repository.test.js
-describe('UserRepository', () => {
-  beforeAll(async () => {
-    await database.migrate.latest();
-  });
-  
-  afterAll(async () => {
-    await database.migrate.rollback();
-    await database.destroy();
-  });
-  
-  describe('create', () => {
-    it('should create user in database', async () => {
+// tests/integration/utils/fileStore.test.js
+describe('FileStore', () => {
+  describe('read', () => {
+    it('should read existing file', async () => {
       // Arrange
-      const userData = {
-        email: 'test@example.com',
-        name: 'Test User',
-        role: 'viewer',
-        tenant_id: 'test-tenant-id'
-      };
+      const filename = 'test.json';
       
       // Act
-      const user = await userRepository.create(userData);
+      const data = await fileStore.read(filename);
       
       // Assert
-      expect(user).toHaveProperty('id');
-      expect(user.email).toBe(userData.email);
+      expect(data).toBeDefined();
+    });
+    
+    it('should return null for non-existent file', async () => {
+      // Arrange
+      const filename = 'nonexistent.json';
       
-      // Verify in database
-      const dbUser = await database('users').where({ id: user.id }).first();
-      expect(dbUser).toBeDefined();
+      // Act
+      const data = await fileStore.read(filename);
+      
+      // Assert
+      expect(data).toBeNull();
+    });
+  });
+  
+  describe('write', () => {
+    it('should write data atomically', async () => {
+      // Arrange
+      const filename = 'test-write.json';
+      const data = { test: 'data' };
+      
+      // Act
+      await fileStore.write(filename, data);
+      
+      // Assert
+      const readData = await fileStore.read(filename);
+      expect(readData).toEqual(data);
     });
   });
 });
@@ -254,137 +296,26 @@ describe('UserRepository', () => {
 
 ---
 
-## 4. E2E TESTS
+## 5. E2E TESTS
 
-### 4.1 Critical User Flows
+### 5.1 Critical User Flows
 
 ```javascript
-// tests/e2e/auth-flow.test.js
+// tests/e2e/auth-flow.spec.js
 describe('Authentication Flow', () => {
-  it('should complete full login flow', async () => {
-    // 1. Login
-    const loginResponse = await request(app)
-      .post('/api/v1/auth/login')
-      .send({
-        email: 'test@example.com',
-        password: 'ValidPassword123!',
-        tenant_slug: 'test-tenant'
-      });
+  it('should complete full login flow', async ({ page }) => {
+    // 1. Navigate to login
+    await page.goto('http://localhost:3000');
     
-    expect(loginResponse.status).toBe(200);
-    const { access_token, refresh_token } = loginResponse.body.data;
+    // 2. Enter credentials
+    await page.fill('#loginUser', 'test@example.com');
+    await page.fill('#loginPass', 'ValidPassword123!');
     
-    // 2. Access protected resource
-    const usersResponse = await request(app)
-      .get('/api/v1/users')
-      .set('Authorization', `Bearer ${access_token}`);
+    // 3. Click login
+    await page.click('#loginBtn');
     
-    expect(usersResponse.status).toBe(200);
-    
-    // 3. Refresh token
-    const refreshResponse = await request(app)
-      .post('/api/v1/auth/refresh')
-      .send({ refresh_token });
-    
-    expect(refreshResponse.status).toBe(200);
-    expect(refreshResponse.body.data).toHaveProperty('access_token');
-    
-    // 4. Logout
-    const logoutResponse = await request(app)
-      .post('/api/v1/auth/logout')
-      .send({ refresh_token });
-    
-    expect(logoutResponse.status).toBe(200);
-  });
-});
-```
-
----
-
-## 5. SECURITY TESTS
-
-### 5.1 Authentication Tests
-
-```javascript
-// tests/security/auth.test.js
-describe('Authentication Security', () => {
-  it('should prevent brute force attacks', async () => {
-    // Arrange
-    const payload = {
-      email: 'test@example.com',
-      password: 'WrongPassword',
-      tenant_slug: 'test-tenant'
-    };
-    
-    // Act - Make 6 requests
-    const responses = [];
-    for (let i = 0; i < 6; i++) {
-      responses.push(
-        await request(app)
-          .post('/api/v1/auth/login')
-          .send(payload)
-      );
-    }
-    
-    // Assert - Last response should be rate limited
-    expect(responses[5].status).toBe(429);
-  });
-  
-  it('should prevent token replay attacks', async () => {
-    // Arrange
-    const token = await generateToken({ userId: 'test-user' });
-    
-    // Act - Use token twice
-    const response1 = await request(app)
-      .get('/api/v1/users/me')
-      .set('Authorization', `Bearer ${token}`);
-    
-    // Blacklist token
-    await blacklistToken(token);
-    
-    const response2 = await request(app)
-      .get('/api/v1/users/me')
-      .set('Authorization', `Bearer ${token}`);
-    
-    // Assert
-    expect(response1.status).toBe(200);
-    expect(response2.status).toBe(401);
-  });
-});
-```
-
-### 5.2 Authorization Tests
-
-```javascript
-// tests/security/authorization.test.js
-describe('Authorization Security', () => {
-  it('should prevent privilege escalation', async () => {
-    // Arrange
-    const viewerToken = await loginAs('viewer');
-    const adminToken = await loginAs('admin');
-    
-    // Act - Viewer tries to access admin endpoint
-    const response = await request(app)
-      .post('/api/v1/users')
-      .set('Authorization', `Bearer ${viewerToken}`)
-      .send({ email: 'new@example.com', name: 'New', role: 'admin' });
-    
-    // Assert
-    expect(response.status).toBe(403);
-  });
-  
-  it('should prevent cross-tenant access', async () => {
-    // Arrange
-    const tenant1Token = await loginAs('user@tenant1.com');
-    
-    // Act - Try to access tenant2 resources
-    const response = await request(app)
-      .get('/api/v1/users')
-      .set('Authorization', `Bearer ${tenant1Token}`)
-      .query({ tenant_id: 'tenant2-id' });
-    
-    // Assert
-    expect(response.status).toBe(403);
+    // 4. Verify redirect to dashboard
+    await expect(page).toHaveURL(/.*dashboard/);
   });
 });
 ```
@@ -400,15 +331,13 @@ describe('Authorization Security', () => {
 describe('API Performance', () => {
   it('should handle 100 concurrent requests', async () => {
     // Arrange
-    const token = await loginAs('admin');
     const requests = [];
     
-    // Act - Make 100 concurrent requests
+    // Act
     for (let i = 0; i < 100; i++) {
       requests.push(
         request(app)
-          .get('/api/v1/users')
-          .set('Authorization', `Bearer ${token}`)
+          .get('/api/v1/health')
       );
     }
     
@@ -417,7 +346,7 @@ describe('API Performance', () => {
     const duration = Date.now() - startTime;
     
     // Assert
-    expect(duration).toBeLessThan(5000); // 5 seconds
+    expect(duration).toBeLessThan(5000);
     responses.forEach(response => {
       expect(response.status).toBe(200);
     });
@@ -427,47 +356,34 @@ describe('API Performance', () => {
 
 ---
 
-## 7. TEST UTILITIES
+## 7. SECURITY TESTS
 
-### 7.1 Test Helpers
-
-```javascript
-// tests/helpers/auth.helper.js
-const generateToken = async (payload) => {
-  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
-};
-
-const loginAs = async (role) => {
-  const response = await request(app)
-    .post('/api/v1/auth/login')
-    .send({
-      email: `${role}@test.com`,
-      password: 'TestPassword123!',
-      tenant_slug: 'test-tenant'
-    });
-  
-  return response.body.data.access_token;
-};
-```
-
-### 7.2 Test Fixtures
+### 7.1 Authentication Security
 
 ```javascript
-// tests/fixtures/users.fixture.js
-module.exports = {
-  admin: {
-    email: 'admin@test.com',
-    name: 'Admin User',
-    role: 'tenant_admin',
-    tenant_id: 'test-tenant-id'
-  },
-  viewer: {
-    email: 'viewer@test.com',
-    name: 'Viewer User',
-    role: 'viewer',
-    tenant_id: 'test-tenant-id'
-  }
-};
+// tests/security/auth.test.js
+describe('Authentication Security', () => {
+  it('should prevent brute force attacks', async () => {
+    // Arrange
+    const payload = {
+      email: 'test@example.com',
+      password: 'WrongPassword'
+    };
+    
+    // Act
+    const responses = [];
+    for (let i = 0; i < 6; i++) {
+      responses.push(
+        await request(app)
+          .post('/api/v1/auth/login')
+          .send(payload)
+      );
+    }
+    
+    // Assert
+    expect(responses[5].status).toBe(429);
+  });
+});
 ```
 
 ---
@@ -479,29 +395,35 @@ module.exports = {
 ```yaml
 # .github/workflows/test.yml
 name: Tests
+
 on: [push, pull_request]
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v3
       
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+      
       - name: Install dependencies
         run: npm ci
+        working-directory: ./backend
       
       - name: Run unit tests
         run: npm run test:unit
+        working-directory: ./backend
       
       - name: Run integration tests
         run: npm run test:integration
+        working-directory: ./backend
       
       - name: Run security tests
         run: npm run test:security
-      
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        working-directory: ./backend
 ```
 
 ### 8.2 Test Scripts
@@ -529,24 +451,27 @@ jobs:
 
 | Component | Configuration |
 |-----------|---------------|
-| Database | PostgreSQL (test) |
-| Cache | Redis (test) |
+| Data Persistence | JSON files (test directory) |
 | JWT Secret | Test secret |
-| Rate Limiting | Disabled |
+| Rate Limiting | Disabled for tests |
+| Logging | Suppressed |
 
-### 9.2 Test Database
+### 9.2 Test Data
 
 ```javascript
-// tests/setup.js
-beforeAll(async () => {
-  await database.migrate.latest();
-  await database.seed.run();
-});
-
-afterAll(async () => {
-  await database.migrate.rollback();
-  await database.destroy();
-});
+// tests/fixtures/users.fixture.js
+module.exports = {
+  admin: {
+    email: 'admin@test.com',
+    name: 'Admin User',
+    role: 'Admin'
+  },
+  viewer: {
+    email: 'viewer@test.com',
+    name: 'Viewer User',
+    role: 'Viewer'
+  }
+};
 ```
 
 ---
@@ -569,3 +494,8 @@ afterAll(async () => {
 | Branches | 80% | 75% |
 | Functions | 85% | 80% |
 | Lines | 85% | 80% |
+
+---
+
+**Document Generated:** 2026-08-05
+**Status:** REVISED - Aligned with Verified Architecture
