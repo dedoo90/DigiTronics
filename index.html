@@ -30842,60 +30842,70 @@ function openPartnerEditModal(idx) {
   openModal('partnerModal');
 }
 
-function savePartner() {
-  const name = document.getElementById('partName').value.trim();
-  const phone = document.getElementById('partPhone').value.trim();
-  const phone2 = document.getElementById('partPhone2').value.trim();
-  const capital = parseFloat(document.getElementById('partCapital').value) || 0;
-  const percent = parseFloat(document.getElementById('partPercent').value) || 50;
+async function savePartner() {
+   const name = document.getElementById('partName').value.trim();
+   const phone = document.getElementById('partPhone').value.trim();
+   const phone2 = document.getElementById('partPhone2').value.trim();
+   const capital = parseFloat(document.getElementById('partCapital').value) || 0;
+   const percent = parseFloat(document.getElementById('partPercent').value) || 50;
 
-  if (!name) { showToast('أدخل اسم الشريك', 'error'); return; }
+   if (!name) { showToast('أدخل اسم الشريك', 'error'); return; }
 
-  if (editingPartnerIndex !== null) {
-    if (!isOwnerUser()) {
-      showToast('تعديل الشريك متاح للمالك فقط', 'error');
-      return;
-    }
+   if (editingPartnerIndex !== null) {
+     if (!isOwnerUser()) {
+       showToast('تعديل الشريك متاح للمالك فقط', 'error');
+       return;
+     }
 
-    if (!DB.partners[editingPartnerIndex]) {
-      showToast('الشريك غير موجود', 'error');
-      return;
-    }
+     if (!DB.partners[editingPartnerIndex]) {
+       showToast('الشريك غير موجود', 'error');
+       return;
+     }
 
-    DB.partners[editingPartnerIndex] = {
-      ...DB.partners[editingPartnerIndex],
-      name,
-      phone,
-      phone2,
-      capital,
-      percent,
-      initialCapital: Number.isFinite(DB.partners[editingPartnerIndex].initialCapital)
-        ? DB.partners[editingPartnerIndex].initialCapital
-        : capital,
-      createdAt: DB.partners[editingPartnerIndex].createdAt || new Date().toISOString()
-    };
-    syncPartnerWithCapitalPartner(DB.partners[editingPartnerIndex]);
-    showToast('تم تعديل الشريك');
-  } else {
-    DB.partners.push({
-      id: Date.now(),
-      name,
-      phone,
-      phone2,
-      capital,
-      initialCapital: capital,
-      percent,
-      createdAt: new Date().toISOString()
-    });
-    showToast('تم إضافة الشريك');
-  }
+     DB.partners[editingPartnerIndex] = {
+       ...DB.partners[editingPartnerIndex],
+       name,
+       phone,
+       phone2,
+       capital,
+       percent,
+       initialCapital: Number.isFinite(DB.partners[editingPartnerIndex].initialCapital)
+         ? DB.partners[editingPartnerIndex].initialCapital
+         : capital,
+       createdAt: DB.partners[editingPartnerIndex].createdAt || new Date().toISOString()
+     };
+     // Phase 23B: update in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.partners && DB.partners[editingPartnerIndex]._backendId) {
+       try { await backendApi.partners.update(DB.partners[editingPartnerIndex]._backendId, DB.partners[editingPartnerIndex]); } catch (_) {}
+     }
+     syncPartnerWithCapitalPartner(DB.partners[editingPartnerIndex]);
+     showToast('تم تعديل الشريك');
+   } else {
+     const newPartner = {
+       id: Date.now(),
+       name, phone, phone2, capital,
+       initialCapital: capital,
+       percent,
+       createdAt: new Date().toISOString()
+     };
+     // Phase 23B: create in backend when enabled
+     if (USE_BACKEND && backendApi && backendApi.partners) {
+       try {
+         const res = await backendApi.partners.create(newPartner);
+         if (res && res.success && res.data) { newPartner._backendId = res.data.id || null; newPartner._syncedToBackend = true; }
+       } catch (_) {}
+     }
+     DB.partners.push(newPartner);
+     syncPartnerWithCapitalPartner(newPartner);
+     showToast('تم إضافة الشريك');
+   }
 
-  saveDB();
-  ensureCapitalPartnerState();
-  editingPartnerIndex = null;
-  closeModal('partnerModal');
-  renderPartners();
-}
+   saveDB();
+   ensureCapitalPartnerState();
+   editingPartnerIndex = null;
+   closeModal('partnerModal');
+   renderPartners();
+ }
 
 function syncPartnerWithCapitalPartner(partner) {
   if (!partner || !partner.id) return;
@@ -30919,44 +30929,51 @@ function syncPartnerWithCapitalPartner(partner) {
   }
 }
 
-function renderPartners() {
-  const grid = document.getElementById('partnersGrid');
+async function renderPartners() {
+   ensureCapitalPartnerState();
+   // Phase 23B: fetch from backend when enabled
+   let partners = DB.partners;
+   if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+     try { partners = await digitronicsDataAdapter.listPartners(); } catch (_) {}
+   }
+   const grid = document.getElementById('partnersGrid');
+   const totalCapital = partners.reduce((sum, p) => sum + (p.capital || 0), 0);
+   grid.innerHTML = partners.map((p, idx) => {
+     const share = totalCapital > 0 ? ((p.capital || 0) / totalCapital * 100).toFixed(1) : 0;
+     return `<div class="stat-card" style="padding:18px">
+       <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:10px;">${escapeHtml(p.name)}</div>
+       <div style="margin-bottom:8px;"><strong>التليفون:</strong> ${p.phone || '-'}</div>
+       <div style="margin-bottom:8px;"><strong>رأس المال الحالي:</strong> ${formatMoney(p.capital)}</div>
+       <div style="margin-bottom:8px;"><strong>رأس المال الافتتاحي:</strong> ${formatMoney(p.initialCapital || 0)}</div>
+       <div style="margin-bottom:8px;"><strong>نسبة الربح:</strong> ${p.percent || 50}%</div>
+       <div style="margin-bottom:8px;"><strong>الحصة:</strong> ${share}%</div>
+       <div class="progress-bar" style="background:var(--surface2);height:8px;border-radius:4px;overflow:hidden;margin-top:10px;">
+         <div style="background:var(--accent);height:100%;width:${share}%"></div>
+       </div>
+       ${isOwnerUser() ? `<button class="btn btn-sm btn-warning" style="margin-top:10px;width:100%" onclick="openPartnerEditModal(${idx})">✏️ تعديل</button>` : ''}
+       ${isOwnerUser() ? `<button class="btn btn-sm btn-danger" style="margin-top:10px;width:100%" onclick="deletePartner(${idx})">🗑️ حذف</button>` : ''}
+     </div>`;
+   }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text2)">لا يوجد شركاء</div>';
+   renderPartnerTransactions();
+ }
 
-  const totalCapital = DB.partners.reduce((sum, p) => sum + (p.capital || 0), 0);
-
-  grid.innerHTML = DB.partners.map((p, idx) => {
-    const share = totalCapital > 0 ? ((p.capital || 0) / totalCapital * 100).toFixed(1) : 0;
-    return `<div class="stat-card" style="padding:18px">
-      <div style="font-size:1.1rem;font-weight:700;color:var(--accent);margin-bottom:10px;">${escapeHtml(p.name)}</div>
-      <div style="margin-bottom:8px;"><strong>التليفون:</strong> ${p.phone || '-'}</div>
-      <div style="margin-bottom:8px;"><strong>رأس المال الحالي:</strong> ${formatMoney(p.capital)}</div>
-      <div style="margin-bottom:8px;"><strong>رأس المال الافتتاحي:</strong> ${formatMoney(p.initialCapital || 0)}</div>
-      <div style="margin-bottom:8px;"><strong>نسبة الربح:</strong> ${p.percent || 50}%</div>
-      <div style="margin-bottom:8px;"><strong>الحصة:</strong> ${share}%</div>
-      <div class="progress-bar" style="background:var(--surface2);height:8px;border-radius:4px;overflow:hidden;margin-top:10px;">
-        <div style="background:var(--accent);height:100%;width:${share}%"></div>
-      </div>
-      ${isOwnerUser() ? `<button class="btn btn-sm btn-warning" style="margin-top:10px;width:100%" onclick="openPartnerEditModal(${idx})">✏️ تعديل</button>` : ''}
-      ${isOwnerUser() ? `<button class="btn btn-sm btn-danger" style="margin-top:10px;width:100%" onclick="deletePartner(${idx})">🗑️ حذف</button>` : ''}
-    </div>`;
-  }).join('') || '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text2)">لا يوجد شركاء</div>';
-
-  renderPartnerTransactions();
-}
-
-function deletePartner(idx) {
-  if (!isOwnerUser()) { showToast('حذف الشريك متاح للمالك فقط', 'error'); return; }
-  if (!confirm('هل تريد حذف هذا الشريك؟')) return;
-  const partner = DB.partners[idx];
-  if (!partner) return;
-  DB.partners.splice(idx, 1);
-  DB.partnerTransactions = (DB.partnerTransactions || []).filter(t => Number(t.partnerId) !== Number(partner.id));
-  const cpIdx = (DB.capitalPartners || []).findIndex(cp => String(cp.partnerId) === String(partner.id));
-  if (cpIdx >= 0) DB.capitalPartners.splice(cpIdx, 1);
-  saveDB();
-  renderPartners();
-  showToast('تم الحذف');
-}
+async function deletePartner(idx) {
+   if (!isOwnerUser()) { showToast('حذف الشريك متاح للمالك فقط', 'error'); return; }
+   if (!confirm('هل تريد حذف هذا الشريك؟')) return;
+   const partner = DB.partners[idx];
+   if (!partner) return;
+   DB.partners.splice(idx, 1);
+   // Phase 23B: delete in backend when enabled
+   if (USE_BACKEND && backendApi && backendApi.partners && partner && partner._backendId) {
+     try { await backendApi.partners.delete(partner._backendId); } catch (_) {}
+   }
+   DB.partnerTransactions = (DB.partnerTransactions || []).filter(t => Number(t.partnerId) !== Number(partner.id));
+   const cpIdx = (DB.capitalPartners || []).findIndex(cp => String(cp.partnerId) === String(partner.id));
+   if (cpIdx >= 0) DB.capitalPartners.splice(cpIdx, 1);
+   saveDB();
+   renderPartners();
+   showToast('تم الحذف');
+ }
 
 function populatePartnerTxSelectors() {
   const sel = document.getElementById('partTxPartner');
