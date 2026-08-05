@@ -29631,23 +29631,28 @@ function renderEmployeePerformance() {
   }).join('') || '<tr><td colspan="7" style="text-align:center">لا يوجد بيانات</td></tr>';
 }
 
-function renderEmployees() {
+async function renderEmployees() {
   ensureHRState();
   populateEmployeeBranchControls();
+  // Phase 23B: fetch from backend when enabled
+  let employees = getVisibleEmployees();
+  if (USE_BACKEND && typeof digitronicsDataAdapter !== 'undefined') {
+    try { employees = await digitronicsDataAdapter.listEmployees(); } catch (_) {}
+  }
   const search = String(document.getElementById('employeeSearchInput')?.value || '').trim().toLowerCase();
   const branchFilter = String(document.getElementById('employeeBranchFilter')?.value || '').trim();
   const canFullHR = can('manageEmployees') || can('all');
-  const employees = getVisibleEmployees().filter(e => {
+  const filtered = employees.filter(e => {
     if (branchFilter && getEmployeeBranchId(e) !== branchFilter) return false;
     if (!search) return true;
     return [e.name, e.phone, e.phone2, e.position, e.branchName, e.address].join(' ').toLowerCase().includes(search);
   });
   const today = localDateString();
-  const count = employees.length;
-  const salaries = employees.reduce((sum, e) => sum + (e.salary || 0), 0);
-  const bonuses = employees.reduce((sum, e) => sum + (e.bonus || 0), 0);
-  const present = employees.filter(e => getTodayAttendance(e.id)?.checkIn).length;
-  const absent = employees.filter(e => (e.status || 'active') === 'active' && !getTodayAttendance(e.id)?.checkIn).length;
+  const count = filtered.length;
+  const salaries = filtered.reduce((sum, e) => sum + (e.salary || 0), 0);
+  const bonuses = filtered.reduce((sum, e) => sum + (e.bonus || 0), 0);
+  const present = filtered.filter(e => getTodayAttendance(e.id)?.checkIn).length;
+  const absent = filtered.filter(e => (e.status || 'active') === 'active' && !getTodayAttendance(e.id)?.checkIn).length;
   
   document.getElementById('emp-count').textContent = count;
   document.getElementById('emp-salaries').textContent = canFullHR ? formatMoney(salaries) : '***';
@@ -29656,7 +29661,7 @@ function renderEmployees() {
   const absentEl = document.getElementById('emp-absent'); if (absentEl) absentEl.textContent = canFullHR ? absent : '-';
   
   const tbody = document.getElementById('employeesTbody');
-  tbody.innerHTML = employees.map((e, idx) => {
+  tbody.innerHTML = filtered.map((e, idx) => {
     const att = getTodayAttendance(e.id);
     const attendanceBtns = `<button class="btn btn-sm btn-outline" onclick="employeeCheckIn(${e.id})">حضور</button><button class="btn btn-sm btn-outline" onclick="employeeCheckOut(${e.id})">انصراف</button>`;
     return `<tr>
