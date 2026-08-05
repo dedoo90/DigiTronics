@@ -52,7 +52,10 @@
 
 | Document | Path |
 |----------|------|
-| (Pending) | `Phase23D/` |
+| Investigation Report | `Phase23D/PHASE23D_INVESTIGATION_REPORT.md` |
+| Roadmap | `Phase23D/PHASE23D_ROADMAP.md` |
+| Master Prompt | `Phase23D/PHASE23D_MASTER_PROMPT.md` |
+| Checklist | `Phase23D/PHASE23D_CHECKLIST.md` |
 
 ---
 
