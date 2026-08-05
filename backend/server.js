@@ -3,7 +3,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
+const session = require('express-session');
+const passport = require('passport');
 const config = require('./config');
+const oauthConfig = require('./config/oauth');
 const logger = require('./utils/logger');
 const fileStore = require('./utils/fileStore');
 const { notFound, serverError, requestPerfLogger } = require('./middleware/errorHandler');
@@ -11,6 +14,7 @@ const { authMiddleware, requireAuth } = require('./middleware/auth');
 const { writeRoleGuard } = require('./middleware/authorize');
 const { sanitizeBody, jsonParseErrorHandler, apiRateLimiter } = require('./middleware/security');
 const { validateResource } = require('./middleware/validate');
+const { configurePassport } = require('./middleware/passport');
 
 const app = express();
 
@@ -31,6 +35,15 @@ app.use(requestPerfLogger(config.slowRequestMs));
 app.use(express.json({ limit: config.bodyLimit }));
 app.use(express.urlencoded({ extended: true }));
 app.use(sanitizeBody);
+
+// Session middleware (required for OAuth)
+if (oauthConfig.enabled) {
+  app.use(session(oauthConfig.session));
+  configurePassport();
+  app.use(passport.initialize());
+  app.use(passport.session());
+}
+
 app.use('/api/v1', apiRateLimiter(config.rateLimitMax));
 app.use(authMiddleware);
 
@@ -50,9 +63,15 @@ const dashboardRoutes = require('./routes/dashboard.routes');
 const reportsRoutes = require('./routes/reports.routes');
 const usersRoutes = require('./routes/users.routes');
 const authRoutes = require('./routes/auth.routes');
+const oauthRoutes = require('./routes/oauth.routes');
 
 app.use('/api/v1', apiRouter);
 app.use('/api/v1/auth', authRoutes);
+
+// OAuth routes (mounted at root for OAuth callbacks)
+if (oauthConfig.enabled) {
+  app.use('/auth', oauthRoutes);
+}
 
 // Optional route protection (AUTH_REQUIRED=true).
 // Default is OFF: every route stays open exactly as before (legacy behavior).
