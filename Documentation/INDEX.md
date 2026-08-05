@@ -17,6 +17,7 @@
 | Phase 23D | HTML Consolidation | RELEASED | `Phase23D/` | phase23d-release |
 | Phase 23E | Database Schema Evolution | RELEASED | `Phase23E/` | phase23e-release |
 | Phase 23F | Performance & Optimization | RELEASED | `Phase23F/` | phase23f-release |
+| Phase 24 | API Foundation & Authentication | PLANNING ONLY | `Phase24/` | - |
 
 ---
 
@@ -101,6 +102,27 @@
 | Gate C Report | `Phase23F/PHASE23F_GATE_C_REPORT.md` |
 | Gate D Report | `Phase23F/PHASE23F_GATE_D_REPORT.md` |
 | Gate E Report | `Phase23F/PHASE23F_GATE_E_REPORT.md` |
+
+---
+
+## Phase 24 Documents
+
+| Document | Path |
+|----------|------|
+| Architecture | `Phase24/PHASE24_ARCHITECTURE.md` |
+| API Specification | `Phase24/PHASE24_API_SPECIFICATION.md` |
+| Authentication Design | `Phase24/PHASE24_AUTHENTICATION_DESIGN.md` |
+| Authorization Design | `Phase24/PHASE24_AUTHORIZATION_DESIGN.md` |
+| Permission Matrix | `Phase24/PHASE24_PERMISSION_MATRIX.md` |
+| Security Model | `Phase24/PHASE24_SECURITY_MODEL.md` |
+| Service Architecture | `Phase24/PHASE24_SERVICE_ARCHITECTURE.md` |
+| OpenAPI Strategy | `Phase24/PHASE24_OPENAPI_STRATEGY.md` |
+| Test Strategy | `Phase24/PHASE24_TEST_STRATEGY.md` |
+| Deployment Strategy | `Phase24/PHASE24_DEPLOYMENT_STRATEGY.md` |
+| Rollback Plan | `Phase24/PHASE24_ROLLBACK_PLAN.md` |
+| Risk Register | `Phase24/PHASE24_RISK_REGISTER.md` |
+| Gate A Report | `Phase24/PHASE24_GATE_A_REPORT.md` |
+| Master Report | `Phase24/PHASE24_MASTER_REPORT.md` |
 
 ---
 
