@@ -2,7 +2,7 @@
 ## DigiTronics V2 Enterprise Risk Register
 
 **Date:** 2026-08-05
-**Status:** PLANNING ONLY
+**Status:** REVISED - Post Gate B
 **Phase:** 24 - API Foundation & Authentication
 
 ---
@@ -21,280 +21,138 @@
 | Low | Medium | Low |
 | Low | Low | Low |
 
+### 1.2 Revised Scope Risks
+
+Phase 24 scope has been revised to focus on **gaps only** (OAuth2, MFA, API docs, monitoring). Risks related to implementing existing components have been removed.
+
 ---
 
-## 2. TECHNICAL RISKS
+## 2. NEW RISKS (Phase 24 Scope)
 
-### 2.1 Risk: JWT Implementation Vulnerabilities
+### 2.1 Risk: OAuth2 Integration Complexity
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | TR-001 |
+| **ID** | NR-001 |
 | **Probability** | Medium |
 | **Impact** | High |
 | **Risk Level** | High |
-| **Description** | Improper JWT implementation could lead to token forgery or session hijacking |
-| **Mitigation** | Use established libraries (jsonwebtoken), follow OWASP guidelines, security audit |
-| **Rollback** | Revert to previous authentication method |
-| **Owner** | Security Team |
+| **Description** | OAuth2 integration with multiple providers (Google, GitHub) could be complex |
+| **Mitigation** | Use established libraries (passport.js), follow provider documentation |
+| **Rollback** | Disable OAuth2, keep existing auth |
+| **Owner** | Backend Team |
 
-### 2.2 Risk: Database Performance Degradation
+### 2.2 Risk: MFA User Adoption
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | TR-002 |
+| **ID** | NR-002 |
 | **Probability** | Medium |
 | **Impact** | Medium |
 | **Risk Level** | Medium |
-| **Description** | New API layer could introduce database connection pooling issues |
-| **Mitigation** | Connection pooling, query optimization, load testing |
-| **Rollback** | Reduce connection pool, scale database |
-| **Owner** | Backend Team |
+| **Description** | Users may resist MFA adoption |
+| **Mitigation** | Progressive rollout, optional initially, clear communication |
+| **Rollback** | Make MFA optional |
+| **Owner** | Product Team |
 
-### 2.3 Risk: Redis Cache Inconsistency
+### 2.3 Risk: API Documentation Drift
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | TR-003 |
+| **ID** | NR-003 |
 | **Probability** | Low |
 | **Impact** | Medium |
 | **Risk Level** | Low |
-| **Description** | Cache invalidation could cause stale data |
-| **Mitigation** | TTL-based expiration, cache-aside pattern, monitoring |
-| **Rollback** | Disable caching, use database directly |
+| **Description** | OpenAPI spec may drift from actual API |
+| **Mitigation** | Automated generation from code, CI/CD validation |
+| **Rollback** | Manual documentation |
 | **Owner** | Backend Team |
 
----
-
-## 3. SECURITY RISKS
-
-### 3.1 Risk: Brute Force Attacks
+### 2.4 Risk: Monitoring Performance Overhead
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | SR-001 |
-| **Probability** | High |
-| **Impact** | High |
-| **Risk Level** | Critical |
-| **Description** | Login endpoint could be targeted by brute force attacks |
-| **Mitigation** | Rate limiting, account lockout, CAPTCHA, IP blocking |
-| **Rollback** | Enable additional rate limiting |
-| **Owner** | Security Team |
-
-### 3.2 Risk: SQL Injection
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | SR-002 |
+| **ID** | NR-004 |
 | **Probability** | Low |
-| **Impact** | Critical |
-| **Risk Level** | Medium |
-| **Description** | Input validation could be bypassed |
-| **Mitigation** | Parameterized queries, input validation, ORM |
-| **Rollback** | Disable affected endpoints |
-| **Owner** | Security Team |
+| **Impact** | Low |
+| **Risk Level** | Low |
+| **Description** | Monitoring could add performance overhead |
+| **Mitigation** | Lightweight implementation, sampling |
+| **Rollback** | Disable monitoring |
+| **Owner** | DevOps Team |
 
-### 3.3 Risk: Cross-Site Scripting (XSS)
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | SR-003 |
-| **Probability** | Medium |
-| **Impact** | High |
-| **Risk Level** | High |
-| **Description** | User input could be rendered as executable code |
-| **Mitigation** | Output encoding, CSP headers, input sanitization |
-| **Rollback** | Enable stricter CSP |
-| **Owner** | Security Team |
-
-### 3.4 Risk: Token Theft
+### 2.5 Risk: Webhook Reliability
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | SR-004 |
-| **Probability** | Medium |
-| **Impact** | Critical |
-| **Risk Level** | High |
-| **Description** | JWT tokens could be stolen via XSS or MITM attacks |
-| **Mitigation** | HttpOnly cookies, short token expiry, token rotation |
-| **Rollback** | Invalidate all tokens |
-| **Owner** | Security Team |
-
----
-
-## 4. PERFORMANCE RISKS
-
-### 4.1 Risk: API Response Time Degradation
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | PR-001 |
-| **Probability** | Medium |
-| **Impact** | High |
-| **Risk Level** | High |
-| **Description** | API layer could add latency to requests |
-| **Mitigation** | Caching, connection pooling, load balancing |
-| **Rollback** | Scale horizontally |
-| **Owner** | Performance Team |
-
-### 4.2 Risk: Memory Leaks
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | PR-002 |
-| **Probability** | Low |
-| **Impact** | High |
-| **Risk Level** | Medium |
-| **Description** | Node.js application could have memory leaks |
-| **Mitigation** | Memory profiling, monitoring, heap dumps |
-| **Rollback** | Restart affected pods |
-| **Owner** | Backend Team |
-
-### 4.3 Risk: Database Connection Exhaustion
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | PR-003 |
-| **Probability** | Low |
-| **Impact** | Critical |
-| **Risk Level** | Medium |
-| **Description** | Database connections could be exhausted under load |
-| **Mitigation** | Connection pooling, monitoring, auto-scaling |
-| **Rollback** | Increase connection limits |
-| **Owner** | Database Team |
-
----
-
-## 5. MIGRATION RISKS
-
-### 5.1 Risk: Data Loss During Migration
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | MR-001 |
-| **Probability** | Low |
-| **Impact** | Critical |
-| **Risk Level** | Medium |
-| **Description** | Migration could cause data loss or corruption |
-| **Mitigation** | Backup before migration, migration testing, rollback scripts |
-| **Rollback** | Restore from backup |
-| **Owner** | Database Team |
-
-### 5.2 Risk: Authentication Migration Failure
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | MR-002 |
-| **Probability** | Medium |
-| **Impact** | High |
-| **Risk Level** | High |
-| **Description** | Migration from legacy auth could fail |
-| **Mitigation** | Dual authentication, gradual migration, fallback |
-| **Rollback** | Re-enable legacy auth |
-| **Owner** | Backend Team |
-
-### 5.3 Risk: Password Migration Issues
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | MR-003 |
-| **Probability** | Medium |
-| **Impact** | High |
-| **Risk Level** | High |
-| **Description** | Plaintext passwords cannot be converted to bcrypt |
-| **Mitigation** | Force password reset, gradual migration |
-| **Rollback** | Re-enable legacy password verification |
-| **Owner** | Security Team |
-
----
-
-## 6. INTEGRATION RISKS
-
-### 6.1 Risk: Third-Party Service Failures
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | IR-001 |
+| **ID** | NR-005 |
 | **Probability** | Medium |
 | **Impact** | Medium |
 | **Risk Level** | Medium |
-| **Description** | External services (email, SMS) could fail |
-| **Mitigation** | Circuit breaker, retry logic, fallbacks |
-| **Rollback** | Disable affected integrations |
-| **Owner** | Integration Team |
+| **Description** | Webhooks may fail or be delayed |
+| **Mitigation** | Retry logic, dead letter queue, monitoring |
+| **Rollback** | Disable webhooks |
+| **Owner** | Backend Team |
 
-### 6.2 Risk: API Compatibility Issues
+### 2.6 Risk: API Key Security
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | IR-002 |
+| **ID** | NR-006 |
 | **Probability** | Low |
 | **Impact** | High |
 | **Risk Level** | Medium |
-| **Description** | New API could break existing integrations |
-| **Mitigation** | API versioning, backward compatibility, deprecation notice |
-| **Rollback** | Maintain v1 API |
-| **Owner** | API Team |
+| **Description** | API keys could be compromised |
+| **Mitigation** | Secure storage, rotation, scope limitation |
+| **Rollback** | Revoke compromised keys |
+| **Owner** | Security Team |
 
 ---
 
-## 7. OPERATIONAL RISKS
+## 3. REMOVED RISKS (No Longer Applicable)
 
-### 7.1 Risk: Deployment Failures
+### 3.1 Risks Removed Due to Existing Implementation
 
-| Aspect | Detail |
-|--------|--------|
-| **ID** | OR-001 |
-| **Probability** | Low |
-| **Impact** | High |
-| **Risk Level** | Medium |
-| **Description** | Deployment could fail in production |
-| **Mitigation** | Blue-green deployment, canary releases, rollback automation |
-| **Rollback** | Automatic rollback |
-| **Owner** | DevOps Team |
-
-### 7.2 Risk: Monitoring Gaps
-
-| Aspect | Detail |
-|--------|--------|
-| **ID** | OR-002 |
-| **Probability** | Medium |
-| **Impact** | Medium |
-| **Risk Level** | Medium |
-| **Description** | Monitoring could miss critical issues |
-| **Mitigation** | Comprehensive monitoring, alerting, logging |
-| **Rollback** | Manual monitoring |
-| **Owner** | DevOps Team |
+| Risk | Reason Removed |
+|------|----------------|
+| JWT implementation vulnerabilities | JWT already implemented and working |
+| Database performance degradation | JSON file persistence already working |
+| Redis cache inconsistency | Redis not in scope |
+| Migration failure | No migration needed for existing system |
+| Authentication migration failure | Auth already migrated to JWT |
+| Plaintext password risks | bcrypt already implemented |
+| No backend API risks | Backend already exists |
+| No PWA risks | PWA already implemented |
 
 ---
 
-## 8. RISK SUMMARY
+## 4. RISK SUMMARY
 
-### 8.1 Risk Distribution
+### 4.1 Risk Distribution
 
 | Risk Level | Count | Percentage |
 |------------|-------|------------|
-| Critical | 1 | 7% |
-| High | 4 | 29% |
-| Medium | 7 | 50% |
-| Low | 2 | 14% |
-| **Total** | **14** | **100%** |
+| Critical | 0 | 0% |
+| High | 1 | 17% |
+| Medium | 4 | 67% |
+| Low | 1 | 17% |
+| **Total** | **6** | **100%** |
 
-### 8.2 Top Risks
+### 4.2 Top Risks
 
 | ID | Risk | Level | Mitigation |
 |----|------|-------|------------|
-| SR-001 | Brute Force Attacks | Critical | Rate limiting, lockout |
-| TR-001 | JWT Vulnerabilities | High | Established libraries, audit |
-| SR-003 | XSS | High | Output encoding, CSP |
-| SR-004 | Token Theft | High | HttpOnly cookies, rotation |
-| MR-002 | Auth Migration Failure | High | Dual auth, gradual migration |
+| NR-001 | OAuth2 integration complexity | High | Use established libraries |
+| NR-002 | MFA user adoption | Medium | Progressive rollout |
+| NR-005 | Webhook reliability | Medium | Retry logic, monitoring |
+| NR-006 | API key security | Medium | Secure storage, rotation |
+| NR-003 | API documentation drift | Low | Automated generation |
 
 ---
 
-## 9. RISK MONITORING
+## 5. RISK MONITORING
 
-### 9.1 Risk Review
+### 5.1 Risk Review
 
 | Frequency | Action |
 |-----------|--------|
@@ -302,7 +160,7 @@
 | Weekly | Review all risks |
 | Monthly | Update risk register |
 
-### 9.2 Risk Escalation
+### 5.2 Risk Escalation
 
 | Level | Action |
 |-------|--------|
@@ -310,3 +168,73 @@
 | Medium | Action plan required |
 | High | Immediate attention |
 | Critical | Emergency response |
+
+---
+
+## 6. RISK MITIGATION STRATEGIES
+
+### 6.1 OAuth2 Mitigation
+
+| Strategy | Implementation |
+|----------|----------------|
+| Use established libraries | passport.js, provider-specific strategies |
+| Follow provider documentation | Google, GitHub official guides |
+| Test thoroughly | Integration tests for each provider |
+| Fallback | Keep existing auth if OAuth2 fails |
+
+### 6.2 MFA Mitigation
+
+| Strategy | Implementation |
+|----------|----------------|
+| Progressive rollout | Start with opt-in |
+| User education | Clear instructions, FAQs |
+| Backup codes | Provide backup options |
+| Support | Helpdesk for issues |
+
+### 6.3 API Documentation Mitigation
+
+| Strategy | Implementation |
+|----------|----------------|
+| Automated generation | swagger-jsdoc from code |
+| CI/CD validation | Check spec on every build |
+| Regular reviews | Monthly documentation review |
+| Version control | Track spec changes |
+
+---
+
+## 7. CONTINGENCY PLANS
+
+### 7.1 OAuth2 Failure
+
+| Trigger | Action |
+|---------|--------|
+| Provider outage | Fallback to existing auth |
+| Integration failure | Disable OAuth2, investigate |
+| Security breach | Revoke tokens, investigate |
+
+### 7.2 MFA Failure
+
+| Trigger | Action |
+|---------|--------|
+| User lockout | Admin reset, backup codes |
+| System outage | Disable MFA temporarily |
+| Security breach | Force re-enrollment |
+
+### 7.3 Webhook Failure
+
+| Trigger | Action |
+|---------|--------|
+| Delivery failure | Retry with exponential backoff |
+| Queue overflow | Scale queue workers |
+| Security breach | Revoke webhook secrets |
+
+---
+
+## 8. RISK REGISTER UPDATE HISTORY
+
+| Date | Change | Reason |
+|------|--------|--------|
+| 2026-08-05 | Initial creation | Phase 24 planning |
+| 2026-08-05 | Revised | Post Gate B correction |
+| - | Removed 8 risks | No longer applicable |
+| - | Added 6 risks | New scope risks |

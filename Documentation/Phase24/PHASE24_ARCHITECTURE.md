@@ -2,536 +2,334 @@
 ## DigiTronics V2 Enterprise API Foundation & Authentication Architecture
 
 **Date:** 2026-08-05
-**Status:** PLANNING ONLY
+**Status:** REVISED - Post Gate B
 **Phase:** 24 - API Foundation & Authentication
 **Governance:** Architecture Governance Edition
 
 ---
 
-## 1. CURRENT STATE ANALYSIS
+## 1. VERIFIED CURRENT STATE
 
-### 1.1 Existing System Summary
+### 1.1 Existing Architecture (Evidence-Based)
 
-| Component | Current State | Gap |
-|-----------|---------------|-----|
-| **Backend** | None (client-side only) | CRITICAL |
-| **API** | None (GitHub Gist sync only) | CRITICAL |
-| **Authentication** | Plaintext in localStorage | CRITICAL |
-| **Database** | localStorage (single JS object) | CRITICAL |
-| **PWA** | Not implemented | HIGH |
-| **Security** | Critical gaps | CRITICAL |
+| Component | Status | Evidence |
+|-----------|--------|----------|
+| Express.js Backend | ✅ EXISTS | backend/server.js (127 lines) |
+| REST API | ✅ EXISTS | 14 route groups |
+| JWT Authentication | ✅ EXISTS | backend/utils/jwt.js |
+| bcrypt Hashing | ✅ EXISTS | backend/utils/password.js |
+| RBAC Authorization | ✅ EXISTS | backend/middleware/authorize.js |
+| Rate Limiting | ✅ EXISTS | backend/middleware/security.js |
+| Security Headers | ✅ EXISTS | Helmet + Nginx |
+| PWA | ✅ EXISTS | manifest.json + sw.js |
+| Docker | ✅ EXISTS | docker-compose.yml |
+| CI/CD | ✅ EXISTS | .github/workflows/ci.yml |
+| Tests | ✅ EXISTS | backend/tests/ (15 files) |
+| Logging | ✅ EXISTS | Morgan + Winston |
 
-### 1.2 Critical Security Findings
-
-| Finding | Severity | Location |
-|---------|----------|----------|
-| Plaintext passwords | CRITICAL | Line 2871 |
-| Hardcoded credentials | CRITICAL | Lines 2813-2816 |
-| Client-side auth only | CRITICAL | No server validation |
-| No CSRF protection | HIGH | Global |
-| No rate limiting | HIGH | Global |
-| No input sanitization | HIGH | XSS vulnerable |
-
-### 1.3 Migration Strategy
-
-**Approach:** Strangler Fig Pattern
-
-| Phase | Action |
-|-------|--------|
-| Phase 24 | Add API layer alongside existing system |
-| Phase 25 | Migrate features to API |
-| Phase 26-28 | Complete migration |
-| Phase 29+ | Decommission legacy |
-
----
-
-## 2. TARGET ARCHITECTURE
-
-### 2.1 Architecture Overview
+### 1.2 Current Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     CLIENT LAYER                            │
+│                     FRONTEND (EXISTS)                       │
 ├─────────────────────────────────────────────────────────────┤
-│  Legacy SPA (CairoTech_v6.html)  │  New API Client          │
-│  (Maintained for backward compat) │  (Fetch/Axios)           │
+│  index.html (40,288 lines) - Monolithic SPA                 │
+│  manifest.json - PWA manifest                               │
+│  sw.js - Service worker (447 lines)                         │
+│  services/ - 34 frontend service modules                    │
+│  plugins/ - 12 business plugins                             │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     API GATEWAY                             │
+│                     BACKEND (EXISTS)                        │
 ├─────────────────────────────────────────────────────────────┤
-│  Rate Limiting  │  CORS  │  Auth  │  Validation            │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     APPLICATION LAYER                       │
-├─────────────────────────────────────────────────────────────┤
-│  Express.js  │  Routes  │  Controllers  │  Services         │
+│  Express.js API (backend/server.js)                         │
+│  JWT Authentication (backend/utils/jwt.js)                  │
+│  bcrypt Password Hashing (backend/utils/password.js)        │
+│  RBAC Authorization (backend/middleware/authorize.js)       │
+│  Rate Limiting (backend/middleware/security.js)             │
+│  15 Route Files (backend/routes/)                           │
+│  14 Controllers (backend/controllers/)                      │
+│  13 Services (backend/services/)                            │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     DATA LAYER                              │
 ├─────────────────────────────────────────────────────────────┤
-│  Supabase (PostgreSQL)  │  Redis (Cache/Sessions)           │
+│  JSON File Persistence (backend/utils/fileStore.js)         │
+│  Supabase (Optional, DRAFT schemas)                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Component Responsibilities
+---
 
-| Component | Responsibility | Technology |
-|-----------|----------------|------------|
-| **API Gateway** | Rate limiting, CORS, auth, validation | Express middleware |
-| **Auth Service** | JWT, OAuth2, MFA, sessions | Passport.js, bcrypt |
-| **User Service** | User CRUD, profiles | Custom service |
-| **Tenant Service** | Multi-tenancy, isolation | Custom service |
-| **Permission Service** | RBAC, permissions | Custom service |
-| **Audit Service** | Logging, tracking | Custom service |
+## 2. PHASE 24 SCOPE (REVISED)
+
+### 2.1 Scope Definition
+
+Phase 24 is **NOT** creating systems from scratch. Phase 24 is **EXTENDING AND HARDENING** existing systems.
+
+### 2.2 Implementation Focus
+
+| Area | Focus | Priority |
+|------|-------|----------|
+| OAuth2 | Add OAuth2 provider support | HIGH |
+| MFA | Add TOTP/SMS multi-factor auth | HIGH |
+| API Documentation | Add OpenAPI/Swagger | HIGH |
+| API Versioning | Formalize versioning strategy | MEDIUM |
+| Monitoring | Add comprehensive observability | MEDIUM |
+| Webhooks | Add webhook framework | MEDIUM |
+| API Keys | Add API key management | MEDIUM |
+| Service Accounts | Add service account support | LOW |
 
 ---
 
-## 3. API DESIGN
+## 3. EXISTING COMPONENTS
 
-### 3.1 API Versioning Strategy
+### 3.1 Backend (EXISTS)
 
-| Version | Status | Base Path |
-|---------|--------|-----------|
-| v1 | Active | `/api/v1/` |
-| v2 | Future | `/api/v2/` |
+| Component | File | Lines | Purpose |
+|-----------|------|-------|---------|
+| Server | backend/server.js | 127 | Express.js application |
+| Config | backend/config/index.js | 31 | Configuration loader |
+| Auth Middleware | backend/middleware/auth.js | 46 | JWT validation |
+| Role Guard | backend/middleware/authorize.js | 34 | RBAC enforcement |
+| Security | backend/middleware/security.js | 69 | Rate limiting, sanitization |
+| JWT | backend/utils/jwt.js | 42 | Token generation/validation |
+| Password | backend/utils/password.js | 39 | bcrypt hashing |
+| Token Store | backend/utils/tokenStore.js | 14 | Token revocation |
+| Logger | backend/utils/logger.js | - | Winston logging |
+| File Store | backend/utils/fileStore.js | 93 | JSON persistence |
 
-**Decision:** URL-based versioning
-- **Reason:** Clear version identification, easy routing
-- **Alternative:** Header-based versioning
-- **Trade-off:** URLs are more visible but easier to debug
-- **Long-term:** Support both URL and header for flexibility
+### 3.2 API Routes (EXISTS)
 
-### 3.2 API Structure
+| Route | Endpoint | File |
+|-------|----------|------|
+| Health | /api/v1/health | routes/index.js |
+| Auth | /api/v1/auth/* | routes/auth.routes.js |
+| Sales | /api/v1/sales | routes/sales.routes.js |
+| Purchases | /api/v1/purchases | routes/purchase.routes.js |
+| Inventory | /api/v1/inventory | routes/inventory.routes.js |
+| Customers | /api/v1/customers | routes/customers.routes.js |
+| Suppliers | /api/v1/suppliers | routes/suppliers.routes.js |
+| Treasury | /api/v1/treasury | routes/treasury.routes.js |
+| Employees | /api/v1/employees | routes/employees.routes.js |
+| Partners | /api/v1/partners | routes/partners.routes.js |
+| Vouchers | /api/v1/vouchers | routes/voucher.routes.js |
+| Dashboard | /api/v1/dashboard | routes/dashboard.routes.js |
+| Reports | /api/v1/reports | routes/reports.routes.js |
+| Users | /api/v1/users | routes/users.routes.js |
 
-```
-/api/v1/
-├── auth/
-│   ├── POST /login
-│   ├── POST /register
-│   ├── POST /logout
-│   ├── POST /refresh
-│   ├── POST /forgot-password
-│   ├── POST /reset-password
-│   ├── POST /mfa/enable
-│   ├── POST /mfa/verify
-│   └── POST /mfa/disable
-├── users/
-│   ├── GET /
-│   ├── GET /:id
-│   ├── POST /
-│   ├── PUT /:id
-│   ├── DELETE /:id
-│   └── GET /me
-├── tenants/
-│   ├── GET /
-│   ├── GET /:id
-│   ├── POST /
-│   ├── PUT /:id
-│   └── DELETE /:id
-├── roles/
-│   ├── GET /
-│   ├── GET /:id
-│   ├── POST /
-│   ├── PUT /:id
-│   └── DELETE /:id
-├── permissions/
-│   ├── GET /
-│   └── GET /matrix
-├── audit/
-│   ├── GET /
-│   └── GET /:id
-└── health/
-    └── GET /
-```
+### 3.3 Authentication (EXISTS)
 
-### 3.3 Response Format
+| Feature | Status | Implementation |
+|---------|--------|----------------|
+| JWT Access Tokens | ✅ EXISTS | 15min TTL |
+| JWT Refresh Tokens | ✅ EXISTS | 7d TTL |
+| bcrypt Hashing | ✅ EXISTS | Cost factor 10 |
+| Token Revocation | ✅ EXISTS | In-memory Set |
+| Rate Limiting | ✅ EXISTS | 20 attempts/15min |
 
-```json
-{
-  "success": true,
-  "data": {},
-  "meta": {
-    "page": 1,
-    "limit": 10,
-    "total": 100,
-    "totalPages": 10
-  },
-  "links": {
-    "self": "/api/v1/users?page=1",
-    "next": "/api/v1/users?page=2",
-    "prev": null
-  }
-}
-```
+### 3.4 Authorization (EXISTS)
 
-### 3.4 Error Format
-
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid input",
-    "details": [
-      {
-        "field": "email",
-        "message": "Invalid email format"
-      }
-    ]
-  },
-  "meta": {
-    "requestId": "req_abc123",
-    "timestamp": "2026-08-05T12:00:00Z"
-  }
-}
-```
+| Feature | Status | Implementation |
+|---------|--------|----------------|
+| Role-based Access | ✅ EXISTS | requireRole() |
+| Permission-based Access | ✅ EXISTS | requirePermission() |
+| Write Guard | ✅ EXISTS | writeRoleGuard() |
+| Owner/Admin Bypass | ✅ EXISTS | In authorize.js |
 
 ---
 
-## 4. AUTHENTICATION DESIGN
+## 4. GAP ANALYSIS
 
-### 4.1 Authentication Flow
+### 4.1 Missing Components
+
+| Component | Status | Priority | Phase 24 Action |
+|-----------|--------|----------|-----------------|
+| OAuth2 | ❌ NOT PRESENT | HIGH | Implement |
+| MFA | ❌ NOT PRESENT | HIGH | Implement |
+| API Documentation | ❌ NOT PRESENT | HIGH | Implement |
+| API Versioning | ⚠️ PARTIAL | MEDIUM | Formalize |
+| Comprehensive Monitoring | ❌ NOT PRESENT | MEDIUM | Implement |
+| Webhooks | ❌ NOT PRESENT | MEDIUM | Implement |
+| API Keys | ❌ NOT PRESENT | MEDIUM | Implement |
+| Service Accounts | ❌ NOT PRESENT | LOW | Implement |
+| Redis Cache | ❌ NOT PRESENT | LOW | Future phase |
+| Multi-Tenant Isolation | ❌ NOT PRESENT | HIGH | Future phase |
+
+### 4.2 Enhancement Opportunities
+
+| Enhancement | Current State | Target State |
+|-------------|---------------|--------------|
+| Auth logging | Basic | Comprehensive |
+| API versioning | v1 prefix only | Formal strategy |
+| Error handling | Basic | Structured |
+| Health checks | Basic | Deep checks |
+
+---
+
+## 5. TARGET ARCHITECTURE
+
+### 5.1 Enhanced Architecture (Post Phase 24)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     CLIENT                                  │
+│                     FRONTEND (EXISTS)                       │
 ├─────────────────────────────────────────────────────────────┤
-│  1. User enters credentials                                 │
-│  2. Client sends POST /auth/login                           │
-│  3. Client receives access_token + refresh_token            │
-│  4. Client stores tokens securely                           │
-│  5. Client includes token in Authorization header           │
+│  index.html - Monolithic SPA                                │
+│  manifest.json - PWA manifest                               │
+│  sw.js - Service worker                                     │
+│  services/ - Frontend service modules                       │
+│  plugins/ - Business plugins                                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     API GATEWAY                             │
+│                     API GATEWAY (NEW)                       │
 ├─────────────────────────────────────────────────────────────┤
-│  1. Validate JWT signature                                  │
-│  2. Check token expiration                                  │
-│  3. Extract user/tenant info                                │
-│  4. Rate limit check                                        │
-│  5. Forward to service                                      │
+│  Rate Limiting  │  CORS  │  Auth  │  Validation            │
+│  API Versioning │  Documentation  │  Monitoring             │
 └─────────────────────────────────────────────────────────────┘
-```
-
-### 4.2 JWT Token Structure
-
-```json
-{
-  "header": {
-    "alg": "RS256",
-    "typ": "JWT",
-    "kid": "key-id-1"
-  },
-  "payload": {
-    "sub": "user-uuid",
-    "email": "user@example.com",
-    "tenant_id": "tenant-uuid",
-    "role": "manager",
-    "permissions": ["products:read", "products:write"],
-    "iat": 1691234567,
-    "exp": 1691238167,
-    "iss": "digitronics",
-    "aud": "digitronics-api"
-  }
-}
-```
-
-### 4.3 Token Lifecycle
-
-| Token | Lifetime | Storage | Refresh |
-|-------|----------|---------|---------|
-| Access Token | 15 minutes | Memory/HttpOnly cookie | No |
-| Refresh Token | 7 days | HttpOnly cookie | Yes |
-| MFA Token | 5 minutes | Memory | No |
-
-### 4.4 Password Policy
-
-| Rule | Requirement |
-|------|-------------|
-| Minimum length | 12 characters |
-| Maximum length | 128 characters |
-| Uppercase | At least 1 |
-| Lowercase | At least 1 |
-| Number | At least 1 |
-| Special character | At least 1 |
-| History | Last 5 passwords |
-| Expiry | 90 days |
-
----
-
-## 5. AUTHORIZATION DESIGN
-
-### 5.1 RBAC Model
-
-```
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     ROLE HIERARCHY                          │
+│                     BACKEND (ENHANCED)                      │
 ├─────────────────────────────────────────────────────────────┤
-│  Super Admin                                                │
-│    └── Tenant Admin                                         │
-│          ├── Manager                                        │
-│          │     ├── Sales                                    │
-│          │     ├── Warehouse                                │
-│          │     └── Accountant                               │
-│          └── Support                                        │
-│                └── Viewer                                   │
+│  Express.js API (EXISTS)                                    │
+│  JWT Authentication (EXISTS)                                │
+│  OAuth2 Integration (NEW)                                   │
+│  MFA Support (NEW)                                          │
+│  RBAC Authorization (EXISTS)                                │
+│  Rate Limiting (EXISTS)                                     │
+│  Webhook Framework (NEW)                                    │
+│  API Key Management (NEW)                                   │
 └─────────────────────────────────────────────────────────────┘
-```
-
-### 5.2 Permission Structure
-
-```json
-{
-  "resource:action": {
-    "products:read": "View products",
-    "products:write": "Create/edit products",
-    "products:delete": "Delete products",
-    "invoices:read": "View invoices",
-    "invoices:write": "Create/edit invoices",
-    "invoices:delete": "Delete invoices",
-    "users:read": "View users",
-    "users:write": "Create/edit users",
-    "users:delete": "Delete users",
-    "settings:read": "View settings",
-    "settings:write": "Edit settings",
-    "reports:read": "View reports",
-    "reports:export": "Export reports",
-    "audit:read": "View audit logs"
-  }
-}
-```
-
-### 5.3 Role-Permission Matrix
-
-| Role | products | invoices | users | settings | reports | audit |
-|------|----------|----------|-------|----------|---------|-------|
-| Super Admin | CRUD | CRUD | CRUD | CRUD | R + E | R |
-| Tenant Admin | CRUD | CRUD | CRUD | CRUD | R + E | R |
-| Manager | CRUD | CRUD | R + U | R | R + E | - |
-| Sales | R + U | CRUD | R | - | R | - |
-| Warehouse | CRUD | R + U | - | - | - | - |
-| Accountant | R | R + U | - | R | R + E | - |
-| Support | R | R | - | - | R | - |
-| Viewer | R | R | - | - | R | - |
-
----
-
-## 6. MULTI-TENANCY DESIGN
-
-### 6.1 Tenant Isolation
-
-```
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                     TENANT ISOLATION                        │
+│                     DATA LAYER                              │
 ├─────────────────────────────────────────────────────────────┤
-│  Request → JWT (tenant_id) → RLS Policy → Filtered Data    │
+│  JSON File Persistence (EXISTS)                             │
+│  Supabase (Optional)                                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 Tenant Model
-
-```json
-{
-  "id": "uuid",
-  "name": "Company Name",
-  "slug": "company-slug",
-  "settings": {},
-  "plan": "enterprise",
-  "status": "active",
-  "created_at": "2026-08-05T00:00:00Z",
-  "updated_at": "2026-08-05T00:00:00Z"
-}
-```
-
-### 6.3 Branch Isolation
-
-| Level | Isolation | Use Case |
-|-------|-----------|----------|
-| Tenant | Full | Different companies |
-| Branch | Within tenant | Different locations |
-| Warehouse | Within branch | Different warehouses |
-
 ---
 
-## 7. SECURITY DESIGN
+## 6. TECHNOLOGY STACK
 
-### 7.1 Security Layers
+### 6.1 Existing Stack (No Changes)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  1. WAF / DDoS Protection (Cloudflare/AWS)                 │
-├─────────────────────────────────────────────────────────────┤
-│  2. Rate Limiting (express-rate-limit)                     │
-├─────────────────────────────────────────────────────────────┤
-│  3. CORS (whitelist origins)                               │
-├─────────────────────────────────────────────────────────────┤
-│  4. Helmet (security headers)                              │
-├─────────────────────────────────────────────────────────────┤
-│  5. JWT Authentication                                     │
-├─────────────────────────────────────────────────────────────┤
-│  6. RBAC Authorization                                     │
-├─────────────────────────────────────────────────────────────┤
-│  7. Input Validation (Joi/Zod)                             │
-├─────────────────────────────────────────────────────────────┤
-│  8. SQL Injection Prevention (parameterized queries)       │
-├─────────────────────────────────────────────────────────────┤
-│  9. XSS Prevention (output encoding)                       │
-├─────────────────────────────────────────────────────────────┤
-│  10. CSRF Protection (csurf)                               │
-├─────────────────────────────────────────────────────────────┤
-│  11. Audit Logging                                         │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### 7.2 Rate Limiting
-
-| Endpoint | Limit | Window |
-|----------|-------|--------|
-| POST /auth/login | 5 requests | 15 minutes |
-| POST /auth/register | 3 requests | 1 hour |
-| POST /auth/forgot-password | 3 requests | 1 hour |
-| GET /api/* | 100 requests | 15 minutes |
-| POST /api/* | 50 requests | 15 minutes |
-
-### 7.3 CORS Configuration
-
-```javascript
-{
-  origin: [
-    'https://digitronics.app',
-    'https://www.digitronics.app',
-    'http://localhost:3000'  // Development only
-  ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-  maxAge: 86400
-}
-```
-
-### 7.4 Security Headers
-
-| Header | Value |
-|--------|-------|
-| X-Content-Type-Options | nosniff |
-| X-Frame-Options | DENY |
-| X-XSS-Protection | 1; mode=block |
-| Strict-Transport-Security | max-age=31536000; includeSubDomains |
-| Content-Security-Policy | default-src 'self' |
-| Referrer-Policy | strict-origin-when-cross-origin |
-| Permissions-Policy | camera=(), microphone=() |
-
----
-
-## 8. CACHING STRATEGY
-
-### 8.1 Cache Layers
-
-| Layer | Technology | TTL | Use Case |
-|-------|------------|-----|----------|
-| CDN | Cloudflare | 1 hour | Static assets |
-| Application | Redis | 5 minutes | API responses |
-| Database | Query cache | 1 minute | Frequent queries |
-
-### 8.2 Cache Invalidation
-
-| Event | Action |
-|-------|--------|
-| Data write | Invalidate related cache |
-| Tenant update | Clear tenant cache |
-| User update | Clear user cache |
-| Role update | Clear permission cache |
-
----
-
-## 9. MONITORING & OBSERVABILITY
-
-### 9.1 Metrics
-
-| Metric | Type | Description |
-|--------|------|-------------|
-| http_requests_total | Counter | Total requests |
-| http_request_duration_seconds | Histogram | Request duration |
-| auth_login_attempts_total | Counter | Login attempts |
-| auth_login_failures_total | Counter | Failed logins |
-| api_rate_limit_hits_total | Counter | Rate limit hits |
-
-### 9.2 Logging
-
-| Log Type | Level | Content |
-|----------|-------|---------|
-| Access | INFO | Request/response |
-| Auth | INFO | Login/logout events |
-| Security | WARN | Failed auth, rate limits |
-| Error | ERROR | Application errors |
-
-### 9.3 Alerting
-
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| High error rate | > 5% 5xx errors | Critical |
-| Auth failures | > 10 failures/minute | High |
-| Rate limit hits | > 100/minute | Medium |
-| Slow responses | > 2 seconds | Medium |
-
----
-
-## 10. PERFORMANCE TARGETS
-
-| Metric | Target | Measurement |
-|--------|--------|-------------|
-| API response time | < 200ms | p95 |
-| Authentication | < 500ms | p95 |
-| Database query | < 100ms | p95 |
-| Concurrent users | 1000+ | Load test |
-| Uptime | 99.9% | SLA |
-
----
-
-## 11. TECHNOLOGY STACK
-
-| Component | Technology | Reason |
+| Component | Technology | Status |
 |-----------|------------|--------|
-| Runtime | Node.js 20 LTS | JavaScript consistency |
-| Framework | Express.js | Mature, well-documented |
-| Authentication | Passport.js | Flexible, plugins |
-| JWT | jsonwebtoken | Industry standard |
-| Password hashing | bcrypt | Secure, slow |
-| Validation | Joi | Comprehensive |
-| Rate limiting | express-rate-limit | Simple, effective |
-| CORS | cors | Official package |
-| Security | helmet | Security headers |
-| Database | Supabase (PostgreSQL) | Existing infrastructure |
-| Cache | Redis | Performance |
-| Documentation | Swagger/OpenAPI | Industry standard |
-| Testing | Jest + Supertest | Comprehensive |
-| Logging | Winston | Structured logging |
+| Runtime | Node.js 22 | EXISTS |
+| Framework | Express.js | EXISTS |
+| Authentication | JWT (jsonwebtoken) | EXISTS |
+| Password Hashing | bcryptjs | EXISTS |
+| Rate Limiting | express-rate-limit | EXISTS |
+| Security Headers | helmet | EXISTS |
+| Logging | Morgan + Winston | EXISTS |
+| Testing | Jest + Supertest | EXISTS |
+| E2E Testing | Playwright | EXISTS |
+| Docker | Docker + Compose | EXISTS |
+| CI/CD | GitHub Actions | EXISTS |
+
+### 6.2 New Dependencies (Phase 24)
+
+| Dependency | Purpose | Priority |
+|------------|---------|----------|
+| passport | OAuth2 framework | HIGH |
+| passport-google-oauth20 | Google OAuth | HIGH |
+| speakeasy | TOTP generation | HIGH |
+| qrcode | QR code generation | HIGH |
+| swagger-jsdoc | OpenAPI generation | HIGH |
+| swagger-ui-express | Swagger UI | HIGH |
+| bull | Job queue (webhooks) | MEDIUM |
+| prom-client | Prometheus metrics | MEDIUM |
 
 ---
 
-## 12. DOCUMENTATION
+## 7. IMPLEMENTATION PLAN
 
-| Document | Path |
-|----------|------|
-| Architecture | `Documentation/Phase24/PHASE24_ARCHITECTURE.md` |
-| API Specification | `Documentation/Phase24/PHASE24_API_SPECIFICATION.md` |
-| Authentication Design | `Documentation/Phase24/PHASE24_AUTHENTICATION_DESIGN.md` |
-| Authorization Design | `Documentation/Phase24/PHASE24_AUTHORIZATION_DESIGN.md` |
-| Permission Matrix | `Documentation/Phase24/PHASE24_PERMISSION_MATRIX.md` |
-| Security Model | `Documentation/Phase24/PHASE24_SECURITY_MODEL.md` |
-| Service Architecture | `Documentation/Phase24/PHASE24_SERVICE_ARCHITECTURE.md` |
-| OpenAPI Strategy | `Documentation/Phase24/PHASE24_OPENAPI_STRATEGY.md` |
-| Test Strategy | `Documentation/Phase24/PHASE24_TEST_STRATEGY.md` |
-| Deployment Strategy | `Documentation/Phase24/PHASE24_DEPLOYMENT_STRATEGY.md` |
-| Rollback Plan | `Documentation/Phase24/PHASE24_ROLLBACK_PLAN.md` |
-| Risk Register | `Documentation/Phase24/PHASE24_RISK_REGISTER.md` |
-| Gate A Report | `Documentation/Phase24/PHASE24_GATE_A_REPORT.md` |
-| Master Report | `Documentation/Phase24/PHASE24_MASTER_REPORT.md` |
+### 7.1 Phase 24 Tasks
+
+| # | Task | Priority | Effort |
+|---|------|----------|--------|
+| 1 | Add OAuth2 (Google, GitHub) | HIGH | 2 weeks |
+| 2 | Add MFA (TOTP) | HIGH | 2 weeks |
+| 3 | Add OpenAPI documentation | HIGH | 1 week |
+| 4 | Formalize API versioning | MEDIUM | 3 days |
+| 5 | Add comprehensive monitoring | MEDIUM | 1 week |
+| 6 | Add webhook framework | MEDIUM | 1 week |
+| 7 | Add API key management | MEDIUM | 3 days |
+| 8 | Add service account support | LOW | 2 days |
+
+### 7.2 Dependencies
+
+| Task | Depends On |
+|------|------------|
+| OAuth2 | None |
+| MFA | None |
+| OpenAPI | None |
+| API Versioning | None |
+| Monitoring | None |
+| Webhooks | None |
+| API Keys | None |
+| Service Accounts | API Keys |
+
+---
+
+## 8. RISK ASSESSMENT
+
+### 8.1 Revised Risks
+
+| Risk | Probability | Impact | Mitigation |
+|------|-------------|--------|------------|
+| OAuth2 integration complexity | Medium | High | Use established libraries |
+| MFA adoption resistance | Medium | Medium | Progressive rollout |
+| API documentation drift | Low | Medium | Automated generation |
+| Monitoring overhead | Low | Low | Lightweight implementation |
+| Webhook reliability | Medium | Medium | Retry logic, dead letter queue |
+
+### 8.2 Removed Risks (No Longer Applicable)
+
+| Risk | Reason Removed |
+|------|----------------|
+| JWT implementation vulnerabilities | JWT already implemented |
+| Database performance | JSON persistence already working |
+| Migration failure | No migration needed |
+| Auth migration failure | Auth already migrated |
+
+---
+
+## 9. SUCCESS CRITERIA
+
+### 9.1 Phase 24 Success Criteria
+
+| Criterion | Target |
+|-----------|--------|
+| OAuth2 working | Google + GitHub login |
+| MFA working | TOTP generation + verification |
+| API docs | OpenAPI spec complete |
+| Monitoring | Metrics + logging |
+| Webhooks | Event notification system |
+| API keys | Key management system |
+| Tests | All new features tested |
+
+---
+
+## 10. DOCUMENTATION
+
+| Document | Path | Status |
+|----------|------|--------|
+| Architecture | `Documentation/Phase24/PHASE24_ARCHITECTURE.md` | REVISED |
+| API Specification | `Documentation/Phase24/PHASE24_API_SPECIFICATION.md` | REVISED |
+| Authentication Design | `Documentation/Phase24/PHASE24_AUTHENTICATION_DESIGN.md` | REVISED |
+| Authorization Design | `Documentation/Phase24/PHASE24_AUTHORIZATION_DESIGN.md` | REVISED |
+| Security Model | `Documentation/Phase24/PHASE24_SECURITY_MODEL.md` | REVISED |
+| Risk Register | `Documentation/Phase24/PHASE24_RISK_REGISTER.md` | REVISED |
+| Master Report | `Documentation/Phase24/PHASE24_MASTER_REPORT.md` | REVISED |
+| Revision Report | `Documentation/Phase24/PHASE24_REVISION_REPORT.md` | NEW |
