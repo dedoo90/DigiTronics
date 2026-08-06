@@ -1,11 +1,11 @@
 # PHASE 24 — BASELINE CERTIFICATION
 
-**Status:** ⏳ PENDING — CERTIFICATION HELD
-**Hold reason (CRITICAL B-01):** Phase 24 Gate C3–C8 implementation is not committed; no `phase24` baseline tag exists.
+**Status:** ✅ **APPROVED — CERTIFIED**
+**Baseline:** tag `phase24` / `phase24-release` @ commit `a67e3ba` (main)
 
 ---
 
-## What is verified and certified now
+## What is verified and certified
 
 | Check | Result |
 |---|---|
@@ -19,16 +19,16 @@
 
 ## What blocks certification
 
-- **B-01 (CRITICAL):** Working tree contains the entire Gate C3–C8 implementation + tests + docs. A release baseline that does not include them is not the Phase 24 baseline.
-- **B-02 (MEDIUM):** Runtime state files must be excluded from the release commit.
-- **B-03 (LOW):** Version consistency final check pending.
+- ~~**B-01 (CRITICAL):** Working tree contains the entire Gate C3–C8 implementation + tests + docs.~~ **RESOLVED** — committed `a67e3ba`, tagged `phase24`/`phase24-release`.
+- ~~**B-02 (MEDIUM):** Runtime state files must be excluded from the release commit.~~ **RESOLVED** — excluded (`data/*.json`, `jest-results.json`, `.bak`, `test-results/` remain untracked).
+- ~~**B-03 (LOW):** Version consistency final check pending.~~ **RESOLVED** — confirmed at certification.
 
-## Certification condition
+## Certification condition — MET
 
-Certification becomes **APPROVED** only after:
-1. Phase 24 work committed (excluding runtime artifacts),
-2. `phase24` tag created and pushed,
-3. Post-tag verification: full suite re-run on tagged tree (447/447),
-4. Release notes / baseline docs finalized and committed.
+Certification is **APPROVED**:
+1. ✅ Phase 24 work committed (excluding runtime artifacts),
+2. ✅ `phase24` tag created and pushed,
+3. ✅ Post-tag verification: full suite re-run on tagged tree — **447/447 passed, 35/35 suites**,
+4. ✅ Release notes / baseline docs finalized.
 
-Until then, this document records Phase 24 as **feature-complete, test-certified, release-hold**.
+**CONFIRMED:** Phase 24 is certified as the official production release baseline.
