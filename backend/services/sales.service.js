@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const fileStore = require('../utils/fileStore');
 const logger = require('../utils/logger');
+const { eventBus } = require('./eventBus');
 
 const STORE_NAME = 'sales';
 
@@ -125,7 +126,10 @@ class SalesService {
 
     if (!Array.isArray(db.invoices)) db.invoices = [];
     db.invoices.push(invoice);
-    if (this._save(db)) return { invoice };
+    if (this._save(db)) {
+      try { eventBus.publish('sale.created', invoice); } catch (_) {}
+      return { invoice };
+    }
     return { error: 'Failed to persist invoice' };
   }
 

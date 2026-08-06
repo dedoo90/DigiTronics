@@ -5,8 +5,10 @@ const morgan = require('morgan');
 const compression = require('compression');
 const session = require('express-session');
 const passport = require('passport');
+const swaggerUi = require('swagger-ui-express');
 const config = require('./config');
 const oauthConfig = require('./config/oauth');
+const swaggerSpec = require('./config/swagger');
 const logger = require('./utils/logger');
 const fileStore = require('./utils/fileStore');
 const { notFound, serverError, requestPerfLogger } = require('./middleware/errorHandler');
@@ -15,6 +17,14 @@ const { writeRoleGuard } = require('./middleware/authorize');
 const { sanitizeBody, jsonParseErrorHandler, apiRateLimiter } = require('./middleware/security');
 const { validateResource } = require('./middleware/validate');
 const { configurePassport } = require('./middleware/passport');
+const { apiKeyMiddleware } = require('./middleware/apiKeyAuth');
+const { correlationId, auditCapture } = require('./middleware/audit');
+const { etagMiddleware } = require('./middleware/etag');
+const metricsMiddleware = require('./middleware/metrics');
+const { eventBus } = require('./services/eventBus');
+const webhookService = require('./services/webhook.service');
+const jobService = require('./services/job.service');
+const schedulerService = require('./services/scheduler.service');
 
 const app = express();
 
@@ -36,6 +46,9 @@ app.use(express.json({ limit: config.bodyLimit }));
 app.use(express.urlencoded({ extended: true }));
 app.use(sanitizeBody);
 
+// Request correlation ID (X-Request-Id) — applied to ALL requests
+app.use(correlationId);
+
 // Session middleware (required for OAuth)
 if (oauthConfig.enabled) {
   app.use(session(oauthConfig.session));
@@ -46,6 +59,15 @@ if (oauthConfig.enabled) {
 
 app.use('/api/v1', apiRateLimiter(config.rateLimitMax));
 app.use(authMiddleware);
+app.use(apiKeyMiddleware);
+
+// Audit capture: records mutating operations (POST/PUT/DELETE) after response
+app.use(auditCapture);
+
+// Observability: request metrics (counters/latency) — enabled via config
+if (config.metricsEnabled) {
+  app.use(metricsMiddleware);
+}
 
 // API v1 routes
 const apiRouter = require('./routes/index');
@@ -65,21 +87,57 @@ const usersRoutes = require('./routes/users.routes');
 const authRoutes = require('./routes/auth.routes');
 const oauthRoutes = require('./routes/oauth.routes');
 const mfaRoutes = require('./routes/mfa.routes');
+const apiKeyRoutes = require('./routes/apiKey.routes');
+const auditRoutes = require('./routes/audit.routes');
+const webhookRoutes = require('./routes/webhook.routes');
+const metricsRoutes = require('./routes/metrics.routes');
+const healthRoutes = require('./routes/health.routes');
+const errorTrackerRoutes = require('./routes/errorTracker.routes');
 
 app.use('/api/v1', apiRouter);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/auth/mfa', mfaRoutes);
+app.use('/api/v1/api-keys', apiKeyRoutes);
+app.use('/api/v1/audit-log', auditRoutes);
+app.use('/api/v1/webhooks', webhookRoutes);
+app.use('/api/v1/metrics', metricsRoutes);
+app.use('/api/v1/health/deep', healthRoutes);
+app.use('/api/v1/errors', errorTrackerRoutes);
+
+// Route events from the bus to outbound webhooks (additive; no-op if none)
+eventBus.subscribe('sale.created', (ev) => webhookService.dispatch('sale.created', ev.data));
+eventBus.subscribe('sale.updated', (ev) => webhookService.dispatch('sale.updated', ev.data));
+eventBus.subscribe('sale.deleted', (ev) => webhookService.dispatch('sale.deleted', ev.data));
+eventBus.subscribe('inventory.updated', (ev) => webhookService.dispatch('inventory.updated', ev.data));
+eventBus.subscribe('inventory.low', (ev) => webhookService.dispatch('inventory.low', ev.data));
 
 // OAuth routes (mounted at root for OAuth callbacks)
 if (oauthConfig.enabled) {
   app.use('/auth', oauthRoutes);
 }
 
+// Swagger API documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'DigiTronics V2 API Documentation'
+}));
+
+// JSON endpoint for the raw OpenAPI spec
+app.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
 // Optional route protection (AUTH_REQUIRED=true).
 // Default is OFF: every route stays open exactly as before (legacy behavior).
 if (config.authRequired) {
   app.use('/api/v1', requireAuth);
   app.use('/api/v1', writeRoleGuard('Owner', 'Admin', 'Manager'));
+}
+
+// Conditional requests: ETag on GET responses (behavior: no-op if disabled)
+if (config.etagEnabled) {
+  app.use(etagMiddleware);
 }
 
 app.use('/api/v1/sales', validateResource('sales'), salesRoutes);
@@ -106,7 +164,17 @@ app.use(serverError);
 // is never pending data; flushAll is the stable hook regardless.
 function gracefulShutdown(server, exitCode) {
   logger.info('Shutdown signal received — closing gracefully');
+  // Stop background workers so no timers keep the process alive.
+  try { schedulerService.stop(); } catch (_) {}
+  try { jobService.stopWorker(); } catch (_) {}
+  // finish must run exactly once: the server.close callback and the
+  // 3s fallback timer can both fire, and process.exit is not idempotent.
+  let finished = false;
+  let fallbackTimer = null;
   const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (fallbackTimer) clearTimeout(fallbackTimer);
     try { fileStore.flushAll(); } catch (_) {}
     logger.close();
     process.exit(exitCode || 0);
@@ -114,7 +182,8 @@ function gracefulShutdown(server, exitCode) {
   if (server && server.close) {
     server.close(() => finish());
     // Never hang on keep-alive connections.
-    setTimeout(finish, 3000).unref();
+    fallbackTimer = setTimeout(finish, 3000);
+    if (fallbackTimer.unref) fallbackTimer.unref();
   } else {
     finish();
   }
@@ -131,6 +200,10 @@ if (require.main === module) {
     logger.error('Uncaught exception:', err.message, err.stack);
     process.exit(1);
   });
+
+  // Start background job worker and scheduler (recoverable, in-process).
+  jobService.startWorker({ concurrency: 1 });
+  schedulerService.start();
 
   const server = app.listen(config.port, () => {
     if (config.isProduction && config.jwtSecret === 'dev-secret') {

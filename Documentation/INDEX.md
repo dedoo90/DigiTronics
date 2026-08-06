@@ -17,7 +17,7 @@
 | Phase 23D | HTML Consolidation | RELEASED | `Phase23D/` | phase23d-release |
 | Phase 23E | Database Schema Evolution | RELEASED | `Phase23E/` | phase23e-release |
 | Phase 23F | Performance & Optimization | RELEASED | `Phase23F/` | phase23f-release |
-| Phase 24 | API Foundation & Authentication | GATE C2 COMPLETE — MFA IMPLEMENTED | `Phase24/` | - |
+| Phase 24 | API Foundation & Authentication | GATE C7 PLANNING — JOBS, SCHEDULER, HEALTH, ERROR TRACKING | `Phase24/` | - |
 
 ---
 
@@ -154,6 +154,33 @@
 | MFA Test Report | `Phase24/PHASE24_MFA_TEST_REPORT.md` |
 | MFA Security Report | `Phase24/PHASE24_MFA_SECURITY_REPORT.md` |
 | MFA User Guide | `Phase24/PHASE24_MFA_USER_GUIDE.md` |
+| Gate C3 Implementation Report | `Phase24/PHASE24_GATE_C3_IMPLEMENTATION_REPORT.md` |
+| OpenAPI Validation Report | `Phase24/PHASE24_OPENAPI_VALIDATION_REPORT.md` |
+| API Contract Report | `Phase24/PHASE24_API_CONTRACT_REPORT.md` |
+| API Reference | `Phase24/PHASE24_API_REFERENCE.md` |
+| Gate C4 Implementation Report | `Phase24/PHASE24_GATE_C4_IMPLEMENTATION_REPORT.md` |
+| Gate C4 Security Report | `Phase24/PHASE24_GATE_C4_SECURITY_REPORT.md` |
+| Gate C4 Test Report | `Phase24/PHASE24_GATE_C4_TEST_REPORT.md` |
+| Gate C5 Implementation Report | `Phase24/PHASE24_GATE_C5_IMPLEMENTATION_REPORT.md` |
+| Gate C5 Security Report | `Phase24/PHASE24_GATE_C5_SECURITY_REPORT.md` |
+| Gate C5 Test Report | `Phase24/PHASE24_GATE_C5_TEST_REPORT.md` |
+| Gate C6 Architecture Review | `Phase24/PHASE24_GATE_C6_ARCHITECTURE_REVIEW.md` |
+| Gate C6 Implementation Blueprint | `Phase24/PHASE24_GATE_C6_IMPLEMENTATION_BLUEPRINT.md` |
+| Gate C6 File Change Matrix | `Phase24/PHASE24_GATE_C6_FILE_CHANGE_MATRIX.md` |
+| Gate C6 WBS | `Phase24/PHASE24_GATE_C6_WBS.md` |
+| Gate C6 Test Execution Plan | `Phase24/PHASE24_GATE_C6_TEST_EXECUTION_PLAN.md` |
+| Gate C6 API Changelog | `Phase24/PHASE24_GATE_C6_API_CHANGELOG.md` |
+| Gate C6 Risk Register | `Phase24/PHASE24_GATE_C6_RISK_REGISTER.md` |
+| Gate C6 Release Plan | `Phase24/PHASE24_GATE_C6_RELEASE_PLAN.md` |
+| Gate C6 Approval Report | `Phase24/PHASE24_GATE_C6_APPROVAL_REPORT.md` |
+| Gate C6 Implementation Report | `Phase24/PHASE24_GATE_C6_IMPLEMENTATION_REPORT.md` |
+| Gate C6 Security Report | `Phase24/PHASE24_GATE_C6_SECURITY_REPORT.md` |
+| Gate C6 Test Report | `Phase24/PHASE24_GATE_C6_TEST_REPORT.md` |
+| Gate C7 Architecture Review | `Phase24/PHASE24_GATE_C7_ARCHITECTURE_REVIEW.md` |
+| Gate C7 Implementation Blueprint | `Phase24/PHASE24_GATE_C7_IMPLEMENTATION_BLUEPRINT.md` |
+| Gate C7 File Change Matrix | `Phase24/PHASE24_GATE_C7_FILE_CHANGE_MATRIX.md` |
+| Gate C7 Risk Register | `Phase24/PHASE24_GATE_C7_RISK_REGISTER.md` |
+| Gate C7 Approval Report | `Phase24/PHASE24_GATE_C7_APPROVAL_REPORT.md` |
 
 ---
 

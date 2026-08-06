@@ -2,8 +2,9 @@
 ## DigiTronics V2 Enterprise Risk Register
 
 **Date:** 2026-08-05
-**Status:** REVISED - Post Gate B
+**Status:** APPROVED
 **Phase:** 24 - API Foundation & Authentication
+**Authority:** ADR-001, ADR-002
 
 ---
 
@@ -21,58 +22,166 @@
 | Low | Medium | Low |
 | Low | Low | Low |
 
-### 1.2 Revised Scope Risks
-
-Phase 24 scope has been revised to focus on **gaps only** (OAuth2, MFA, API docs, monitoring). Risks related to implementing existing components have been removed.
-
 ---
 
-## 2. NEW RISKS (Phase 24 Scope)
+## 2. ADR-001 ROLE MODEL RISKS
 
-### 2.1 Risk: OAuth2 Integration Complexity
+### 2.1 Role Migration Risk
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | NR-001 |
+| **ID** | ADR1-001 |
+| **Probability** | Low |
+| **Impact** | High |
+| **Risk Level** | Medium |
+| **Description** | Role alias mapping may cause unexpected behavior |
+| **Mitigation** | Thorough testing, backward compatibility validation |
+| **Rollback** | Revert to original 5 roles |
+| **Owner** | Backend Team |
+
+### 2.2 Permission Escalation Risk
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | ADR1-002 |
+| **Probability** | Low |
+| **Impact** | Critical |
+| **Risk Level** | Medium |
+| **Description** | Users may gain unintended permissions during migration |
+| **Mitigation** | Permission validation, inheritance limits |
+| **Rollback** | Restore original permissions |
+| **Owner** | Security Team |
+
+### 2.3 Backward Compatibility Risk
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | ADR1-003 |
 | **Probability** | Medium |
 | **Impact** | High |
 | **Risk Level** | High |
-| **Description** | OAuth2 integration with multiple providers (Google, GitHub) could be complex |
-| **Mitigation** | Use established libraries (passport.js), follow provider documentation |
-| **Rollback** | Disable OAuth2, keep existing auth |
+| **Description** | Existing integrations may break with new roles |
+| **Mitigation** | Alias mapping, API compatibility testing |
+| **Rollback** | Keep both systems temporarily |
 | **Owner** | Backend Team |
 
-### 2.2 Risk: MFA User Adoption
+### 2.4 Documentation Drift Risk
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | NR-002 |
+| **ID** | ADR1-004 |
+| **Probability** | Medium |
+| **Impact** | Medium |
+| **Risk Level** | Medium |
+| **Description** | Documentation may not reflect actual role model |
+| **Mitigation** | Automated validation, regular reviews |
+| **Rollback** | N/A |
+| **Owner** | Architecture Team |
+
+---
+
+## 3. ADR-002 TENANT MODEL RISKS
+
+### 3.1 Tenant Isolation Breach Risk
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | ADR2-001 |
+| **Probability** | Low |
+| **Impact** | Critical |
+| **Risk Level** | High |
+| **Description** | Data may leak between tenants |
+| **Mitigation** | Middleware validation, isolation tests |
+| **Rollback** | Disable tenant isolation, restore single-tenant |
+| **Owner** | Security Team |
+
+### 3.2 Performance Degradation Risk
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | ADR2-002 |
+| **Probability** | Medium |
+| **Impact** | Medium |
+| **Risk Level** | Medium |
+| **Description** | Tenant filtering may slow queries |
+| **Mitigation** | Query optimization, indexing |
+| **Rollback** | Remove tenant filters |
+| **Owner** | Backend Team |
+
+### 3.3 Data Migration Risk
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | ADR2-003 |
+| **Probability** | Medium |
+| **Impact** | High |
+| **Risk Level** | High |
+| **Description** | Existing data may be corrupted during migration |
+| **Mitigation** | Backup, validation, rollback plan |
+| **Rollback** | Restore from backup |
+| **Owner** | Backend Team |
+
+### 3.4 Hierarchy Violation Risk
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | ADR2-004 |
+| **Probability** | Low |
+| **Impact** | Medium |
+| **Risk Level** | Low |
+| **Description** | Tenant → Branch → Warehouse hierarchy may be violated |
+| **Mitigation** | Validation, constraints |
+| **Rollback** | Remove hierarchy constraints |
+| **Owner** | Backend Team |
+
+---
+
+## 4. PHASE 24 SCOPE RISKS
+
+### 4.1 OAuth2 Integration Complexity
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | P24-001 |
+| **Probability** | Medium |
+| **Impact** | High |
+| **Risk Level** | High |
+| **Description** | OAuth2 integration with multiple providers could be complex |
+| **Mitigation** | Use established libraries (passport.js) |
+| **Rollback** | Disable OAuth2, keep existing auth |
+| **Owner** | Backend Team |
+
+### 4.2 MFA User Adoption
+
+| Aspect | Detail |
+|--------|--------|
+| **ID** | P24-002 |
 | **Probability** | Medium |
 | **Impact** | Medium |
 | **Risk Level** | Medium |
 | **Description** | Users may resist MFA adoption |
-| **Mitigation** | Progressive rollout, optional initially, clear communication |
+| **Mitigation** | Progressive rollout, optional initially |
 | **Rollback** | Make MFA optional |
 | **Owner** | Product Team |
 
-### 2.3 Risk: API Documentation Drift
+### 4.3 API Documentation Drift
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | NR-003 |
+| **ID** | P24-003 |
 | **Probability** | Low |
 | **Impact** | Medium |
 | **Risk Level** | Low |
 | **Description** | OpenAPI spec may drift from actual API |
-| **Mitigation** | Automated generation from code, CI/CD validation |
+| **Mitigation** | Automated generation, CI/CD validation |
 | **Rollback** | Manual documentation |
 | **Owner** | Backend Team |
 
-### 2.4 Risk: Monitoring Performance Overhead
+### 4.4 Monitoring Performance Overhead
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | NR-004 |
+| **ID** | P24-004 |
 | **Probability** | Low |
 | **Impact** | Low |
 | **Risk Level** | Low |
@@ -81,24 +190,24 @@ Phase 24 scope has been revised to focus on **gaps only** (OAuth2, MFA, API docs
 | **Rollback** | Disable monitoring |
 | **Owner** | DevOps Team |
 
-### 2.5 Risk: Webhook Reliability
+### 4.5 Webhook Reliability
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | NR-005 |
+| **ID** | P24-005 |
 | **Probability** | Medium |
 | **Impact** | Medium |
 | **Risk Level** | Medium |
 | **Description** | Webhooks may fail or be delayed |
-| **Mitigation** | Retry logic, dead letter queue, monitoring |
+| **Mitigation** | Retry logic, dead letter queue |
 | **Rollback** | Disable webhooks |
 | **Owner** | Backend Team |
 
-### 2.6 Risk: API Key Security
+### 4.6 API Key Security
 
 | Aspect | Detail |
 |--------|--------|
-| **ID** | NR-006 |
+| **ID** | P24-006 |
 | **Probability** | Low |
 | **Impact** | High |
 | **Risk Level** | Medium |
@@ -109,50 +218,50 @@ Phase 24 scope has been revised to focus on **gaps only** (OAuth2, MFA, API docs
 
 ---
 
-## 3. REMOVED RISKS (No Longer Applicable)
+## 5. REMOVED RISKS
 
-### 3.1 Risks Removed Due to Existing Implementation
+### 5.1 Risks No Longer Applicable
 
 | Risk | Reason Removed |
 |------|----------------|
-| JWT implementation vulnerabilities | JWT already implemented and working |
-| Database performance degradation | JSON file persistence already working |
+| JWT implementation vulnerabilities | JWT already implemented |
+| Database performance degradation | JSON persistence already working |
 | Redis cache inconsistency | Redis not in scope |
 | Migration failure | No migration needed for existing system |
-| Authentication migration failure | Auth already migrated to JWT |
+| Authentication migration failure | Auth already migrated |
 | Plaintext password risks | bcrypt already implemented |
 | No backend API risks | Backend already exists |
 | No PWA risks | PWA already implemented |
 
 ---
 
-## 4. RISK SUMMARY
+## 6. RISK SUMMARY
 
-### 4.1 Risk Distribution
+### 6.1 Risk Distribution
 
 | Risk Level | Count | Percentage |
 |------------|-------|------------|
 | Critical | 0 | 0% |
-| High | 1 | 17% |
-| Medium | 4 | 67% |
-| Low | 1 | 17% |
-| **Total** | **6** | **100%** |
+| High | 3 | 25% |
+| Medium | 6 | 50% |
+| Low | 3 | 25% |
+| **Total** | **12** | **100%** |
 
-### 4.2 Top Risks
+### 6.2 Top Risks
 
 | ID | Risk | Level | Mitigation |
 |----|------|-------|------------|
-| NR-001 | OAuth2 integration complexity | High | Use established libraries |
-| NR-002 | MFA user adoption | Medium | Progressive rollout |
-| NR-005 | Webhook reliability | Medium | Retry logic, monitoring |
-| NR-006 | API key security | Medium | Secure storage, rotation |
-| NR-003 | API documentation drift | Low | Automated generation |
+| ADR1-003 | Backward compatibility | High | Alias mapping, testing |
+| ADR2-001 | Tenant isolation breach | High | Middleware, tests |
+| ADR2-003 | Data migration | High | Backup, validation |
+| P24-001 | OAuth2 complexity | High | Established libraries |
+| ADR1-002 | Permission escalation | Medium | Validation, limits |
 
 ---
 
-## 5. RISK MONITORING
+## 7. RISK MONITORING
 
-### 5.1 Risk Review
+### 7.1 Risk Review
 
 | Frequency | Action |
 |-----------|--------|
@@ -160,7 +269,7 @@ Phase 24 scope has been revised to focus on **gaps only** (OAuth2, MFA, API docs
 | Weekly | Review all risks |
 | Monthly | Update risk register |
 
-### 5.2 Risk Escalation
+### 7.2 Risk Escalation
 
 | Level | Action |
 |-------|--------|
@@ -171,70 +280,46 @@ Phase 24 scope has been revised to focus on **gaps only** (OAuth2, MFA, API docs
 
 ---
 
-## 6. RISK MITIGATION STRATEGIES
+## 8. CONTINGENCY PLANS
 
-### 6.1 OAuth2 Mitigation
+### 8.1 Role Migration Failure
 
-| Strategy | Implementation |
-|----------|----------------|
-| Use established libraries | passport.js, provider-specific strategies |
-| Follow provider documentation | Google, GitHub official guides |
-| Test thoroughly | Integration tests for each provider |
-| Fallback | Keep existing auth if OAuth2 fails |
+| Trigger | Action |
+|---------|--------|
+| Users cannot login | Revert to original roles |
+| Permissions incorrect | Restore original permissions |
+| API breaking changes | Keep both systems temporarily |
 
-### 6.2 MFA Mitigation
+### 8.2 Tenant Isolation Failure
 
-| Strategy | Implementation |
-|----------|----------------|
-| Progressive rollout | Start with opt-in |
-| User education | Clear instructions, FAQs |
-| Backup codes | Provide backup options |
-| Support | Helpdesk for issues |
+| Trigger | Action |
+|---------|--------|
+| Data leakage | Disable tenant isolation |
+| Performance issues | Optimize queries |
+| Hierarchy violations | Remove constraints |
 
-### 6.3 API Documentation Mitigation
+### 8.3 Phase 24 Feature Failure
 
-| Strategy | Implementation |
-|----------|----------------|
-| Automated generation | swagger-jsdoc from code |
-| CI/CD validation | Check spec on every build |
-| Regular reviews | Monthly documentation review |
-| Version control | Track spec changes |
+| Trigger | Action |
+|---------|--------|
+| OAuth2 failure | Disable OAuth2, keep existing auth |
+| MFA failure | Make MFA optional |
+| Webhook failure | Disable webhooks |
 
 ---
 
-## 7. CONTINGENCY PLANS
-
-### 7.1 OAuth2 Failure
-
-| Trigger | Action |
-|---------|--------|
-| Provider outage | Fallback to existing auth |
-| Integration failure | Disable OAuth2, investigate |
-| Security breach | Revoke tokens, investigate |
-
-### 7.2 MFA Failure
-
-| Trigger | Action |
-|---------|--------|
-| User lockout | Admin reset, backup codes |
-| System outage | Disable MFA temporarily |
-| Security breach | Force re-enrollment |
-
-### 7.3 Webhook Failure
-
-| Trigger | Action |
-|---------|--------|
-| Delivery failure | Retry with exponential backoff |
-| Queue overflow | Scale queue workers |
-| Security breach | Revoke webhook secrets |
-
----
-
-## 8. RISK REGISTER UPDATE HISTORY
+## 9. RISK REGISTER UPDATE HISTORY
 
 | Date | Change | Reason |
 |------|--------|--------|
 | 2026-08-05 | Initial creation | Phase 24 planning |
-| 2026-08-05 | Revised | Post Gate B correction |
-| - | Removed 8 risks | No longer applicable |
-| - | Added 6 risks | New scope risks |
+| 2026-08-05 | Added ADR-001 risks | Role model decisions |
+| 2026-08-05 | Added ADR-002 risks | Tenant model decisions |
+| 2026-08-05 | Removed 8 risks | No longer applicable |
+| 2026-08-05 | Added 6 Phase 24 risks | New scope risks |
+
+---
+
+**Document Generated:** 2026-08-05
+**Status:** APPROVED
+**Authority:** ADR-001, ADR-002

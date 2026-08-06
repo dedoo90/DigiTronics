@@ -66,4 +66,19 @@ function loginRateLimiter() {
   });
 }
 
-module.exports = { sanitizeBody, jsonParseErrorHandler, apiRateLimiter, loginRateLimiter };
+// Per-API-key rate limiter. Keyed by the API key ID so each key gets its own
+// quota. Falls back to IP if no key is present (should not happen in practice).
+function apiKeyRateLimiter(max) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: max || 500,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator(req) {
+      return (req.apiKey && req.apiKey.id) ? req.apiKey.id : (req.ip || 'unknown');
+    },
+    message: { success: false, message: 'API key rate limit exceeded, please try again later', data: null }
+  });
+}
+
+module.exports = { sanitizeBody, jsonParseErrorHandler, apiRateLimiter, loginRateLimiter, apiKeyRateLimiter };

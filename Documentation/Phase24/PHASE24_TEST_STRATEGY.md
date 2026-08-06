@@ -2,8 +2,9 @@
 ## DigiTronics V2 Enterprise Test Strategy
 
 **Date:** 2026-08-05
-**Status:** REVISED - Aligned with Verified Architecture
+**Status:** APPROVED
 **Phase:** 24 - API Foundation & Authentication
+**Authority:** ADR-001, ADR-002
 
 ---
 
@@ -75,281 +76,279 @@
 | shutdown.test.js | Graceful shutdown | EXISTS |
 | helpers.test.js | Test utilities | EXISTS |
 
-### 2.2 Test Helpers
+---
 
-| Helper | Purpose | Status |
-|--------|---------|--------|
-| authHelper.js | Authentication utilities | EXISTS |
-| cleanup.js | Test cleanup | EXISTS |
-| testData.js | Test data generation | EXISTS |
-| testServer.js | Test server setup | EXISTS |
+## 3. ADR-001 ROLE MODEL TESTS
+
+### 3.1 Backward Compatibility Tests
+
+```javascript
+describe('ADR-001 Backward Compatibility', () => {
+  it('should accept Owner role as Super Admin', async () => {
+    const user = { role: 'Owner' };
+    const effectiveRole = getEffectiveRole(user.role);
+    expect(effectiveRole).toBe('Super Admin');
+  });
+
+  it('should accept Admin role as Tenant Admin', async () => {
+    const user = { role: 'Admin' };
+    const effectiveRole = getEffectiveRole(user.role);
+    expect(effectiveRole).toBe('Tenant Admin');
+  });
+
+  it('should keep Manager role unchanged', async () => {
+    const user = { role: 'Manager' };
+    const effectiveRole = getEffectiveRole(user.role);
+    expect(effectiveRole).toBe('Manager');
+  });
+
+  it('should keep Sales role unchanged', async () => {
+    const user = { role: 'Sales' };
+    const effectiveRole = getEffectiveRole(user.role);
+    expect(effectiveRole).toBe('Sales');
+  });
+
+  it('should keep Viewer role unchanged', async () => {
+    const user = { role: 'Viewer' };
+    const effectiveRole = getEffectiveRole(user.role);
+    expect(effectiveRole).toBe('Viewer');
+  });
+});
+```
+
+### 3.2 Owner Alias Tests
+
+```javascript
+describe('ADR-001 Owner Alias', () => {
+  it('should allow Owner to access all resources', async () => {
+    const user = { role: 'Owner' };
+    const hasPermission = checkPermission(user, 'products', 'read');
+    expect(hasPermission).toBe(true);
+  });
+
+  it('should allow Owner to delete resources', async () => {
+    const user = { role: 'Owner' };
+    const hasPermission = checkPermission(user, 'products', 'delete');
+    expect(hasPermission).toBe(true);
+  });
+
+  it('should allow Owner to manage users', async () => {
+    const user = { role: 'Owner' };
+    const hasPermission = checkPermission(user, 'users', 'write');
+    expect(hasPermission).toBe(true);
+  });
+});
+```
+
+### 3.3 Admin Alias Tests
+
+```javascript
+describe('ADR-001 Admin Alias', () => {
+  it('should allow Admin to access tenant resources', async () => {
+    const user = { role: 'Admin', tenant_id: 'tenant-1' };
+    const hasPermission = checkPermission(user, 'products', 'read');
+    expect(hasPermission).toBe(true);
+  });
+
+  it('should restrict Admin from managing tenants', async () => {
+    const user = { role: 'Admin', tenant_id: 'tenant-1' };
+    const hasPermission = checkPermission(user, 'tenants', 'write');
+    expect(hasPermission).toBe(false);
+  });
+});
+```
+
+### 3.4 New Role Tests
+
+```javascript
+describe('ADR-001 New Roles', () => {
+  it('should create Warehouse role with correct permissions', async () => {
+    const role = await createRole('Warehouse');
+    expect(role.permissions).toContain('products:read');
+    expect(role.permissions).toContain('inventory:read');
+    expect(role.permissions).toContain('inventory:write');
+  });
+
+  it('should create Accountant role with correct permissions', async () => {
+    const role = await createRole('Accountant');
+    expect(role.permissions).toContain('invoices:read');
+    expect(role.permissions).toContain('accounts:read');
+    expect(role.permissions).toContain('reports:export');
+  });
+
+  it('should create Support role with correct permissions', async () => {
+    const role = await createRole('Support');
+    expect(role.permissions).toContain('products:read');
+    expect(role.permissions).toContain('customers:read');
+    expect(role.permissions).not.toContain('products:write');
+  });
+});
+```
+
+### 3.5 Permission Inheritance Tests
+
+```javascript
+describe('ADR-001 Permission Inheritance', () => {
+  it('should inherit permissions from parent role', async () => {
+    const user = { role: 'Tenant Admin' };
+    const hasPermission = checkPermission(user, 'products', 'read');
+    expect(hasPermission).toBe(true);
+  });
+
+  it('should not exceed parent permissions', async () => {
+    const user = { role: 'Viewer' };
+    const hasPermission = checkPermission(user, 'products', 'write');
+    expect(hasPermission).toBe(false);
+  });
+});
+```
 
 ---
 
-## 3. UNIT TESTS
+## 4. ADR-002 TENANT MODEL TESTS
 
-### 3.1 Service Tests
+### 4.1 Tenant Isolation Tests
 
 ```javascript
-// tests/unit/services/auth.service.test.js
-describe('AuthService', () => {
-  describe('login', () => {
-    it('should return tokens for valid credentials', async () => {
-      // Arrange
-      const email = 'test@example.com';
-      const password = 'ValidPassword123!';
-      
-      // Act
-      const result = await authService.login(email, password);
-      
-      // Assert
-      expect(result).toHaveProperty('access_token');
-      expect(result).toHaveProperty('refresh_token');
-      expect(result.user.email).toBe(email);
-    });
+describe('ADR-002 Tenant Isolation', () => {
+  it('should isolate data between tenants', async () => {
+    const tenant1User = { tenant_id: 'tenant-1' };
+    const tenant2User = { tenant_id: 'tenant-2' };
     
-    it('should throw error for invalid credentials', async () => {
-      // Arrange
-      const email = 'test@example.com';
-      const password = 'WrongPassword';
-      
-      // Act & Assert
-      await expect(authService.login(email, password))
-        .rejects.toThrow('Invalid credentials');
-    });
+    const data1 = await getData(tenant1User);
+    const data2 = await getData(tenant2User);
+    
+    expect(data1).not.toEqual(data2);
+  });
+
+  it('should prevent cross-tenant access', async () => {
+    const tenant1User = { tenant_id: 'tenant-1' };
+    const tenant2Data = { tenant_id: 'tenant-2' };
+    
+    const hasAccess = checkTenantAccess(tenant1User, tenant2Data);
+    expect(hasAccess).toBe(false);
   });
 });
 ```
 
-### 3.2 Utility Tests
+### 4.2 Branch Isolation Tests
 
 ```javascript
-// tests/unit/utils/jwt.test.js
-describe('JWT Utils', () => {
-  describe('signAccessToken', () => {
-    it('should generate valid access token', () => {
-      // Arrange
-      const payload = { sub: 'user-123', role: 'admin' };
-      
-      // Act
-      const token = signAccessToken(payload);
-      
-      // Assert
-      expect(token).toBeDefined();
-      expect(typeof token).toBe('string');
-    });
-  });
-  
-  describe('verifyAccessToken', () => {
-    it('should verify valid token', () => {
-      // Arrange
-      const payload = { sub: 'user-123', role: 'admin' };
-      const token = signAccessToken(payload);
-      
-      // Act
-      const decoded = verifyAccessToken(token);
-      
-      // Assert
-      expect(decoded.sub).toBe('user-123');
-      expect(decoded.role).toBe('admin');
-    });
+describe('ADR-002 Branch Isolation', () => {
+  it('should isolate data between branches', async () => {
+    const branch1User = { branch_id: 'branch-1', tenant_id: 'tenant-1' };
+    const branch2User = { branch_id: 'branch-2', tenant_id: 'tenant-1' };
     
-    it('should throw on invalid token', () => {
-      // Arrange
-      const invalidToken = 'invalid.token.here';
-      
-      // Act & Assert
-      expect(() => verifyAccessToken(invalidToken)).toThrow();
-    });
+    const data1 = await getInventoryData(branch1User);
+    const data2 = await getInventoryData(branch2User);
+    
+    expect(data1).not.toEqual(data2);
   });
 });
 ```
 
-### 3.3 Middleware Tests
+### 4.3 Warehouse Isolation Tests
 
 ```javascript
-// tests/unit/middleware/auth.test.js
-describe('Auth Middleware', () => {
-  describe('requireAuth', () => {
-    it('should pass with valid token', async () => {
-      // Arrange
-      const req = { headers: { authorization: `Bearer ${validToken}` } };
-      const res = {};
-      const next = jest.fn();
-      
-      // Act
-      await requireAuth(req, res, next);
-      
-      // Assert
-      expect(next).toHaveBeenCalled();
-      expect(req.user).toBeDefined();
-    });
+describe('ADR-002 Warehouse Isolation', () => {
+  it('should isolate stock between warehouses', async () => {
+    const warehouse1User = { warehouse_id: 'wh-1', branch_id: 'branch-1' };
+    const warehouse2User = { warehouse_id: 'wh-2', branch_id: 'branch-1' };
     
-    it('should reject without token', async () => {
-      // Arrange
-      const req = { headers: {} };
-      const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
-      const next = jest.fn();
-      
-      // Act
-      await requireAuth(req, res, next);
-      
-      // Assert
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(next).not.toHaveBeenCalled();
-    });
+    const stock1 = await getStockData(warehouse1User);
+    const stock2 = await getStockData(warehouse2User);
+    
+    expect(stock1).not.toEqual(stock2);
+  });
+});
+```
+
+### 4.4 Hierarchy Tests
+
+```javascript
+describe('ADR-002 Hierarchy', () => {
+  it('should enforce Tenant → Branch → Warehouse hierarchy', async () => {
+    const warehouse = { branch_id: 'branch-1', tenant_id: 'tenant-1' };
+    const branch = { tenant_id: 'tenant-1' };
+    
+    expect(warehouse.tenant_id).toBe(branch.tenant_id);
+  });
+
+  it('should prevent orphaned branches', async () => {
+    const branch = { tenant_id: null };
+    
+    const isValid = validateBranch(branch);
+    expect(isValid).toBe(false);
   });
 });
 ```
 
 ---
 
-## 4. INTEGRATION TESTS
+## 5. INTEGRATION TESTS
 
-### 4.1 API Endpoint Tests
+### 5.1 Authentication Integration
 
 ```javascript
-// tests/integration/auth/login.test.js
-describe('POST /api/v1/auth/login', () => {
-  it('should return 200 for valid credentials', async () => {
-    // Arrange
-    const payload = {
-      email: 'test@example.com',
-      password: 'ValidPassword123!'
-    };
-    
-    // Act
+describe('Authentication Integration', () => {
+  it('should complete full login flow with role alias', async () => {
     const response = await request(app)
       .post('/api/v1/auth/login')
-      .send(payload);
+      .send({ email: 'owner@acme.com', password: '***' });
     
-    // Assert
     expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-    expect(response.body.data).toHaveProperty('access_token');
-  });
-  
-  it('should return 401 for invalid credentials', async () => {
-    // Arrange
-    const payload = {
-      email: 'test@example.com',
-      password: 'WrongPassword'
-    };
-    
-    // Act
-    const response = await request(app)
-      .post('/api/v1/auth/login')
-      .send(payload);
-    
-    // Assert
-    expect(response.status).toBe(401);
-    expect(response.body.success).toBe(false);
+    expect(response.body.data.user.role).toBe('Super Admin');
   });
 });
 ```
 
-### 4.2 File Persistence Tests
+### 5.2 Authorization Integration
 
 ```javascript
-// tests/integration/utils/fileStore.test.js
-describe('FileStore', () => {
-  describe('read', () => {
-    it('should read existing file', async () => {
-      // Arrange
-      const filename = 'test.json';
-      
-      // Act
-      const data = await fileStore.read(filename);
-      
-      // Assert
-      expect(data).toBeDefined();
-    });
+describe('Authorization Integration', () => {
+  it('should enforce role-based access', async () => {
+    const token = await getToken('Viewer');
     
-    it('should return null for non-existent file', async () => {
-      // Arrange
-      const filename = 'nonexistent.json';
-      
-      // Act
-      const data = await fileStore.read(filename);
-      
-      // Assert
-      expect(data).toBeNull();
-    });
+    const response = await request(app)
+      .post('/api/v1/products')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Test Product' });
+    
+    expect(response.status).toBe(403);
   });
-  
-  describe('write', () => {
-    it('should write data atomically', async () => {
-      // Arrange
-      const filename = 'test-write.json';
-      const data = { test: 'data' };
-      
-      // Act
-      await fileStore.write(filename, data);
-      
-      // Assert
-      const readData = await fileStore.read(filename);
-      expect(readData).toEqual(data);
-    });
+});
+```
+
+### 5.3 Tenant Integration
+
+```javascript
+describe('Tenant Integration', () => {
+  it('should scope data to tenant', async () => {
+    const token = await getToken('Manager', 'tenant-1');
+    
+    const response = await request(app)
+      .get('/api/v1/products')
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(response.body.data.every(p => p.tenant_id === 'tenant-1')).toBe(true);
   });
 });
 ```
 
 ---
 
-## 5. E2E TESTS
+## 6. E2E TESTS
 
-### 5.1 Critical User Flows
+### 6.1 Critical User Flows
 
 ```javascript
-// tests/e2e/auth-flow.spec.js
-describe('Authentication Flow', () => {
+describe('E2E Authentication Flow', () => {
   it('should complete full login flow', async ({ page }) => {
-    // 1. Navigate to login
     await page.goto('http://localhost:3000');
-    
-    // 2. Enter credentials
     await page.fill('#loginUser', 'test@example.com');
     await page.fill('#loginPass', 'ValidPassword123!');
-    
-    // 3. Click login
     await page.click('#loginBtn');
-    
-    // 4. Verify redirect to dashboard
     await expect(page).toHaveURL(/.*dashboard/);
-  });
-});
-```
-
----
-
-## 6. PERFORMANCE TESTS
-
-### 6.1 Load Tests
-
-```javascript
-// tests/performance/load.test.js
-describe('API Performance', () => {
-  it('should handle 100 concurrent requests', async () => {
-    // Arrange
-    const requests = [];
-    
-    // Act
-    for (let i = 0; i < 100; i++) {
-      requests.push(
-        request(app)
-          .get('/api/v1/health')
-      );
-    }
-    
-    const startTime = Date.now();
-    const responses = await Promise.all(requests);
-    const duration = Date.now() - startTime;
-    
-    // Assert
-    expect(duration).toBeLessThan(5000);
-    responses.forEach(response => {
-      expect(response.status).toBe(200);
-    });
   });
 });
 ```
@@ -358,135 +357,101 @@ describe('API Performance', () => {
 
 ## 7. SECURITY TESTS
 
-### 7.1 Authentication Security
+### 7.1 Brute Force Protection
 
 ```javascript
-// tests/security/auth.test.js
-describe('Authentication Security', () => {
-  it('should prevent brute force attacks', async () => {
-    // Arrange
-    const payload = {
-      email: 'test@example.com',
-      password: 'WrongPassword'
-    };
-    
-    // Act
-    const responses = [];
+describe('Brute Force Protection', () => {
+  it('should block after 5 failed attempts', async () => {
     for (let i = 0; i < 6; i++) {
-      responses.push(
-        await request(app)
-          .post('/api/v1/auth/login')
-          .send(payload)
-      );
+      await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'test@example.com', password: 'Wrong' });
     }
     
-    // Assert
-    expect(responses[5].status).toBe(429);
+    const response = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: 'test@example.com', password: 'Wrong' });
+    
+    expect(response.status).toBe(429);
+  });
+});
+```
+
+### 7.2 Tenant Escape Attempts
+
+```javascript
+describe('Tenant Escape', () => {
+  it('should prevent cross-tenant data access', async () => {
+    const token = await getToken('Manager', 'tenant-1');
+    
+    const response = await request(app)
+      .get('/api/v1/products?tenant_id=tenant-2')
+      .set('Authorization', `Bearer ${token}`);
+    
+    expect(response.body.data.every(p => p.tenant_id === 'tenant-1')).toBe(true);
   });
 });
 ```
 
 ---
 
-## 8. TEST AUTOMATION
+## 8. PERFORMANCE TESTS
 
-### 8.1 CI/CD Integration
+### 8.1 Load Tests
+
+```javascript
+describe('API Performance', () => {
+  it('should handle 100 concurrent requests', async () => {
+    const requests = [];
+    for (let i = 0; i < 100; i++) {
+      requests.push(request(app).get('/api/v1/health'));
+    }
+    
+    const startTime = Date.now();
+    const responses = await Promise.all(requests);
+    const duration = Date.now() - startTime;
+    
+    expect(duration).toBeLessThan(5000);
+    responses.forEach(r => expect(r.status).toBe(200));
+  });
+});
+```
+
+---
+
+## 9. TEST AUTOMATION
+
+### 9.1 CI/CD Integration
 
 ```yaml
-# .github/workflows/test.yml
 name: Tests
-
 on: [push, pull_request]
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22'
-      
       - name: Install dependencies
         run: npm ci
         working-directory: ./backend
-      
       - name: Run unit tests
         run: npm run test:unit
         working-directory: ./backend
-      
       - name: Run integration tests
         run: npm run test:integration
         working-directory: ./backend
-      
       - name: Run security tests
         run: npm run test:security
         working-directory: ./backend
 ```
 
-### 8.2 Test Scripts
-
-```json
-{
-  "scripts": {
-    "test": "jest",
-    "test:unit": "jest --testPathPattern=unit",
-    "test:integration": "jest --testPathPattern=integration",
-    "test:e2e": "jest --testPathPattern=e2e",
-    "test:security": "jest --testPathPattern=security",
-    "test:performance": "jest --testPathPattern=performance",
-    "test:coverage": "jest --coverage",
-    "test:watch": "jest --watch"
-  }
-}
-```
-
 ---
 
-## 9. TEST ENVIRONMENT
-
-### 9.1 Environment Setup
-
-| Component | Configuration |
-|-----------|---------------|
-| Data Persistence | JSON files (test directory) |
-| JWT Secret | Test secret |
-| Rate Limiting | Disabled for tests |
-| Logging | Suppressed |
-
-### 9.2 Test Data
-
-```javascript
-// tests/fixtures/users.fixture.js
-module.exports = {
-  admin: {
-    email: 'admin@test.com',
-    name: 'Admin User',
-    role: 'Admin'
-  },
-  viewer: {
-    email: 'viewer@test.com',
-    name: 'Viewer User',
-    role: 'Viewer'
-  }
-};
-```
-
----
-
-## 10. REPORTING
-
-### 10.1 Test Reports
-
-| Report | Tool | Output |
-|--------|------|--------|
-| Coverage | Jest | HTML/LCOV |
-| Results | Jest | JUnit XML |
-| Security | Jest | Console |
-
-### 10.2 Coverage Thresholds
+## 10. COVERAGE THRESHOLDS
 
 | Metric | Global | Per-file |
 |--------|--------|----------|
@@ -498,4 +463,5 @@ module.exports = {
 ---
 
 **Document Generated:** 2026-08-05
-**Status:** REVISED - Aligned with Verified Architecture
+**Status:** APPROVED
+**Authority:** ADR-001, ADR-002

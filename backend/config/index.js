@@ -18,7 +18,14 @@ module.exports = {
   // API security
   corsOrigins: process.env.CORS_ORIGINS || '',
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX, 10) || 1000,
+  apiKeyRateLimitMax: parseInt(process.env.API_KEY_RATE_LIMIT_MAX, 10) || 500,
   bodyLimit: process.env.BODY_LIMIT || '10mb',
+
+  // Observability / integration
+  metricsEnabled: process.env.METRICS_ENABLED !== 'false',
+  etagEnabled: process.env.ETAG_ENABLED !== 'false',
+  webhookTimeout: parseInt(process.env.WEBHOOK_TIMEOUT, 10) || 10000,
+  webhookMaxRetries: parseInt(process.env.WEBHOOK_MAX_RETRIES, 10) || 3,
 
   // Logging
   logFile: process.env.LOG_FILE || '',

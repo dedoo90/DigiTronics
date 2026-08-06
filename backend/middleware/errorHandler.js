@@ -1,5 +1,6 @@
 const logger = require('../utils/logger');
 const { error: errorResponse } = require('../utils/apiResponse');
+const errorTracker = require('../services/errorTracker.service');
 
 const isProd = (process.env.NODE_ENV || 'development') === 'production';
 
@@ -9,6 +10,17 @@ function notFound(req, res, next) {
 
 function serverError(err, req, res, next) {
   logger.error('Unhandled error:', err.message, err.stack);
+  // Additive: persist a deduplicated error issue for the error tracker.
+  try {
+    errorTracker.capture(err, {
+      route: req.originalUrl,
+      method: req.method,
+      userId: req.user ? req.user.id : null,
+      level: 'error'
+    });
+  } catch (_) {
+    // Never let error tracking itself break error handling.
+  }
   // Never leak internals in production; full message only in development.
   errorResponse(res, isProd ? 'Internal Server Error' : (err.message || 'Internal Server Error'), 500);
 }
